@@ -1,0 +1,267 @@
+import React, {useEffect, useState} from 'react';
+import {useMCP} from '../../hooks/useMCP.js';
+import CardWrapper from '../common/CardWrapper.jsx';
+import '../../styles/policy-dashboard.css';
+
+// ── 月份名称 ──
+const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+// ── 从 timeline JSON 解析 ──
+function parseTimeline(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export default function PolicyDashboard() {
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem('policyFavorites');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  const [hoverCard, setHoverCard] = useState({ show: false, x: 0, y: 0, policy: null, keywords: [] });
+  const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
+
+  // ── 动态数据源 ──
+  const stats = useMCP('policy_stats');
+  const timeline = useMCP('policy_timeline', { year: timelineYear });
+  const search = useMCP('policy_search', { limit: 30, year: timelineYear });
+
+  const tl = parseTimeline(timeline.data);
+  const realStats = stats.data || '';
+  const realDocs = (search.data || '').split('\n').slice(1).filter(Boolean);
+
+  // ── 十五五进度 ──
+  const now = new Date();
+  const planStart = tl ? new Date(tl.five_year.start, 0, 1) : new Date(2026, 0, 1);
+  const planEnd = tl ? new Date(tl.five_year.end, 11, 31) : new Date(2030, 11, 31);
+  const totalDays = (planEnd - planStart) / (1000 * 60 * 60 * 24);
+  const elapsedDays = (now - planStart) / (1000 * 60 * 60 * 24);
+  const progress = Math.max(0, Math.min(100, (elapsedDays / totalDays) * 100));
+  const remainingMs = planEnd - now;
+  const rDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+  const rYears = Math.floor(rDays / 365);
+  const rMonths = Math.floor((rDays % 365) / 30);
+  const rFinalDays = rDays % 30;
+
+  const stageName = tl?.five_year?.stage || '';
+
+  useEffect(() => {
+    localStorage.setItem('policyFavorites', JSON.stringify([...favorites]));
+  }, [favorites]);
+
+  const toggleFav = (e, key) => {
+    e.stopPropagation();
+    setFavorites(prev => {
+      const n = new Set(prev);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  };
+
+  // ── 悬浮卡片 ──
+  const showHover = (e, policy, keywords) => {
+    setHoverCard({ show: true, x: e.clientX + 12, y: e.clientY - 16, policy, keywords: keywords || [] });
+  };
+  const moveHover = (e) => { if (hoverCard.show) setHoverCard(p => ({ ...p, x: e.clientX + 12, y: e.clientY - 16 })); };
+  const hideHover = () => setHoverCard(p => ({ ...p, show: false }));
+
+  // ── 月度节点渲染（从真实数据动态生成） ──
+  const renderMonthNode = (monthIdx) => {
+    const monthData = tl?.months?.[monthIdx];
+    const isQuarter = [2, 5, 8, 11].includes(monthIdx);
+    const hasData = monthData && monthData.count > 0;
+
+    // 无数据月份 — 小刻度
+    if (!hasData) {
+      return (
+        <div key={`e-${monthIdx}`} className="timeline-node" style={{ left: `${(monthIdx / 11) * 100}%` }}>
+          {isQuarter ? (
+            <div className="node-dot" style={{ width: 10, height: 10, borderStyle: 'dashed' }} />
+          ) : (
+            <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-muted)', opacity: 0.3 }} />
+          )}
+        </div>
+      );
+    }
+
+    // 计算重要度：基于文件数量 + 关键词丰富度
+    const topKeywords = monthData.items?.[0]?.keywords || [];
+    const importance = monthData.count >= 5 ? 5 : monthData.count >= 3 ? 4 : 3;
+    const isCompleted = monthIdx < now.getMonth();
+    const isCurrent = monthIdx === now.getMonth();
+    const favKey = `m${monthIdx}`;
+    const isFav = favorites.has(favKey);
+
+    let cls = `node-dot importance-${importance}`;
+    if (isCompleted) cls += ' completed';
+    if (isCurrent) cls += ' current';
+    if (isFav) cls += ' favorite';
+
+    // 悬浮信息
+    const hoverPolicy = {
+      tag: `${monthData.count}篇政策`,
+      title: monthData.items?.[0]?.title || MONTH_NAMES[monthIdx],
+      time: MONTH_NAMES[monthIdx],
+      dept: monthData.items?.[0]?.org || '',
+      content: monthData.items?.map(i => i.title).join('；'),
+      impact: topKeywords.join(' · '),
+    };
+
+    // 非季度月份 — 只有圆
+    if (!isQuarter) {
+      return (
+        <div key={favKey} className="timeline-node" style={{ left: `${(monthIdx / 11) * 100}%` }}
+          onMouseEnter={(e) => showHover(e, hoverPolicy, topKeywords)} onMouseMove={moveHover} onMouseLeave={hideHover}>
+          <div className={cls} onClick={(e) => toggleFav(e, favKey)}>
+            {isFav && <span className="favorite-star">★</span>}
+          </div>
+        </div>
+      );
+    }
+
+    // 季度点 — 大圆 + 月份标签
+    return (
+      <div key={favKey} className="timeline-node" style={{ left: `${(monthIdx / 11) * 100}%` }}
+        onMouseEnter={(e) => showHover(e, hoverPolicy, topKeywords)} onMouseMove={moveHover} onMouseLeave={hideHover}>
+        <div className={cls} onClick={(e) => toggleFav(e, favKey)}>
+          {isFav && <span className="favorite-star">★</span>}
+        </div>
+        <div className="node-label" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
+          {String(monthIdx + 1).padStart(2, '0')}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="policy-dashboard-container" onMouseMove={moveHover}>
+      {/* ── 顶部卡片 ── */}
+      <div className="top-cards">
+        <div className="card countdown-card">
+          <h3>📅 十五五规划进度</h3>
+          <div className="countdown-days">{progress.toFixed(1)}%</div>
+          <div className="card-subtitle">剩余 {rYears}年{rMonths}月{rFinalDays}天</div>
+          <div className="card-desc">
+            {tl?.five_year?.start || '2026'} → {tl?.five_year?.end || '2030'}
+            {stageName ? ` · ${stageName}` : ''}
+          </div>
+        </div>
+        <div className="card progress-card">
+          <h3>📊 十五五规划{stageName ? ` · ${stageName}` : ''}</h3>
+          <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }}></div></div>
+          <div className="progress-info">
+            <span>已完成 {progress.toFixed(1)}%</span>
+            <span>剩余 <span className="highlight-text">{rYears}年{rMonths}月</span></span>
+          </div>
+        </div>
+        <div className="card">
+          <h3>📂 政策文件库</h3>
+          <div className="favorites-count">{realStats.match(/\d+/)?.[0] || '—'}</div>
+          <div className="card-subtitle">篇 · 已收藏 {favorites.size} 篇</div>
+          {realStats.split('\n').slice(1, 3).map((l, i) => <div key={i} className="card-desc">{l}</div>)}
+        </div>
+      </div>
+
+      {/* ── 年度政策时间线 — 数据驱动 ── */}
+      <div className="timeline-section">
+        <div className="year-label">📋 {timelineYear} 年政策时间线</div>
+        <div className="annual-timeline">
+          <button className="year-arrow left" onClick={() => setTimelineYear(y => y - 1)}>◀</button>
+          <div className="timeline-track">
+            <div className="timeline-line"></div>
+            <div className="timeline-nodes">
+              {MONTH_NAMES.map((_, i) => renderMonthNode(i))}
+            </div>
+          </div>
+          <button className="year-arrow right" onClick={() => setTimelineYear(y => y + 1)}>▶</button>
+        </div>
+        <div className="importance-legend">
+          <div className="legend-item"><div className="legend-dot importance-5"></div><span>≥5篇</span></div>
+          <div className="legend-item"><div className="legend-dot importance-4"></div><span>3-4篇</span></div>
+          <div className="legend-item"><div className="legend-dot importance-3"></div><span>1-2篇</span></div>
+          <div className="legend-item"><div className="legend-dot favorite"></div><span>★ 收藏</span></div>
+        </div>
+      </div>
+
+      {/* ── 长周期战略节点 — 从后端配置读取 ── */}
+      <div className="timeline-section">
+        <h2 className="section-title">🔭 长周期战略节点（2025-2030）</h2>
+        <div className="long-cycle-timeline">
+          <div className="long-cycle-line"></div>
+          <div className="long-cycle-nodes">
+            {(tl?.long_cycle || []).map((node) => {
+              const cls = 'long-cycle-dot' + (node.is_major ? ' major' : ' minor');
+              return (
+                <div key={node.year} className="long-cycle-node">
+                  <div className={cls}><span>{node.is_major ? '◆' : '▲'}</span></div>
+                  <div className="long-cycle-label">{node.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="long-cycle-legend">
+          <div className="legend-item"><div className="legend-dot major"></div><span>■ 重大战略节点</span></div>
+          <div className="legend-item"><div className="legend-dot minor"></div><span>▲ 专题白皮书</span></div>
+        </div>
+      </div>
+
+      {/* ── 最新政策文件 — 从 policy_search 动态获取 ── */}
+      <div className="timeline-section">
+        <h2 className="section-title">📄 {timelineYear} 年政策文件</h2>
+        <CardWrapper style={{ maxWidth: '50%', display: 'flex', flexDirection: 'column', gap: 0, padding: 0 }}>
+          <div style={{ padding: 12 }}>
+            {realDocs.length > 0 ? realDocs.slice(0, 10).map((doc, i) => {
+              const kw = (doc.match(/\[(.+?)\]/)?.[1] || '').split(',').map(s => s.trim()).filter(Boolean);
+              const date = doc.match(/\d{4}-\d{2}-\d{2}/)?.[0] || '';
+              const filename = doc.replace(/^\s*\d{4}-\d{2}-\d{2}\s*/, '');
+              const url = (() => {
+                const parts = doc.trim().split(/\s+/);
+                const last = parts[parts.length - 1];
+                return (last && (last.startsWith('http://') || last.startsWith('https://'))) ? last : '';
+              })();
+              return (
+              <CardWrapper key={i} as="a" href={url || undefined} target={url ? '_blank' : undefined} rel="noopener noreferrer" truncate hoverable={false}
+                style={{ display: 'block', padding: '6px 0', borderBottom: i < Math.min(realDocs.length, 10) - 1 ? '1px solid var(--border-subtle)' : 'none', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, textDecoration: 'none', cursor: url ? 'pointer' : 'default', background: 'transparent', backdropFilter: 'none', border: 'none', borderRadius: 0, margin: 0 }}
+                onMouseEnter={(e) => {
+                  setHoverCard({ show: true, x: e.clientX + 12, y: e.clientY - 16, policy: { title: doc.substring(0, 40), tag: '政策文件', content: doc, impact: kw.slice(0, 5).join('、') }, keywords: kw });
+                }} onMouseMove={moveHover} onMouseLeave={hideHover}>
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{date}</span>
+                {kw.length > 0 && (
+                  <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent-gold)' }}>
+                    [{kw.slice(0, 3).join(', ')}{kw.length > 3 ? '…' : ''}]
+                  </span>
+                )}
+                <span style={{ marginLeft: 6 }}>{filename}</span>
+              </CardWrapper>
+              );
+            }) : <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)' }}>该年暂无政策数据</div>}
+          </div>
+        </CardWrapper>
+      </div>
+
+      {/* ── 官方链接 — 从后端配置读取 ── */}
+      <div className="links-section">
+        <div className="links-header"><h2>🔗 官方直达</h2></div>
+        <div className="links-container">
+          {(tl?.official_links || []).map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">{link.name}</a>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 悬浮卡片 ── */}
+      <div className="policy-hover-card" style={{ left: hoverCard.x, top: hoverCard.y, display: hoverCard.show ? 'block' : 'none' }}>
+        {hoverCard.policy && (
+          <>
+            <span className="policy-tag">{hoverCard.policy.tag || '政策文件'}</span>
+            <h3 className="policy-title">{hoverCard.policy.title}</h3>
+            {hoverCard.policy.time && <div className="policy-meta">发布时间：{hoverCard.policy.time} · {hoverCard.policy.dept}</div>}
+            <div className="policy-content">{hoverCard.policy.content && hoverCard.policy.content.length > 100 ? hoverCard.policy.content.substring(0, 100) + '…' : hoverCard.policy.content}</div>
+            {hoverCard.keywords.length > 0 && <div className="policy-impact">影响板块：{hoverCard.keywords.join(' · ')}</div>}
+            {hoverCard.policy.impact && !hoverCard.keywords.length && <div className="policy-impact">影响领域：{hoverCard.policy.impact}</div>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

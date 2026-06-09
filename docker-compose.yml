@@ -1,0 +1,15 @@
+services:
+  deep-fusion:
+    build: .
+    image: deep-fusion:latest
+    command: deep-fusion
+    environment:
+      - HTTP_PROXY=http://host.docker.internal:7897
+      - HTTPS_PROXY=http://host.docker.internal:7897
+      - NO_PROXY=localhost,127.0.0.1,192.168.*.*,10.*,*.local
+      - OKX_BASE_URL=https://www.okx.com
+      - BINANCE_BASE_URL=https://api.binance.com
+      - NEWSNOW_BASE_URL=https://newsnow.busiyi.world
+      - DEEP_FUSION_CACHE_DIR=/data/cache
+    volumes:
+      - cache:/data/cache

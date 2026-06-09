@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepFusion · 衍生品</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+:root {
+  --bg-deep: #2A1A2E;
+  --bg-panel: rgba(70,40,80,0.30);
+  --bg-panel-hover: rgba(70,40,80,0.50);
+  --bg-sidebar: rgba(25,15,30,0.97);
+  --border-subtle: rgba(200,160,208,0.12);
+  --border-hover: rgba(200,160,208,0.25);
+  --text-primary: #F0E8F0;
+  --text-secondary: #C0B8C8;
+  --text-muted: #8A8298;
+  --accent-gold: #C8A0D0;
+  --accent-rose: #D0B0C0;
+  --accent-purple: #8A7AB0;
+  --accent-green: #7A8A9A;
+  --accent-red: #C87070;
+  --accent-orange: #D0A060;
+  --accent-blue: #7090C0;
+  --shadow-glow: rgba(200,160,208,0.08);
+  --radius: 12px;
+  --radius-lg: 18px;
+  --font-sans: 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono: 'JetBrains Mono','SF Mono',monospace;
+  --nav-width: 240px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep); color: var(--text-primary);
+  line-height: 1.6; min-height: 100vh; font-size: 14px;
+  transition: background 0.6s ease, color 0.4s ease;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 20% 30%, rgba(100,80,120,0.06), transparent 50%),
+              radial-gradient(ellipse at 80% 70%, rgba(60,100,80,0.06), transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--accent-purple); border-radius: 4px; }
+
+.sb {
+  position: fixed; left: 0; top: 0; bottom: 0; width: var(--nav-width);
+  background: var(--bg-sidebar); backdrop-filter: blur(16px);
+  border-right: 1px solid var(--border-subtle);
+  padding: 24px 0; z-index: 100; overflow-y: auto;
+}
+.sb-b { padding: 0 20px 16px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 12px; }
+.sb-b h1 { font-size: 16px; font-weight: 800; color: var(--accent-gold); letter-spacing: 1px; }
+.sb-b p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.sb-s { padding: 12px 20px 8px; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-muted); }
+.sb a {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 20px; margin: 4px 12px; border-radius: 10px;
+  color: var(--text-secondary); text-decoration: none; font-size: 13px;
+  transition: all 0.25s ease; cursor: pointer;
+}
+.sb a:hover, .sb a.on { background: var(--bg-panel-hover); color: var(--text-primary); }
+
+.mn { margin-left: var(--nav-width); position: relative; z-index: 1; }
+.hero {
+  padding: 36px 44px 24px;
+  background: linear-gradient(135deg, rgba(25,15,30,0.95), rgba(70,40,80,0.5));
+  border-bottom: 1px solid var(--border-subtle);
+}
+.hero .tag { display: inline-block; padding: 4px 14px; background: var(--shadow-glow); border: 1px solid var(--border-subtle); border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--accent-gold); margin-bottom: 12px; }
+.hero h1 { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+.hero h1 .hl { color: var(--accent-gold); }
+.hero p { font-size: 13px; color: var(--text-secondary); max-width: 620px; margin-top: 6px; }
+.hero .meta { display: flex; gap: 18px; margin-top: 14px; font-size: 11px; color: var(--text-muted); }
+
+.se { padding: 24px 28px; border-bottom: 1px solid rgba(200,160,208,0.04); }
+.sh { margin-bottom: 16px; }
+.sh .ba { display: inline-flex; padding: 4px 12px; background: rgba(138,122,176,0.12); border: 1px solid rgba(138,122,176,0.2); border-radius: 16px; font-size: 10px; font-weight: 600; color: var(--accent-rose); margin-bottom: 8px; }
+.sh h2 { font-size: 18px; font-weight: 700; }
+.sh h2 .hl { color: var(--accent-gold); }
+.sh p { color: var(--text-secondary); font-size: 12px; }
+
+.cb { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; backdrop-filter: blur(10px); transition: all 0.3s ease; }
+.cb:hover { border-color: var(--border-hover); box-shadow: 0 8px 32px var(--shadow-glow); }
+.cb h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.cb h3 .cs { font-size: 10px; color: var(--text-muted); font-weight: 400; }
+
+.cg2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.cg3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.cg4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
+
+.cd { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 14px; transition: all 0.3s ease; }
+.cd:hover { background: var(--bg-panel-hover); border-color: var(--border-hover); transform: translateY(-2px); }
+.cd h4 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.cd .cd-c { font-size: 10px; color: var(--text-muted); }
+.cd .cd-v { font-size: 20px; font-weight: 700; margin: 4px 0; font-family: 'JetBrains Mono','SF Mono',monospace; }
+.cd .cd-v.r { color: var(--accent-red); }
+.cd .cd-v.g { color: var(--accent-green); }
+.cd .cd-v.o { color: var(--accent-orange); }
+.cd .cd-v.b { color: var(--accent-blue); }
+
+.tw { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-subtle); margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 600px; }
+th { text-align: left; padding: 7px 12px; font-weight: 600; font-size: 10px; letter-spacing: 0.8px; color: var(--text-muted); background: rgba(25,15,30,0.8); border-bottom: 1px solid var(--border-subtle); }
+td { padding: 7px 12px; border-bottom: 1px solid rgba(200,160,208,0.03); color: var(--text-secondary); }
+tr:hover td { background: var(--bg-panel-hover); }
+td.nm { font-weight: 600; color: var(--text-primary); }
+td.up { color: var(--accent-red); }
+td.dn { color: var(--accent-green); }
+tr.hl td { background: var(--shadow-glow); }
+
+.ec { width: 100%; height: 260px; }
+.ec-lg { width: 100%; height: 340px; }
+.ec-sm { width: 100%; height: 180px; }
+
+.tag-red { background: rgba(200,112,112,0.12); color: var(--accent-red); padding: 2px 8px; border-radius: 6px; font-size: 10px; }
+.tag-green { background: rgba(122,138,154,0.12); color: var(--accent-green); padding: 2px 8px; border-radius: 6px; font-size: 10px; }
+.tag-gold { background: rgba(200,160,208,0.12); color: var(--accent-gold); padding: 2px 8px; border-radius: 6px; font-size: 10px; }
+
+@media (max-width: 768px) {
+  .sb { transform: translateX(-100%); }
+  .mn { margin-left: 0; }
+  .hero { padding: 28px 20px; }
+  .se { padding: 20px 16px; }
+  .cg2 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="sb">
+  <div class="sb-b"><h1>◈ 衍生品</h1><p>期货 · 外汇 · 加密 · 贵金属</p></div>
+  <div class="sb-s">⚡ 行情速览</div>
+  <div class="sb-card" style="margin:0 12px 16px; padding:12px;">
+    <div style="display:flex;justify-content:space-between;font-size:11px;">
+      <span>BTC <span style="color:var(--accent-red);">$68,420</span></span>
+      <span>黄金 <span style="color:var(--accent-gold);">$2,358</span></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px;">
+      <span>USD/CNY <span>7.24</span></span>
+      <span>原油 <span style="color:var(--accent-green);">$72.5</span></span>
+    </div>
+  </div>
+  <div class="sb-s">📂 维度</div>
+  <a href="#" class="on">📦 期货</a>
+  <a href="#">💰 贵金属</a>
+  <a href="#">₿ 加密货币</a>
+  <a href="#">💱 外汇</a>
+  <div class="sb-s">🔗 联动</div>
+  <a href="#">🏭 中观·产业</a>
+  <a href="#">🌐 宏观·周期</a>
+</nav>
+
+<div class="mn">
+
+<!-- ===== 英雄区 ===== -->
+<div class="hero">
+  <div class="tag">✦ DeepFusion · 衍生品</div>
+  <h1>多元资产 <span class="hl">跨市场监测</span></h1>
+  <p>期货期限结构 · 贵金属库存流 · 加密情绪 · 外汇矩阵</p>
+  <div class="meta">
+    <span>◈ 数据源: akshare · OKX · Binance · SGE</span>
+    <span>◈ 更新: 实时</span>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 区块一：期货 -->
+<!-- ============================================== -->
+<div class="se">
+  <div class="sh"><div class="ba">📦 期货</div><h2>主力合约 <span class="hl">行情与期限结构</span></h2><p>多品种对比 · 基差追踪 · 持仓分析</p></div>
+
+  <!-- 价格卡片 -->
+  <div class="cg4">
+    <div class="cd"><h4>⛏️ 铁矿石</h4><div class="cd-c">DCE · 元/吨</div><div class="cd-v o">832</div><div class="cd-c">基差 <span style="color:var(--accent-red);">+26</span> · 持仓 <span>124.5万手</span></div></div>
+    <div class="cd"><h4>🪙 铜</h4><div class="cd-c">SHFE · 元/吨</div><div class="cd-v r">69,200</div><div class="cd-c">基差 <span style="color:var(--accent-gold);">+180</span> · 持仓 <span>38.2万手</span></div></div>
+    <div class="cd"><h4>🛢️ 原油</h4><div class="cd-c">INE · 元/桶</div><div class="cd-v g">528</div><div class="cd-c">基差 <span style="color:var(--accent-green);">-12</span> · 持仓 <span>62.8万手</span></div></div>
+    <div class="cd"><h4>🌾 豆粕</h4><div class="cd-c">DCE · 元/吨</div><div class="cd-v">3,185</div><div class="cd-c">基差 <span style="color:var(--accent-gold);">+45</span> · 持仓 <span>186.3万手</span></div></div>
+  </div>
+
+  <div class="cg2">
+    <div class="cb"><h3>期限结构 <span class="cs">· 铜主力合约</span></h3><div class="ec" id="chartFuturesTerm"></div></div>
+    <div class="cb"><h3>持仓量与基差 <span class="cs">· 近 20 日</span></h3><div class="ec" id="chartFuturesOI"></div></div>
+  </div>
+
+  <!-- 多品种对比表 -->
+  <div class="tw">
+    <table>
+      <thead><tr><th>品种</th><th>交易所</th><th>主力合约</th><th>最新价</th><th>涨跌幅</th><th>持仓量</th><th>基差</th><th>仓单库存</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td class="nm">铜</td><td>SHFE</td><td>CU2408</td><td class="up">69,200</td><td class="up">+0.85%</td><td>38.2万</td><td class="up">+180</td><td>158,426吨</td></tr>
+        <tr><td class="nm">铁矿石</td><td>DCE</td><td>I2409</td><td class="up">832</td><td class="up">+1.22%</td><td>124.5万</td><td class="up">+26</td><td>3,420万吨</td></tr>
+        <tr><td class="nm">螺纹钢</td><td>SHFE</td><td>RB2410</td><td class="dn">3,657</td><td class="dn">-0.65%</td><td>218.7万</td><td class="dn">-45</td><td>58.2万吨</td></tr>
+        <tr><td class="nm">原油</td><td>INE</td><td>SC2408</td><td class="dn">528.0</td><td class="dn">-1.85%</td><td>62.8万</td><td class="dn">-12</td><td>—</td></tr>
+        <tr><td class="nm">豆粕</td><td>DCE</td><td>M2409</td><td class="up">3,185</td><td class="up">+0.38%</td><td>186.3万</td><td class="up">+45</td><td>18,625吨</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 区块二：贵金属 -->
+<!-- ============================================== -->
+<div class="se">
+  <div class="sh"><div class="ba">💰 贵金属</div><h2>金银 <span class="hl">综合诊断</span></h2><p>现货 · 期货 · ETF · 库存 · 基差</p></div>
+
+  <div class="cg4">
+    <div class="cd"><h4>🥇 黄金 (AU9999)</h4><div class="cd-c">SGE · 元/克</div><div class="cd-v r">558.50</div><div class="cd-c">日内 +0.85%</div></div>
+    <div class="cd"><h4>🥈 白银 (AG9999)</h4><div class="cd-c">SGE · 元/千克</div><div class="cd-v r">7,382</div><div class="cd-c">日内 +1.25%</div></div>
+    <div class="cd"><h4>🌍 国际金价</h4><div class="cd-c">COMEX · 美元/盎司</div><div class="cd-v o">2,358.0</div><div class="cd-c">日内 +0.62%</div></div>
+    <div class="cd"><h4>📊 金银比</h4><div class="cd-c">XAU/XAG</div><div class="cd-v b">79.5</div><div class="cd-c">历史分位 <span style="color:var(--accent-gold);">68%</span></div></div>
+  </div>
+
+  <div class="cg2">
+    <div class="cb"><h3>黄金 ETF 持仓量 <span class="cs">· GLD / 近 1 年</span></h3><div class="ec" id="chartGoldETF"></div></div>
+    <div class="cb"><h3>COMEX 黄金库存 <span class="cs">· 近 1 年</span></h3><div class="ec" id="chartComex"></div></div>
+  </div>
+
+  <div class="cg3">
+    <div class="cb" style="border-left:3px solid var(--accent-gold);">
+      <h3>🏦 综合诊断</h3>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
+        金价处于历史高位，ETF 持仓 <span style="color:var(--accent-red);">持续流入</span> 6 周<br/>
+        COMEX 库存 <span style="color:var(--accent-green);">下降</span> 2.3% · 基差 <span style="color:var(--accent-gold);">+2.5</span> 升水<br/>
+        央行购金: 中国央行连续 18 个月增持<br/>
+        <span style="color:var(--accent-gold);font-weight:600;">信号：偏多 · 逢回调配置</span>
+      </div>
+    </div>
+    <div class="cb" style="border-left:3px solid var(--accent-blue);">
+      <h3>🔄 金银比趋势</h3>
+      <div class="ec-sm" id="chartGoldSilverRatio"></div>
+    </div>
+    <div class="cb" style="border-left:3px solid var(--accent-rose);">
+      <h3>📈 期现基差</h3>
+      <div class="ec-sm" id="chartGoldBasis"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 区块三：加密货币 -->
+<!-- ============================================== -->
+<div class="se">
+  <div class="sh"><div class="ba">₿ 加密货币</div><h2>多币种 <span class="hl">行情与情绪</span></h2><p>价格 · 合约 · 资金费率 · 恐惧贪婪 · 综合诊断</p></div>
+
+  <div class="cg4">
+    <div class="cd"><h4>₿ BTC</h4><div class="cd-c">币安 · USDT</div><div class="cd-v r">68,420</div><div class="cd-c">24h <span style="color:var(--accent-red);">+2.35%</span></div></div>
+    <div class="cd"><h4>Ξ ETH</h4><div class="cd-c">币安 · USDT</div><div class="cd-v r">3,520</div><div class="cd-c">24h <span style="color:var(--accent-red);">+1.85%</span></div></div>
+    <div class="cd"><h4>😨 恐惧贪婪</h4><div class="cd-c">Alternative.me</div><div class="cd-v g">62</div><div class="cd-c"><span style="color:var(--accent-gold);">贪婪</span> · 昨 58</div></div>
+    <div class="cd"><h4>📊 BTC 多空比</h4><div class="cd-c">币安合约</div><div class="cd-v o">1.25</div><div class="cd-c">多头 <span style="color:var(--accent-red);">55.3%</span> · 空头 44.7%</div></div>
+  </div>
+
+  <div class="cg2">
+    <div class="cb"><h3>BTC 技术指标 <span class="cs">· 含 MA/RSI</span></h3><div class="ec-lg" id="chartCryptoPrice"></div></div>
+    <div class="cb"><h3>资金费率与持仓量 <span class="cs">· OKX BTC 永续</span></h3><div class="ec-lg" id="chartCryptoFunding"></div></div>
+  </div>
+
+  <!-- 综合诊断卡片 -->
+  <div class="cg3">
+    <div class="cb" style="border-left:3px solid var(--accent-red);">
+      <h3>📊 BTC 综合诊断</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px;">
+        <div><span style="color:var(--text-muted);">趋势</span><br/><span style="color:var(--accent-red);font-weight:600;">多头 · MA 金叉</span></div>
+        <div><span style="color:var(--text-muted);">RSI(14)</span><br/>62.5 <span style="color:var(--accent-gold);">中性偏多</span></div>
+        <div><span style="color:var(--text-muted);">资金费率</span><br/><span style="color:var(--accent-orange);">+0.008%</span> 中性</div>
+        <div><span style="color:var(--text-muted);">持仓量</span><br/><span style="color:var(--accent-red);font-weight:600;">↑ 创 3 月新高</span></div>
+      </div>
+    </div>
+    <div class="cb" style="border-left:3px solid var(--accent-gold);">
+      <h3>🤖 币安 AI 信号</h3>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
+        📈 短期 (1h) <span style="color:var(--accent-red);">买入</span><br/>
+        📊 中期 (4h) <span style="color:var(--accent-gold);">观望</span><br/>
+        📉 长期 (1d) <span style="color:var(--accent-green);">卖出</span><br/>
+        <span style="color:var(--text-muted);font-size:10px;">基于技术指标 + 链上数据</span>
+      </div>
+    </div>
+    <div class="cb" style="border-left:3px solid var(--accent-blue);">
+      <h3>🔀 ETH/BTC 汇率</h3>
+      <div class="ec-sm" id="chartEthBtc"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 区块四：外汇 -->
+<!-- ============================================== -->
+<div class="se">
+  <div class="sh"><div class="ba">💱 外汇</div><h2>汇率矩阵与 <span class="hl">跨境流动</span></h2></div>
+  <div class="cg2">
+    <div class="cb"><h3>主要货币对 <span class="cs">· 实时</span></h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>货币对</th><th>最新价</th><th>涨跌幅</th><th>日内高</th><th>日内低</th></tr></thead>
+          <tbody>
+            <tr class="hl"><td class="nm">USD/CNY</td><td class="up">7.2415</td><td class="up">+0.12%</td><td>7.2480</td><td>7.2350</td></tr>
+            <tr><td class="nm">EUR/USD</td><td class="dn">1.0845</td><td class="dn">-0.08%</td><td>1.0862</td><td>1.0836</td></tr>
+            <tr><td class="nm">GBP/USD</td><td class="up">1.2735</td><td class="up">+0.15%</td><td>1.2750</td><td>1.2720</td></tr>
+            <tr><td class="nm">USD/JPY</td><td class="up">156.80</td><td class="up">+0.25%</td><td>157.20</td><td>156.45</td></tr>
+            <tr><td class="nm">AUD/USD</td><td class="dn">0.6620</td><td class="dn">-0.05%</td><td>0.6635</td><td>0.6610</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="cb"><h3>美元指数与 <span class="cs">CFETS 人民币</span></h3><div class="ec" id="chartForexIndex"></div></div>
+  </div>
+</div>
+
+</div><!-- /mn -->
+
+<script>
+const dpr = window.devicePixelRatio || 1;
+function css(k, fb = '#C8A0D0') { return getComputedStyle(document.body).getPropertyValue(k).trim() || fb; }
+
+window.addEventListener('load', function() {
+  const tp = css('--text-primary');
+  const ts = css('--text-secondary');
+  const tm = css('--text-muted');
+  const bs = css('--border-subtle');
+  const ag = css('--accent-gold');
+  const ar = css('--accent-red');
+  const ap = css('--accent-purple');
+  const ao = css('--accent-orange');
+  const ab = css('--accent-blue');
+  const agn = css('--accent-green');
+  function c(o) { return echarts.init(o).setOption; }
+
+  // 期货期限结构
+  echarts.init(document.getElementById('chartFuturesTerm')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: ['CU当月','CU次月','CU当季','CU次年','CU连三'], axisLabel: { color: ts }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: { type: 'value', axisLabel: { color: ts, formatter: '${v}' }, splitLine: { lineStyle: { color: bs } } },
+    series: [
+      { type: 'line', name: '当前', data: [69200,68800,68500,68000,67600], itemStyle: { color: ag }, lineStyle: { width: 2.5 }, symbol: 'circle', symbolSize: 8 },
+      { type: 'line', name: '上周', data: [68800,68500,68200,67800,67500], itemStyle: { color: tm }, lineStyle: { width: 1.5, type: 'dashed' }, symbol: 'diamond', symbolSize: 6 }
+    ]
+  });
+
+  // 持仓量与基差
+  const days20 = Array.from({length:20},(_,i)=>'T-'+(19-i));
+  echarts.init(document.getElementById('chartFuturesOI')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '10%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: days20, axisLabel: { color: ts, rotate: 30 }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: [
+      { type: 'value', name: '持仓(万手)', nameTextStyle: { color: tm }, axisLabel: { color: ts }, splitLine: { lineStyle: { color: bs } } },
+      { type: 'value', name: '基差', nameTextStyle: { color: tm }, axisLabel: { color: ts, formatter: '{v}' }, splitLine: { show: false } }
+    ],
+    series: [
+      { type: 'bar', name: '持仓量', data: days20.map(()=>Math.round(35+Math.random()*8*10)/10), itemStyle: { color: ap }, barWidth: '45%' },
+      { type: 'line', name: '基差', yAxisIndex: 1, data: days20.map(()=>Math.round((Math.random()*60+150)*10)/10), itemStyle: { color: ag }, lineStyle: { width: 2 }, symbol: 'circle', symbolSize: 6 }
+    ]
+  });
+
+  // 黄金 ETF
+  const months12 = ['2025-06','2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05'];
+  echarts.init(document.getElementById('chartGoldETF')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, rotate: 30 }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: { type: 'value', axisLabel: { color: ts, formatter: '{v}吨' }, splitLine: { lineStyle: { color: bs } } },
+    series: [{ type: 'line', smooth: true, data: [875,882,870,878,885,892,888,895,902,910,918,925],
+      itemStyle: { color: ag }, lineStyle: { width: 2.5 },
+      areaStyle: { opacity: 0.12, color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:ag},{offset:1,color:'transparent'}]) }
+    }]
+  });
+
+  // COMEX 库存
+  echarts.init(document.getElementById('chartComex')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '10%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, rotate: 30 }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: { type: 'value', axisLabel: { color: ts, formatter: '{v}吨' }, splitLine: { lineStyle: { color: bs } } },
+    series: [{ type: 'line', smooth: true, data: [860,855,848,840,835,830,825,820,815,808,800,795],
+      itemStyle: { color: ar }, lineStyle: { width: 2 },
+      areaStyle: { opacity: 0.1, color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:ar},{offset:1,color:'transparent'}]) }
+    }]
+  });
+
+  // 金银比
+  echarts.init(document.getElementById('chartGoldSilverRatio')).setOption({
+    backgroundColor: 'transparent', grid: { left: '8%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, show: false }, axisLine: { show: false } },
+    yAxis: { type: 'value', axisLabel: { color: ts, fontSize: 9 }, splitLine: { lineStyle: { color: bs } } },
+    series: [{ type: 'line', smooth: true, data: [82,81,80,80,79,78,78,77,77,78,79,80], itemStyle: { color: ab }, lineStyle: { width: 2 }, areaStyle: { opacity: 0.08, color: ab } }]
+  });
+
+  // 黄金基差
+  echarts.init(document.getElementById('chartGoldBasis')).setOption({
+    backgroundColor: 'transparent', grid: { left: '8%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, show: false }, axisLine: { show: false } },
+    yAxis: { type: 'value', axisLabel: { color: ts, fontSize: 9 }, splitLine: { lineStyle: { color: bs } } },
+    series: [{ type: 'bar', data: months12.map(()=>Math.round((Math.random()*5-1)*10)/10), itemStyle: { color: ap }, barWidth: '50%' }]
+  });
+
+  // BTC 价格图
+  const btcData = [];
+  for(let i=90;i>=0;i--) {
+    let p = 62000 + Math.sin(i*0.2)*3000 + Math.random()*2000 - 1000 + i*50;
+    btcData.push([i, Math.round(p)]);
+  }
+  btcData.reverse();
+  echarts.init(document.getElementById('chartCryptoPrice')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '8%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: btcData.map((_,i)=>'D-'+i), axisLabel: { color: ts, show: i%15===0 }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: { type: 'value', axisLabel: { color: ts, formatter: '${v}' }, splitLine: { lineStyle: { color: bs } } },
+    series: [
+      { type: 'line', smooth: true, data: btcData.map(d=>d[1]), itemStyle: { color: ag }, lineStyle: { width: 2 },
+        markLine: { data: [{ type: 'average', name: 'MA' }], lineStyle: { color: ao, width: 1, type: 'dashed' } },
+        areaStyle: { opacity: 0.08, color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:ag},{offset:1,color:'transparent'}]) }
+      },
+      { type: 'line', smooth: true, data: btcData.map(d=>d[1]*0.98+Math.random()*500), itemStyle: { color: ar }, lineStyle: { width: 1.5, type: 'dashed' },
+        markLine: { data: [{type:'min',name:'支撑'},{type:'max',name:'阻力'}], lineStyle: { color: tm } }
+      }
+    ]
+  });
+
+  // 资金费率
+  echarts.init(document.getElementById('chartCryptoFunding')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '8%', right: '10%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: days20, axisLabel: { color: ts }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: [
+      { type: 'value', name: '费率 %', nameTextStyle: { color: tm }, axisLabel: { color: ts, formatter: '{v}%' }, splitLine: { lineStyle: { color: bs } } },
+      { type: 'value', name: '持仓(亿)', nameTextStyle: { color: tm }, axisLabel: { color: ts, formatter: '{v}亿' }, splitLine: { show: false } }
+    ],
+    series: [
+      { type: 'bar', name: '资金费率', data: days20.map(()=>Math.round((Math.random()*0.02-0.005)*1000)/1000), itemStyle: { color: ap }, barWidth: '40%' },
+      { type: 'line', name: '持仓量', yAxisIndex: 1, data: days20.map(()=>Math.round((8+Math.random()*4)*10)/10), itemStyle: { color: ag }, lineStyle: { width: 2 } }
+    ]
+  });
+
+  // ETH/BTC
+  echarts.init(document.getElementById('chartEthBtc')).setOption({
+    backgroundColor: 'transparent', grid: { left: '8%', right: '5%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, show: false }, axisLine: { show: false } },
+    yAxis: { type: 'value', axisLabel: { color: ts, fontSize: 9 }, splitLine: { lineStyle: { color: bs } } },
+    series: [{ type: 'line', smooth: true, data: [0.052,0.051,0.050,0.051,0.050,0.049,0.050,0.051,0.052,0.051,0.050,0.051], itemStyle: { color: ab }, lineStyle: { width: 2 }, areaStyle: { opacity: 0.08, color: ab } }]
+  });
+
+  // 美元指数
+  echarts.init(document.getElementById('chartForexIndex')).setOption({
+    backgroundColor: 'transparent', tooltip: { trigger: 'axis' },
+    grid: { left: '8%', right: '10%', top: '8%', bottom: '12%' },
+    xAxis: { type: 'category', data: months12, axisLabel: { color: ts, rotate: 30 }, axisLine: { lineStyle: { color: bs } } },
+    yAxis: [
+      { type: 'value', name: 'DXY', nameTextStyle: { color: tm }, axisLabel: { color: ts }, splitLine: { lineStyle: { color: bs } } },
+      { type: 'value', name: 'CFETS', nameTextStyle: { color: tm }, axisLabel: { color: ts }, splitLine: { show: false } }
+    ],
+    series: [
+      { type: 'line', smooth: true, name: '美元指数', data: [104.5,104.8,105.2,105.0,104.6,104.2,103.8,103.5,103.2,103.0,102.8,102.5], itemStyle: { color: ag }, lineStyle: { width: 2 } },
+      { type: 'line', smooth: true, name: 'CFETS人民币', yAxisIndex: 1, data: [98.5,98.8,99.2,99.0,98.6,98.3,98.0,97.8,97.5,97.3,97.0,96.8], itemStyle: { color: ar }, lineStyle: { width: 2 } }
+    ]
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "mcp": {
+    "deep-fusion": {
+      "command": "uv",
+      "args": [
+        "run", ",--directory", "G:\\PycharmProjects\\DeepFusion", "deep-fusion"],
+      "env": {
+        "HTTP_PROXY": "http://127.0.0.1:7897",
+        "HTTPS_PROXY": "http://127.0.0.1:7897",
+        "NO_PROXY": "localhost,127.0.0.1",
+        "OKX_BASE_URL": "https://www.okx.com",
+        "BINANCE_BASE_URL": "https://api.binance.com",
+        "DEEP_FUSION_CACHE_DIR": ",~/.deep_fusion_cache"
+      }
+    }
+  }
+}

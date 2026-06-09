@@ -1,0 +1,21 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      okxBaseUrl:
+        type: string
+        default: "https://www.okx.com"
+      binanceBaseUrl:
+        type: string
+        default: "https://api.binance.com"
+      cacheDir:
+        type: string
+        default: "/data/cache"
+  commandFunction:
+    "type": "function"
+    "function":
+      "implementaion":
+        type: docker
+        image: deep-fusion:latest
+      command: deep-fusion
