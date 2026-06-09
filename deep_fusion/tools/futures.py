@@ -1,0 +1,125 @@
+"""期货数据工具模块"""
+
+import akshare as ak
+import pandas as pd
+from pydantic import Field
+
+from ..server import mcp
+from ..shared.normalize import normalize_price_df
+from ..shared.schema import format_error_csv
+from ..shared.utils import ak_cache
+
+FUTURES_SYMBOLS = {
+    "螺纹钢": "RB",
+    "铁矿石": "I",
+    "原油": "SC",
+    "沪铜": "CU",
+    "沪金": "AU",
+    "沪银": "AG",
+    "焦炭": "J",
+    "焦煤": "JM",
+    "动力煤": "ZC",
+    "玉米": "C",
+    "豆粕": "M",
+    "豆油": "Y",
+    "棕榈油": "P",
+    "白糖": "SR",
+    "棉花": "CF",
+    "PTA": "TA",
+    "甲醇": "MA",
+    "玻璃": "FG",
+}
+
+
+@mcp.tool(
+    title="获取期货价格",
+    description="获取国内期货主力合约的历史价格数据，包括开高低收、成交量等技术指标",
+)
+def futures_prices(
+    symbol: str = Field(
+        "螺纹钢",
+        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+    ),
+    limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
+):
+    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
+    df = ak_cache(ak.futures_main_sina, symbol=symbol_code)
+    if df is None or df.empty:
+        return normalize_price_df(None, {}, source="akshare", currency="CNY", limit=limit, date_unit=str)
+    df = df.tail(limit).copy()
+    if "日期" in df.columns:
+        df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
+    elif "时间" in df.columns:
+        df["日期"] = pd.to_datetime(df["时间"], errors="coerce")
+        df = df.drop(columns=["时间"])
+    date_col = "日期" if "日期" in df.columns else "时间" if "时间" in df.columns else "日期"
+    open_col = "开盘价" if "开盘价" in df.columns else "开盘"
+    high_col = "最高价" if "最高价" in df.columns else "最高"
+    low_col = "最低价" if "最低价" in df.columns else "最低"
+    close_col = "收盘价" if "收盘价" in df.columns else "收盘"
+    return normalize_price_df(df,
+                              {"date": date_col, "open": open_col, "high": high_col, "low": low_col, "close": close_col,
+                               "volume": "成交量"}, source="akshare", currency="CNY", limit=limit, float_format="%.2f",
+                              date_unit=str)
+
+
+@mcp.tool(
+    title="获取期货库存",
+    description="获取国内期货品种的仓单库存数据，用于判断供需关系和价格走势",
+)
+def futures_inventory(
+    symbol: str = Field(
+        "螺纹钢",
+        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+    ),
+):
+    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
+    df = ak_cache(ak.futures_inventory_em, symbol=symbol_code)
+    if df is None or df.empty:
+        return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
+    return df.to_csv(index=False, float_format="%.2f")
+
+
+@mcp.tool(
+    title="获取期现价差",
+    description="获取期货与现货价格的基差数据，用于判断市场预期和套利机会",
+)
+def futures_basis(
+    symbol: str = Field(
+        "螺纹钢",
+        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+    ),
+    date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
+):
+    if not date:
+        from datetime import datetime
+        date = datetime.now().strftime("%Y%m%d")
+    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
+    df = ak_cache(ak.futures_spot_price, date=date, vars_list=[symbol_code])
+    if df is None or df.empty:
+        return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
+    return df.to_csv(index=False, float_format="%.2f")
+
+
+@mcp.tool(
+    title="获取期货持仓排名",
+    description="获取期货主力合约的机构持仓排名数据，用于判断主力资金动向",
+)
+def futures_positions(
+    symbol: str = Field(
+        "螺纹钢",
+        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+    ),
+    contract: str = Field("", description="合约代码如 OI2501，留空自动取主力"),
+    date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
+):
+    if not date:
+        from datetime import datetime
+        date = datetime.now().strftime("%Y%m%d")
+    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
+    if not contract:
+        contract = symbol_code
+    df = ak_cache(ak.futures_hold_pos_sina, symbol=symbol_code, contract=contract, date=date)
+    if df is None or df.empty:
+        return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
+    return df.to_csv(index=False, float_format="%.2f")
