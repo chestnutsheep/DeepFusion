@@ -16,45 +16,75 @@ import * as echarts from 'echarts';
 
 // ── CSV 解析工具 ──
 
-/** 申万一级行业列表（从 industry_sw_daily 返回数据中解析） */
-function parseSWIndustries(csv) {
-  if (!csv) return [];
-  return csv.trim().split('\n').slice(1).map(l => {
-    const p = l.split(',');
-    return {
-      code: p[0]?.trim(), name: p[1]?.trim(), date: p[2]?.trim(),
-      close: parseFloat(p[3]) || 0, change: parseFloat(p[5]) || 0,
-      pe: parseFloat(p[7]) || 0, pb: parseFloat(p[8]) || 0,
-      volume: parseFloat(p[6]) || 0,
-    };
-  }).filter(i => i.name);
+/**
+ * 解析 industry_sw_daily 返回的 CSV。
+ * 列序: 指数代码(0), 指数名称(1), 发布日期(2), 收盘指数(3), 成交量(4),
+ *       涨跌幅(5), 换手率(6), 市盈率(7), 市净率(8), 均价(9),
+ *       成交额占比(10), 流通市值(11), 平均流通市值(12), 股息率(13)
+ * 
+ * 返回 { industries: 按行业名索引的最新快照, dates: 所有日期, matrix: 行业×日期涨跌幅矩阵 }
+ */
+function parseSWDaily(csv) {
+  if (!csv) return { industries: [], dates: [], matrix: {} };
+  const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
+  if (!rows.length) return { industries: [], dates: [], matrix: {} };
+
+  // 收集所有日期（去重保序）
+  const dateSet = new Set();
+  rows.forEach(r => { if (r[2]?.trim()) dateSet.add(r[2].trim()); });
+  const dates = [...dateSet];
+
+  // 按行业分组，取最新日期作为快照
+  const byName = {};
+  rows.forEach(r => {
+    const name = r[1]?.trim();
+    if (!name) return;
+    if (!byName[name]) byName[name] = [];
+    byName[name].push({
+      name,
+      date: r[2]?.trim(),
+      close: parseFloat(r[3]) || 0,
+      volume: parseFloat(r[4]) || 0,        // 成交量（手）
+      change: parseFloat(r[5]) || 0,         // 涨跌幅 %
+      turnover: parseFloat(r[6]) || 0,       // 换手率 %
+      pe: parseFloat(r[7]) || 0,
+      pb: parseFloat(r[8]) || 0,
+      avgPrice: parseFloat(r[9]) || 0,       // 均价
+      amountRatio: parseFloat(r[10]) || 0,   // 成交额占比 %
+      mktCap: parseFloat(r[11]) || 0,        // 流通市值（元）
+      code: r[0]?.trim(),
+    });
+  });
+
+  // 每个行业按日期倒排，取最新一条作为快照
+  const industries = [];
+  const matrix = {};  // { industryName: { date: change% } }
+  for (const [name, recs] of Object.entries(byName)) {
+    recs.sort((a, b) => b.date.localeCompare(a.date));
+    const latest = recs[0];
+    industries.push(latest);
+    // 构建矩阵
+    matrix[name] = {};
+    recs.forEach(r => { matrix[name][r.date] = r.change; });
+  }
+
+  return { industries, dates, matrix };
 }
 
-/** 行业日线 CSV */
+/** 行业日线 CSV — 列序同 parseSWDaily */
 function parseDaily(csv) {
   if (!csv) return [];
   return csv.trim().split('\n').slice(1).map(l => {
     const p = l.split(',');
     return {
-      period: p[1]?.slice(5) || p[1]?.trim(),
+      period: p[2]?.slice(5) || p[2]?.trim() || '',
       close: parseFloat(p[3]) || 0,
-      change: parseFloat(p[8]) || 0,
-      volume: parseFloat(p[6]) || 0,
+      volume: parseFloat(p[4]) || 0,
+      change: parseFloat(p[5]) || 0,
+      turnover: parseFloat(p[6]) || 0,
+      mktCap: parseFloat(p[11]) || 0,
     };
   }).filter(d => !isNaN(d.close)).slice(-120);
-}
-
-/** 行业资金流 CSV */
-function parseCapitalFlow(csv) {
-  if (!csv) return [];
-  return csv.trim().split('\n').slice(1).map(l => {
-    const p = l.split(',');
-    return {
-      name: p[0]?.trim(),
-      net_amount: parseFloat(p[1]) || 0,
-      change_pct: parseFloat(p[2]) || 0,
-    };
-  }).filter(d => d.name);
 }
 
 // ── 区块组件 ──
@@ -112,33 +142,41 @@ function SectionHeader({ badge, title, highlight, desc }) {
   );
 }
 
-/** 行业热力图 */
-function HeatmapChart({ industries }) {
+/** 行业热力图 — x=日期, y=行业, value=涨跌幅 */
+function HeatmapChart({ industries, dates, matrix }) {
   const chartRef = useRef(null);
   useEffect(() => {
-    if (!chartRef.current || !industries.length) return;
+    if (!chartRef.current || !industries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
-    // 用当前行业涨跌幅作为热力值
-    const data = industries.map((ind, i) => [0, i, ind.change]);
-    const names = industries.map(i => i.name);
+    const names = industries.map(i => i.name || i.code);
+    // 只取最近 10 个交易日，避免太宽
+    const recentDates = dates.slice(-10);
+    const data = [];
+    for (let yi = 0; yi < names.length; yi++) {
+      for (let xi = 0; xi < recentDates.length; xi++) {
+        const val = matrix[names[yi]]?.[recentDates[xi]];
+        if (val !== undefined) data.push([xi, yi, val]);
+      }
+    }
     chart.setOption({
-      tooltip: {
-        formatter: p => `${names[p.data[1]]}<br/>涨跌幅: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
+      "tooltip": {
+        "formatter": p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      grid: { left: 90, right: 30, top: 10, bottom: 30 },
-      xAxis: { type: 'category', data: ['今日'], axisLabel: { fontSize: 11 } },
-      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 10 } },
-      visualMap: {
-        min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
-        inRange: { color: ['#3E6B5C', '#1A2F2A', '#2A4A6A', '#7B5E7B', '#C49BA5', '#D4A853', '#C47B7B'] },
-        textStyle: { color: '#CBC0B0', fontSize: 10 },
+      "grid": { "left": 90, "right": 30, "top": 10, "bottom": 40 },
+      "xAxis": { "type": 'category', "data": recentDates.map(d => d.slice(5)), "axisLabel": { "fontSize": 10, "rotate": 30 } },
+      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 10 } },
+      "visualMap": {
+        "min": -4, "max": 4, "calculable": true, "orient": 'horizontal', "left": 'center', "bottom": 0,
+        "inRange": { "color": ['#3E6B5C', '#1A2F2A', '#2A4A6A', '#7B5E7B', '#C49BA5', '#D4A853', '#C47B7B'] },
+        "textStyle": { "color": '#CBC0B0', "fontSize": 10 },
       },
-      series: [{ type: 'heatmap', data, label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 9, color: '#F0E8D8' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } }],
+      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 9, "color": '#F0E8D8' },
+        "emphasis": { "itemStyle": { "shadowBlur": 10, "shadowColor": 'rgba(0,0,0,0.5)' } },
+      }]
     });
     return () => chart.dispose();
-  }, [industries]);
-  return <div ref={chartRef} style={{ width: '100%', height: Math.max(280, industries.length * 22) }} />;
+  }, [industries, dates, matrix]);
+  return <div ref={chartRef} style={{ width: '100%', height: Math.max(280, industries.length * 22 + 30) }} />;
 }
 
 /** 行业排名 TOP/BOTTOM 表格 */
@@ -184,14 +222,17 @@ function RankingTable({ title, subtitle, items, colorKey }) {
 /** 行业详情五维面板 */
 function IndustryDetail({ sel, chartData, latest, prev }) {
   if (!sel) return null;
+  // 流通市值：后端返回单位为元，转亿元
+  const mktCapYi = sel.mktCap ? (sel.mktCap / 1e8) : 0;
   const metrics = [
     { key: 'close', label: '收盘指数', unit: '', decimals: 2, higherBetter: true },
     { key: 'change', label: '涨跌幅', unit: '%', decimals: 2, higherBetter: true },
-    { key: 'volume', label: '成交额', unit: '亿', decimals: 0, higherBetter: true },
+    { key: 'turnover', label: '换手率', unit: '%', decimals: 2, higherBetter: null },
   ];
   const staticMetrics = [
     { key: 'pe', label: 'PE(TTM)', value: sel.pe, decimals: 1, higherBetter: null },
     { key: 'pb', label: 'PB', value: sel.pb, decimals: 2, higherBetter: null },
+    { key: 'mktCap', label: '流通市值', value: mktCapYi, decimals: 0, unit: '亿', higherBetter: null },
   ];
 
   return (
@@ -219,7 +260,7 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
         ))}
         {/* 静态指标 */}
         {staticMetrics.map(m => (
-          <DataCard key={m.key} label={m.label} value={m.value} decimals={m.decimals} higherBetter={m.higherBetter} />
+          <DataCard key={m.key} label={m.label} value={m.value} unit={m.unit} decimals={m.decimals} higherBetter={m.higherBetter} />
         ))}
       </div>
       {/* 图表区 */}
@@ -322,8 +363,9 @@ function EnergySection() {
 // ── 主组件 ──
 
 export default function MesoLayout() {
-  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业' });
-  const industries = useMemo(() => parseSWIndustries(swResult.data), [swResult.data]);
+  // 请求最近 20 天数据（含多个交易日），让热力图有足够列
+  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', limit: 500 });
+  const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
   const [activeInd, setActiveInd] = useState('');
 
   // 数据加载完成后自动选中第一个行业
@@ -355,7 +397,7 @@ export default function MesoLayout() {
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="🔥 行业轮动" title="全行业" highlight="景气热力" desc="申万一级行业涨跌幅排行，颜色越红 = 表现越强" />
         <CardWrapper style={{ padding: 16 }}>
-          <HeatmapChart industries={industries} />
+          <HeatmapChart industries={industries} dates={dates} matrix={matrix} />
         </CardWrapper>
       </div>
 
