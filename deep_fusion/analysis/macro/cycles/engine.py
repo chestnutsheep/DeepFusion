@@ -7,7 +7,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from DeepFusion.deep_fusion.shared.spectral import cf_bandpass
+from ....shared.spectral import cf_bandpass
 
 logger = logging.getLogger(__name__)
 

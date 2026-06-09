@@ -96,7 +96,7 @@ def data_kitchin() -> str:
     if cached is not None and isinstance(cached, str):
         return cached
     _, _, results = _compute("kitchin", limit=0)
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal, KITCHIN_PHASE_NAMES
+    from ..shared.phase_utils import get_phase_signal, KITCHIN_PHASE_NAMES
     for r in results:
         stage = r.get("stage", 0)
         r["cycle_phase"] = stage
@@ -117,7 +117,7 @@ def data_juglar() -> str:
     if cached is not None and isinstance(cached, str):
         return cached
     _, _, results = _compute("juglar", limit=0)
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal, MACRO_PHASE_NAMES
+    from ..shared.phase_utils import get_phase_signal, MACRO_PHASE_NAMES
     for r in results:
         phase = r.get("phase", 0)
         r["cycle_phase"] = phase
@@ -138,7 +138,7 @@ def data_kuznets() -> str:
     if cached is not None and isinstance(cached, str):
         return cached
     _, _, results = _compute("kuznets", limit=0)
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal, MACRO_PHASE_NAMES
+    from ..shared.phase_utils import get_phase_signal, MACRO_PHASE_NAMES
     for r in results:
         phase = r.get("phase", 0)
         r["cycle_phase"] = phase
@@ -204,9 +204,13 @@ def data_kuznets_extended() -> str:
 )
 def cycle_nesting() -> str:
     """将四周期当前相位转为 +2/+1/-1/-2 哑变量，构建时间对齐的嵌套数据"""
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal
+    from ..shared.phase_utils import (
+        get_phase_signal,
+        zscore_to_phase_angle, phase_angle_to_signal,
+        MACRO_PHASE_NAMES,
+    )
 
-    _ck_nest = CacheKey.init("cycles_nesting_v1", ttl=604800, ttl2=2592000)
+    _ck_nest = CacheKey.init("cycles_nesting_v2", ttl=604800, ttl2=2592000)
     cached = _ck_nest.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -217,10 +221,13 @@ def cycle_nesting() -> str:
     _, _, kuznets_rows = _compute("kuznets", limit=0)
     kondratiev_result, _ = _compute_kondratiev("pca")
 
-    # 2. 构建康波逐行数据（复用 data_kondratiev 的逻辑）
-    from DeepFusion.deep_fusion.shared.phase_utils import MACRO_PHASE_NAMES
+    # 2. 构建康波逐行数据（含连续相位角）
     k_years = kondratiev_result.get("years", [])
     k_zscore = kondratiev_result.get("zscore", [])
+    k_zscore_vals = [z if z is not None else 0.0 for z in k_zscore] if k_zscore else []
+    k_angles = zscore_to_phase_angle(k_zscore_vals)
+    k_cont_signal = phase_angle_to_signal(k_angles)
+
     k_rows = []
     for i, year in enumerate(k_years):
         row = {"period": str(year)}
@@ -241,6 +248,8 @@ def cycle_nesting() -> str:
                 phase = kondratiev_result.get("phase", 0)
             row["phase"] = phase
             row["phase_name"] = MACRO_PHASE_NAMES.get(phase, "未知")
+        if i < len(k_cont_signal):
+            row["cont_signal"] = round(k_cont_signal[i], 4)
         k_rows.append(row)
     # 最后一行用融合结果
     if k_rows:
@@ -262,7 +271,43 @@ def cycle_nesting() -> str:
     kuznets_ann = _annual_rows(kuznets_rows, "phase")
     kondratiev_ann = _annual_rows(k_rows, "phase")
 
-    # 4. 汇总年份并构建嵌套数据
+    # 4. 为三周期（NBS月频数据）计算连续相位角
+    #    提取各周期的 comp_z/stage 等核心指标做相位角
+    def _extract_zscore_series(ann_rows, key):
+        years_sorted = sorted(ann_rows.keys())
+        vals = []
+        for y in years_sorted:
+            v = ann_rows[y].get(key)
+            vals.append(v if v is not None else 0.0)
+        return years_sorted, vals
+
+    # 基钦：用 stage 值 (1-4) 转为 ±信号再计算
+    ki_years_s, ki_stages = _extract_zscore_series(kitchin_ann, "stage")
+    ki_signals_raw = [get_phase_signal(int(s)) for s in ki_stages]
+    ki_angles = zscore_to_phase_angle(ki_signals_raw)
+    ki_cont = phase_angle_to_signal(ki_angles)
+    ki_angle_map = {y: v for y, v in zip(ki_years_s, ki_cont)}
+
+    # 朱格拉：用 comp_z
+    ju_years_s, ju_zs = _extract_zscore_series(juglar_ann, "comp_z")
+    ju_angles = zscore_to_phase_angle(ju_zs)
+    ju_cont = phase_angle_to_signal(ju_angles)
+    ju_angle_map = {y: v for y, v in zip(ju_years_s, ju_cont)}
+
+    # 库兹涅茨：用 comp_z
+    ku_years_s, ku_zs = _extract_zscore_series(kuznets_ann, "comp_z")
+    ku_angles = zscore_to_phase_angle(ku_zs)
+    ku_cont = phase_angle_to_signal(ku_angles)
+    ku_angle_map = {y: v for y, v in zip(ku_years_s, ku_cont)}
+
+    # 康波：直接用已计算的 cont_signal
+    ko_angle_map = {}
+    for r in k_rows:
+        y = str(r.get("period", ""))[:4]
+        if len(y) == 4:
+            ko_angle_map[y] = r.get("cont_signal", 0.0)
+
+    # 5. 汇总年份并构建嵌套数据
     all_years = sorted(set(list(kitchin_ann.keys()) + list(juglar_ann.keys()) +
                            list(kuznets_ann.keys()) + list(kondratiev_ann.keys())))
     nesting = []
@@ -284,6 +329,11 @@ def cycle_nesting() -> str:
                 entry[f"{cid}_phase"] = 0
                 entry[f"{cid}_signal"] = 0.0
                 entry[f"{cid}_name"] = "—"
+        # 连续信号
+        entry["kitchin_cont"] = round(ki_angle_map.get(y, 0.0), 4)
+        entry["juglar_cont"] = round(ju_angle_map.get(y, 0.0), 4)
+        entry["kuznets_cont"] = round(ku_angle_map.get(y, 0.0), 4)
+        entry["kondratiev_cont"] = round(ko_angle_map.get(y, 0.0), 4)
         nesting.append(entry)
 
     text = json.dumps(nesting, ensure_ascii=False)
@@ -446,7 +496,7 @@ def cycle_cache_status() -> str:
 def kondratiev_cycle(
     method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
 ) -> str:
-    _ck = CacheKey.init(f"cycles_report_kondratiev_{method}_v2", ttl=604800, ttl2=2592000)
+    _ck = CacheKey.init(f"cycles_report_kondratiev_{method}_v3", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -471,7 +521,28 @@ def kondratiev_cycle(
     if dp:
         lines.append(f"  主周期长度: {dp:.1f} 年  (置信度: {conf:.2f})")
         lines.append(f"  使用方法: {result.get('method_used', '?')}")
-    lines.append(f"  当前相位: {ph} — {result.get('phase_name', phase_names[ph])}")
+
+    # ── 全球线 ──
+    g_ph = result.get("global_phase", 0)
+    g_conf = result.get("global_confidence", 0)
+    g_name = result.get("global_phase_name", phase_names[g_ph] if g_ph < len(phase_names) else "未知")
+    lines.append("")
+    lines.append("── 全球线 (FRED PPI+GS10 + 世行全球GDP) ──")
+    lines.append(f"  当前相位: {g_ph} — {g_name}  置信度: {g_conf:.2f}")
+
+    # ── 中国线 ──
+    c_ph = result.get("china_phase", 0)
+    c_conf = result.get("china_confidence", 0)
+    c_name = result.get("china_phase_name", phase_names[c_ph] if c_ph < len(phase_names) else "未知")
+    if c_ph > 0:
+        lines.append("")
+        lines.append("── 中国线 (中国GDP + 平减指数 + 城市化率) ──")
+        lines.append(f"  当前相位: {c_ph} — {c_name}  置信度: {c_conf:.2f}")
+
+    # ── 融合结果 ──
+    lines.append("")
+    lines.append("── 融合判定 ──")
+    lines.append(f"  当前相位: {ph} — {result.get('phase_name', phase_names[ph])}  置信度: {conf:.2f}")
     if result.get("phase_confidence"):
         lines.append(f"  相位置信度: {result.get('phase_confidence', 0):.2f}")
     lines.append("")
@@ -527,28 +598,52 @@ def chart_kondratiev_cycle(
 def data_kondratiev(
     method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
 ) -> str:
-    _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v4", ttl=604800, ttl2=2592000)
+    _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v5", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
     result, _ = _compute_kondratiev(method)
 
     # 将汇总 dict 转换为前端 CyclePage 期望的逐期数组格式
-    # 前端要求 JSON.parse → Array，每行含 period + chartSeries key（pca1）+ 相位字段
+    # 前端要求 JSON.parse → Array，每行含 period + chartSeries key + 相位字段
     years = result.get("years", [])
     pca1 = result.get("pca1", [])
     zscore = result.get("zscore", [])
     cf_cycle = result.get("cf_cycle", [])
+    global_zscore = result.get("global_zscore", [])
+    china_zscore = result.get("china_zscore", [])
+    global_cf_cycle = result.get("global_cf_cycle", [])
+    china_cf_cycle = result.get("china_cf_cycle", [])
     # 逐行计算相位：基于 zscore 的 level+momentum 判定
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal, MACRO_PHASE_NAMES
+    from ..shared.phase_utils import (
+        get_phase_signal, MACRO_PHASE_NAMES,
+        zscore_to_phase_angle, phase_angle_to_intensity, phase_angle_to_signal,
+    )
+
+    # 预计算连续相位角和强度 — 融合线
+    zscore_vals = [z if z is not None else 0.0 for z in zscore] if zscore else []
+    angles = zscore_to_phase_angle(zscore_vals)
+    intensity = phase_angle_to_intensity(angles)
+    cont_signal = phase_angle_to_signal(angles)
+
+    # 全球线相位角
+    g_zs_vals = [z if z is not None else 0.0 for z in global_zscore] if global_zscore else []
+    g_angles = zscore_to_phase_angle(g_zs_vals)
+    g_intensity = phase_angle_to_intensity(g_angles)
+
+    # 中国线相位角
+    c_zs_vals = [z if z is not None else 0.0 for z in china_zscore] if china_zscore else []
+    c_angles = zscore_to_phase_angle(c_zs_vals)
+    c_intensity = phase_angle_to_intensity(c_angles)
+
     rows = []
     for i, year in enumerate(years):
         row: dict = {"period": str(year)}
         if i < len(pca1):
             row["pca1"] = pca1[i]
+        # ── 融合线 ──
         if i < len(zscore):
             row["zscore"] = zscore[i]
-            # 逐行相位：用 zscore 和动量判定
             z = zscore[i]
             mom = zscore[i] - zscore[i - 1] if i > 0 else 0
             if abs(mom) < 0.005 and i > 0:
@@ -566,8 +661,28 @@ def data_kondratiev(
             row["phase"] = phase
             row["phase_name"] = MACRO_PHASE_NAMES.get(phase, "未知")
             row["cycle_signal"] = get_phase_signal(phase)
+        if i < len(angles):
+            row["phase_angle"] = round(angles[i], 4)
+        if i < len(intensity):
+            row["intensity"] = round(intensity[i], 4)
+        if i < len(cont_signal):
+            row["cont_signal"] = round(cont_signal[i], 4)
         if i < len(cf_cycle):
             row["cf_cycle"] = cf_cycle[i]
+        # ── 全球线 ──
+        if i < len(global_zscore):
+            row["global_zscore"] = global_zscore[i]
+        if i < len(g_intensity):
+            row["global_intensity"] = round(g_intensity[i], 4)
+        if i < len(global_cf_cycle):
+            row["global_cf_cycle"] = global_cf_cycle[i]
+        # ── 中国线 ──
+        if i < len(china_zscore):
+            row["china_zscore"] = china_zscore[i]
+        if i < len(c_intensity):
+            row["china_intensity"] = round(c_intensity[i], 4)
+        if i < len(china_cf_cycle):
+            row["china_cf_cycle"] = china_cf_cycle[i]
         rows.append(row)
     # 最后一行用 compute_kondratiev 的融合结果覆盖（最精确）
     if rows:
@@ -579,6 +694,12 @@ def data_kondratiev(
             "pca_variance_ratio": result.get("pca_variance_ratio", 0),
             "turning_probability": result.get("turning_probability", 0),
             "cycle_signal": get_phase_signal(result.get("phase", 0)),
+            "global_phase": result.get("global_phase", 0),
+            "global_phase_name": result.get("global_phase_name", "未知"),
+            "global_confidence": result.get("global_confidence", 0),
+            "china_phase": result.get("china_phase", 0),
+            "china_phase_name": result.get("china_phase_name", "未知"),
+            "china_confidence": result.get("china_confidence", 0),
         })
 
     text = json.dumps(rows, ensure_ascii=False)

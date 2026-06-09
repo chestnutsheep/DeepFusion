@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """Kondratiev Wave: Global vs China Composite (PCA-based)"""
-import os, sys, warnings, requests, io
+import io
+import os
+import requests
+import sys
+import warnings
 from pathlib import Path
-import numpy as np, pandas as pd
-import matplotlib; matplotlib.use("Agg")
+
+import matplotlib;
+import numpy as np
+import pandas as pd
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -27,7 +35,7 @@ def fred(sid, start):
     return s
 
 def nbs(kw, ik, lb, freq="MM"):
-    from DeepFusion.deep_fusion import _get_nbs_client as cl
+    from deep_fusion import _get_nbs_client as cl
     try:
         df = cl().search_and_fetch(kw, ik, start="1980", freq=freq)
         if df is None or df.empty: return None

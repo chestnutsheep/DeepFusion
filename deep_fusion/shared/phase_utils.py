@@ -8,10 +8,21 @@
   相位 2 (繁荣):   +2.0 — 高于均值且向上，顶峰
   相位 3 (衰退):   -1.0 — 高于均值但向下，回落
   相位 4 (萧条):   -2.0 — 低于均值且向下，谷底
+
+连续相位角约定（phase_angle）:
+  将 level(zscore) + momentum 映射到 0~2π 的连续相位角，
+  使得周期呈现自然的正弦波结构，便于多周期在同一图上对比。
+
+  θ ≈ 0     → 复苏起点 (从谷底回升)
+  θ ≈ π/2   → 繁荣顶点
+  θ ≈ π     → 衰退起点 (从顶峰回落)
+  θ ≈ 3π/2  → 萧条谷底
+  θ ≈ 2π    → 下一轮复苏起点
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 # ── 相位名称字典 ──────────────────────────────────────
@@ -189,3 +200,109 @@ def normalize_cycle_output(
         else:
             result[cid] = resolve_cycle_series(rows, pt)
     return result
+
+
+# ── 连续相位角 ──────────────────────────────────────────
+
+def zscore_to_phase_angle(zscore: list[float | None], mom_window: int = 5) -> list[float]:
+    """将 zscore 序列转换为连续相位角 [0, 2π)
+
+    核心思想：将 level(位置) 和 momentum(方向) 映射到极坐标角度，
+    使得周期演进呈现连续的正弦波结构，而非离散跳方。
+
+    映射规则:
+        level < 0, mom > 0 → 复苏(θ ∈ [0, π/2))
+        level ≥ 0, mom > 0 → 繁荣(θ ∈ [π/2, π))
+        level ≥ 0, mom ≤ 0 → 衰退(θ ∈ [π, 3π/2))
+        level < 0, mom ≤ 0 → 萧条(θ ∈ [3π/2, 2π))
+
+    在每个象限内，θ 的精确值由 |level| 和 |mom| 的相对强度插值：
+        - |mom| 大 → 靠近象限入口（刚进入新阶段）
+        - |level| 大 → 靠近象限出口（阶段深化）
+
+    Args:
+        zscore: 标准化序列（可为 None）
+        mom_window: 动量计算回看窗口
+
+    Returns:
+        与 zscore 等长的相位角列表，单位弧度 [0, 2π)
+    """
+    n = len(zscore)
+    if n == 0:
+        return []
+
+    angles: list[float] = []
+    for i in range(n):
+        z = zscore[i]
+        if z is None or math.isnan(z):
+            angles.append(0.0)
+            continue
+
+        # 计算动量
+        if i >= mom_window:
+            mom = z - zscore[i - mom_window] if zscore[i - mom_window] is not None else 0.0
+        elif i > 0:
+            mom = z - zscore[i - 1] if zscore[i - 1] is not None else 0.0
+        else:
+            mom = 0.0
+
+        # 归一化 level 和 momentum 到 [0, 1]
+        abs_z = min(abs(z), 3.0) / 3.0  # 截断到3σ
+        abs_m = min(abs(mom), 1.5) / 1.5
+
+        # 在象限内的位置：
+        # progress=1 → 动量主导(刚进入此阶段) → 靠近象限入口(sin≈0)
+        # progress=0 → level主导(深化/极值) → 靠近象限中心(sin绝对值最大)
+        denom = abs_z + abs_m + 1e-12
+        progress = abs_m / denom
+
+        if mom > 0 and z < 0:
+            # 复苏象限 [0, π/2)
+            # 入口(θ=0): sin=0, 刚从萧条拐出; 中心(θ=π/4): sin≈0.7, 回升加速
+            theta = progress * (math.pi / 2)
+        elif mom > 0 and z >= 0:
+            # 繁荣象限 [π/2, π)
+            # 入口(θ=π/2): sin=1, 刚越过0线; 中心(θ=3π/4): sin≈0.7, 繁荣深化
+            theta = math.pi / 2 + progress * (math.pi / 2)
+        elif mom <= 0 and z >= 0:
+            # 衰退象限 [π, 3π/2)
+            # 入口(θ=π): sin=0, 刚从繁荣回落; 中心(θ=5π/4): sin≈-0.7, 衰退加深
+            theta = math.pi + progress * (math.pi / 2)
+        else:
+            # 萧条象限 [3π/2, 2π)
+            # 入口(θ=3π/2): sin=-1, 刚跌破0线; 中心(θ=7π/4): sin≈-0.7, 萧条深化
+            theta = 3 * math.pi / 2 + progress * (math.pi / 2)
+
+        angles.append(theta % (2 * math.pi))
+
+    return angles
+
+
+def phase_angle_to_intensity(angles: list[float]) -> list[float]:
+    """将相位角转换为 [-1, +1] 的连续强度指标
+
+    sin(θ) 投影：繁荣→+1, 萧条→-1, 复苏/衰退→0 附近
+    直观含义：正值=经济扩张区，负值=经济收缩区
+
+    Args:
+        angles: zscore_to_phase_angle 的输出
+
+    Returns:
+        等长的 [-1, +1] 强度序列
+    """
+    return [math.sin(a) for a in angles]
+
+
+def phase_angle_to_signal(angles: list[float]) -> list[float]:
+    """将相位角映射为连续信号值，替代离散的 +2/+1/-1/-2
+
+    使用 sin(θ) 的缩放版本：[-2, +2] 范围
+    与 get_phase_signal 的量纲一致但连续平滑
+
+    Args:
+        angles: zscore_to_phase_angle 的输出
+
+    Returns:
+        等长的 [-2, +2] 信号序列
+    """
+    return [2.0 * math.sin(a) for a in angles]

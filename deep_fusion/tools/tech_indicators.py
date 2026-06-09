@@ -6,9 +6,9 @@ import json
 import akshare as ak
 import pandas as pd
 
-from DeepFusion.deep_fusion.cache import ak_cache
-from DeepFusion.deep_fusion.server import mcp
-from DeepFusion.deep_fusion.shared.indicators import add_technical_indicators
+from ..cache import ak_cache
+from ..server import mcp
+from ..shared.indicators import add_technical_indicators
 
 
 def fetch_kline(symbol: str, period: str = "daily") -> pd.DataFrame | None:

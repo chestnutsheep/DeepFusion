@@ -18,7 +18,7 @@ def _compute_kondratiev(method: str = "pca"):
         return _calc_kondratiev_wavelet()
     elif method == "bandpass":
         return _calc_kondratiev_bandpass()
-    from DeepFusion.deep_fusion.shared.utils import compute_kondratiev as _ck
+    from ....shared.utils import compute_kondratiev as _ck
 
     result = _ck()
     if not result.get("pca1"):
@@ -27,7 +27,7 @@ def _compute_kondratiev(method: str = "pca"):
 
 
     # Fetch actual data ranges via cached _nbs() wrapper
-    from DeepFusion.deep_fusion.shared.utils import fetch_wb
+    from ....shared.utils import fetch_wb
 
     coverage = []
 
@@ -873,7 +873,7 @@ def _fetch_nbs_unemployment() -> tuple[list[str], list[float]]:
 
 def _calc_kondratiev_wavelet() -> tuple[dict, list]:
     """Morlet 小波变换提取康波周期相位"""
-    from DeepFusion.deep_fusion.shared.utils import compute_kondratiev as _ck
+    from ....shared.utils import compute_kondratiev as _ck
 
     result = _ck()
     pca1 = result.get("pca1", [])
@@ -940,12 +940,26 @@ def _calc_kondratiev_wavelet() -> tuple[dict, list]:
         "phase_confidence": round(confidence, 4),
         "turning_probability": 0.0,
         "all_results": {},
+        # 全球/中国双线
+        "global_zscore": result.get("global_zscore", []),
+        "china_zscore": result.get("china_zscore", []),
+        "global_cf_cycle": result.get("global_cf_cycle", []),
+        "china_cf_cycle": result.get("china_cf_cycle", []),
+        "global_phase": result.get("global_phase", 0),
+        "global_phase_name": result.get("global_phase_name", "未知"),
+        "global_confidence": result.get("global_confidence", 0),
+        "china_phase": result.get("china_phase", 0),
+        "china_phase_name": result.get("china_phase_name", "未知"),
+        "china_confidence": result.get("china_confidence", 0),
+        "china_pca1": result.get("china_pca1", []),
+        "zscore": result.get("zscore", []),
+        "cf_cycle": result.get("cf_cycle", []),
     }, cycle_comp
 
 def _calc_kondratiev_bandpass() -> tuple[dict, list]:
     """Butterworth 40-60 年带通滤波提取康波相位"""
-    from DeepFusion.deep_fusion.shared.utils import compute_kondratiev as _ck
-    from DeepFusion.deep_fusion.shared.spectral import phase_from_waveform
+    from ....shared.utils import compute_kondratiev as _ck
+    from ....shared.spectral import phase_from_waveform
     from scipy.signal import butter, sosfiltfilt
 
     result = _ck()
@@ -986,6 +1000,20 @@ def _calc_kondratiev_bandpass() -> tuple[dict, list]:
         "phase_confidence": round(phase_info["confidence"], 4),
         "turning_probability": round(phase_info["turning_probability"], 4),
         "all_results": {},
+        # 全球/中国双线
+        "global_zscore": result.get("global_zscore", []),
+        "china_zscore": result.get("china_zscore", []),
+        "global_cf_cycle": result.get("global_cf_cycle", []),
+        "china_cf_cycle": result.get("china_cf_cycle", []),
+        "global_phase": result.get("global_phase", 0),
+        "global_phase_name": result.get("global_phase_name", "未知"),
+        "global_confidence": result.get("global_confidence", 0),
+        "china_phase": result.get("china_phase", 0),
+        "china_phase_name": result.get("china_phase_name", "未知"),
+        "china_confidence": result.get("china_confidence", 0),
+        "china_pca1": result.get("china_pca1", []),
+        "zscore": result.get("zscore", []),
+        "cf_cycle": result.get("cf_cycle", []),
     }, filtered.tolist()
 
 
@@ -995,8 +1023,8 @@ def _calc_kondratiev_bandpass() -> tuple[dict, list]:
 
 def _fetch_fred_series(cache_key: str) -> tuple[list[str], list[float]]:
     """DB-first 拉取 FRED 序列，未入库则实时拉取并持久化"""
-    from DeepFusion.deep_fusion.shared.cycle_db import get as db_get, set as db_set
-    from DeepFusion.deep_fusion.data.sources.fred import get as fred_get
+    from ....shared.cycle_db import get as db_get, set as db_set
+    from ....data.sources.fred import get as fred_get
     # 1. DB 缓存（永久存储，不设过期）
     df = db_get(cache_key)
     if df is not None and not df.empty:
@@ -1055,8 +1083,8 @@ def _compute_extended_cycle(
     Returns:
         (summary_dict, rows_list)
     """
-    from DeepFusion.deep_fusion.shared.spectral import cf_bandpass
-    from DeepFusion.deep_fusion.shared.phase_utils import get_phase_signal, get_phase_name
+    from ....shared.spectral import cf_bandpass
+    from ....shared.phase_utils import get_phase_signal, get_phase_name
 
     # 1. 拉取所有指标
     raw_series: dict[str, tuple[list[str], list[float]]] = {}

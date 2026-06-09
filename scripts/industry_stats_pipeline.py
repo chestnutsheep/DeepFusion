@@ -10,7 +10,7 @@ import pandas as pd
 import psycopg2
 import numpy as np
 
-from DeepFusion.deep_fusion.shared.constants import DB_CONFIG
+from deep_fusion.shared.constants import DB_CONFIG
 DB = DB_CONFIG
 
 def get_conn():

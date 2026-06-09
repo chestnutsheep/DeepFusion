@@ -9,7 +9,7 @@ import requests
 _LOGGER = logging.getLogger(__name__)
 
 def fetch_wb(indicator: str, country: str = "CN") -> list[tuple[int, float]]:
-    from DeepFusion.deep_fusion.cache import CacheKey
+    from ...cache import CacheKey
     cache = CacheKey.init(f"wb_{country}_{indicator}", ttl=86400 * 30, ttl2=86400 * 60)
     cached = cache.get()
     if cached is not None:
@@ -30,7 +30,7 @@ def fetch_wb(indicator: str, country: str = "CN") -> list[tuple[int, float]]:
 _FRED_BASE = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 def fetch_fred(series_id: str) -> list[tuple[str, float]]:
-    from DeepFusion.deep_fusion.cache import CacheKey
+    from ...cache import CacheKey
     cache = CacheKey.init(f"fred_{series_id}", ttl=86400 * 30, ttl2=86400 * 60)
     cached = cache.get()
     if cached is not None:

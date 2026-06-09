@@ -1,8 +1,8 @@
 """Cycle dispatch: CYCLES configs + _compute + report/chart helpers"""
 import logging
 
-from .engine import CycleEngine, CycleConfig, IndicatorDef
 from .common import _classify_kitchin, _classify_juglar, _classify_kuznets
+from .engine import CycleEngine, CycleConfig, IndicatorDef
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,8 @@ def _nbs(name: str, key: str) -> IndicatorDef:
     """
     _cache_key = name.replace("fetch_", "").replace("_nbs_", "")
     def _resolve():
-        from DeepFusion.deep_fusion.shared.cycle_db import get, set as db_set
-        from DeepFusion.deep_fusion.tools.cycles import _FN_MAP
+        from ....shared.cycle_db import get, set as db_set
+        from ....tools.cycles import _FN_MAP
         cached = get(_cache_key)
         if cached is not None:
             return cached["date"].tolist(), [float(v) if v is not None else None for v in cached["value"]]

@@ -142,9 +142,6 @@ async def ak_search_async(symbol: str | None = None, keyword: str | None = None,
                 return match
 
     return None
-                if name.startswith(keyword):
-                    return v
-    return None
 
 
 def compute_kondratiev() -> dict[str, Any]:
@@ -350,7 +347,21 @@ def compute_kondratiev() -> dict[str, Any]:
         "year_range": f"{years[0]}~{years[-1]}" if years else "?",
         "pca_variance_ratio": composite.get("pca_variance_ratio", 0.0),
         "indicators_used": g_avail + c_avail,
+        # ── 全球线 ──
         "pca1": g_res["pca1"].tolist() if g_res and "pca1" in g_res else [],
+        "global_zscore": g_res["zscore"] if g_res else [],
+        "global_cf_cycle": g_res["cycle"] if g_res else [],
+        "global_phase": result_regions.get("global", {}).get("phase", 0),
+        "global_phase_name": result_regions.get("global", {}).get("phase_name", "未知"),
+        "global_confidence": result_regions.get("global", {}).get("confidence", 0.0),
+        # ── 中国线 ──
+        "china_pca1": c_res["pca1"].tolist() if c_res and "pca1" in c_res else [],
+        "china_zscore": c_res["zscore"] if c_res else [],
+        "china_cf_cycle": c_res["cycle"] if c_res else [],
+        "china_phase": result_regions.get("china", {}).get("phase", 0),
+        "china_phase_name": result_regions.get("china", {}).get("phase_name", "未知"),
+        "china_confidence": result_regions.get("china", {}).get("confidence", 0.0),
+        # ── 通用 ──
         "years": years,
         "phase_confidence": cc,
         "turning_probability": turning_p,

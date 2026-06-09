@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import atexit
 import os
@@ -95,7 +95,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-import akshare as ak
 import pandas as pd
 
 _LOGGER = logging.getLogger(__name__)

@@ -1,16 +1,16 @@
 """Concept board data pipeline: fetch THS concept K-lines, compute returns, store in PG."""
+import sys
 import time
 from datetime import datetime
-
-import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import akshare as ak
 import pandas as pd
 import psycopg2
 
-from DeepFusion.deep_fusion.shared.constants import DB_CONFIG
+from deep_fusion.shared.constants import DB_CONFIG
 DB = DB_CONFIG
 
 def get_conn():
