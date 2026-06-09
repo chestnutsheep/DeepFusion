@@ -180,8 +180,9 @@ function CoverageGrid() {
 }
 
 /**
- * 四周期嵌套图：使用连续信号 [-2,+2] 替代离散哑变量，
- * 以平滑曲线直观展示周期嵌套关系与相位演进
+ * 四周期嵌套图：使用 composite_z（原始标准化 zscore）绘制平滑曲线，
+ * 直观展示周期嵌套关系与波动形态。
+ * 旧逻辑（phase_angle 转换为 _cont 信号）已存档，不再接入绘图。
  */
 const NEST_COLORS = {
   kitchin: '#5bba57',
@@ -195,6 +196,10 @@ const NEST_LABELS = {
   kuznets: '库兹涅茨',
   kondratiev: '康波',
 };
+
+// ── 存档：相位角转换绘图函数（供后续对比验证，不再接入） ──
+// const _RESERVED_getContData = (id) => rows.map(r => r[`${id}_cont`] ?? r[`${id}_signal`] ?? 0);
+// ── 存档结束 ──
 
 function CycleNesting() {
   const { data: rawData, isLoading } = useMCP('cycle_nesting', {});
@@ -215,8 +220,13 @@ function CycleNesting() {
     const dates = rows.map(r => r.period);
     const cycleIds = ['kondratiev', 'kuznets', 'juglar', 'kitchin'];
 
-    // 优先使用连续信号，回退到离散信号
-    const getData = (id) => rows.map(r => r[`${id}_cont`] ?? r[`${id}_signal`] ?? 0);
+    // 直接使用 composite_z（原始标准化 zscore），连续平滑
+    const getData = (id) => rows.map(r => r[`${id}_z`] ?? null);
+
+    // 自动计算 Y 轴范围
+    const allVals = cycleIds.flatMap(id => getData(id).filter(v => v != null));
+    const yMin = allVals.length ? Math.floor(Math.min(...allVals) * 2) / 2 - 0.5 : -3;
+    const yMax = allVals.length ? Math.ceil(Math.max(...allVals) * 2) / 2 + 0.5 : 3;
 
     const option = {
       tooltip: {
@@ -224,13 +234,14 @@ function CycleNesting() {
         formatter(params) {
           let s = `<b>${params[0].axisValue}</b><br/>`;
           for (const p of params) {
+            if (p.seriesName === '零线') continue;
             const val = p.value;
-            const absV = Math.abs(val);
-            let label;
-            if (absV > 1.5) label = val > 0 ? '繁荣' : '萧条';
-            else if (absV > 0.5) label = val > 0 ? '复苏' : '衰退';
-            else label = '过渡';
-            s += `${p.marker} ${p.seriesName}: ${label} (${val > 0 ? '+' : ''}${val.toFixed(2)})<br/>`;
+            if (val == null) continue;
+            // 从 rows 找到对应相位名
+            const idx = p.dataIndex;
+            const cid = Object.keys(NEST_LABELS).find(k => NEST_LABELS[k] === p.seriesName) || '';
+            const phaseName = rows[idx]?.[`${cid}_name`] || '—';
+            s += `${p.marker} ${p.seriesName}: ${phaseName} (z=${val > 0 ? '+' : ''}${val.toFixed(2)})<br/>`;
           }
           return s;
         },
@@ -239,7 +250,7 @@ function CycleNesting() {
       grid: { left: '8%', right: '5%', top: '8%', bottom: '18%', containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
       yAxis: {
-        type: 'value', min: -2.5, max: 2.5,
+        type: 'value', min: yMin, max: yMax,
         axisLabel: {
           formatter(v) {
             if (v >= 1.5) return '繁荣';
@@ -256,7 +267,6 @@ function CycleNesting() {
         { type: 'slider', start: 80, end: 100, height: 16, bottom: 24,
           borderColor: 'rgba(212,168,83,0.12)', backgroundColor: 'rgba(26,47,42,0.6)' },
       ],
-      // 零线标记
       series: [
         // 零线参考
         {
@@ -265,12 +275,13 @@ function CycleNesting() {
           symbol: 'none', silent: true, tooltip: { show: false },
           z: 0,
         },
-        // 四周期连续信号
+        // 四周期 composite_z 原始曲线
         ...cycleIds.map(id => ({
           name: NEST_LABELS[id],
           type: 'line',
           data: getData(id),
           smooth: true,
+          connectNulls: true,
           lineStyle: { color: NEST_COLORS[id], width: id === 'kondratiev' ? 3 : 2 },
           areaStyle: id === 'kondratiev'
             ? { opacity: 0.06, color: NEST_COLORS[id] }
@@ -288,6 +299,153 @@ function CycleNesting() {
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
   return <div ref={chartRef} style={{ width: '100%', height: 400 }} />;
+}
+
+// ── 相位→甘特图颜色/纹理 ──
+const GANTT_PHASE_STYLE = {
+  1: { color: '#5bba57', pattern: '///', label: '复苏' },   // 斜线纹理
+  2: { color: '#D4A853', pattern: '===', label: '繁荣' },   // 横线纹理
+  3: { color: '#cc4842', pattern: '\\\\\\', label: '衰退' }, // 反斜线纹理
+  4: { color: '#888',    pattern: '...', label: '萧条' },   // 点状纹理
+  0: { color: '#333',    pattern: '   ', label: '未知' },
+};
+
+/**
+ * 四周期相位甘特图：水平条形图，每个周期一行，
+ * 按年份展示相位区间，颜色+纹理区分四相位。
+ */
+function CycleGantt() {
+  const { data: rawData, isLoading } = useMCP('cycle_nesting', {});
+
+  const rows = useMemo(() => {
+    if (!rawData) return [];
+    try {
+      const parsed = JSON.parse(rawData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }, [rawData]);
+
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (!chartRef.current || !rows.length) return;
+    const chart = echarts.init(chartRef.current, 'df-dark');
+
+    const cycleIds = ['kondratiev', 'kuznets', 'juglar', 'kitchin'];
+    const years = rows.map(r => r.period);
+    const yearSet = [...new Set(years)].sort();
+
+    // 为每个周期生成色块数据：[yearIndex, cycleIndex, phase]
+    // ECharts custom series: renderItem 画矩形
+    const seriesData = [];
+    for (let yi = 0; yi < yearSet.length; yi++) {
+      const y = yearSet[yi];
+      const row = rows.find(r => r.period === y);
+      if (!row) continue;
+      for (let ci = 0; ci < cycleIds.length; ci++) {
+        const cid = cycleIds[ci];
+        const phase = row[`${cid}_phase`] ?? 0;
+        seriesData.push({
+          value: [yi, ci, phase],
+          phase,
+          name: row[`${cid}_name`] || '—',
+        });
+      }
+    }
+
+    const option = {
+      tooltip: {
+        formatter(params) {
+          const d = params.data;
+          if (!d) return '';
+          return `<b>${yearSet[d.value[0]]}</b><br/>${NEST_LABELS[cycleIds[d.value[1]]]}: ${d.name}`;
+        },
+      },
+      grid: { left: '12%', right: '5%', top: '5%', bottom: '20%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: yearSet,
+        axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(yearSet.length / 30) - 1) },
+      },
+      yAxis: {
+        type: 'category',
+        data: cycleIds.map(id => NEST_LABELS[id]),
+        inverse: true,
+        axisLabel: { fontSize: 12, fontWeight: 600 },
+      },
+      dataZoom: [
+        { type: 'inside', start: 80, end: 100 },
+        { type: 'slider', start: 80, end: 100, height: 16, bottom: 24,
+          borderColor: 'rgba(212,168,83,0.12)', backgroundColor: 'rgba(26,47,42,0.6)' },
+      ],
+      // 图例
+      visualMap: {
+        show: true,
+        orient: 'horizontal',
+        bottom: 0,
+        itemWidth: 14,
+        itemHeight: 14,
+        textStyle: { color: '#CBC0B0', fontSize: 11 },
+        categories: ['复苏', '繁荣', '衰退', '萧条', '未知'],
+        inRange: {
+          color: ['#5bba57', '#D4A853', '#cc4842', '#888', '#333'],
+        },
+        calculable: false,
+        dimension: 2,
+      },
+      series: [{
+        type: 'custom',
+        data: seriesData,
+        renderItem(params, api) {
+          const xIdx = api.value(0);
+          const yIdx = api.value(1);
+          const phase = api.value(2);
+
+          const start = api.coord([xIdx - 0.5, yIdx]);
+          const end = api.coord([xIdx + 0.5, yIdx]);
+          if (!start || !end) return;
+
+          const style = GANTT_PHASE_STYLE[phase] || GANTT_PHASE_STYLE[0];
+          const rectShape = {
+            x: start[0],
+            y: start[1] - 4,
+            width: end[0] - start[0],
+            height: 8,
+          };
+
+          // 纹理装饰：用 decal pattern 区分
+          const decalPatterns = {
+            1: { symbol: 'rect', symbolSize: 1, dashArrayX: [2, 3], dashArrayY: [2, 3], rotation: Math.PI / 4, color: 'rgba(255,255,255,0.12)' },
+            2: { symbol: 'rect', symbolSize: 1, dashArrayX: [4, 2], dashArrayY: [1, 0], rotation: 0, color: 'rgba(255,255,255,0.15)' },
+            3: { symbol: 'rect', symbolSize: 1, dashArrayX: [2, 3], dashArrayY: [2, 3], rotation: -Math.PI / 4, color: 'rgba(255,255,255,0.10)' },
+            4: { symbol: 'circle', symbolSize: 1, dashArrayX: [1, 4], dashArrayY: [1, 4], rotation: 0, color: 'rgba(255,255,255,0.08)' },
+            0: null,
+          };
+
+          return {
+            type: 'rect',
+            shape: rectShape,
+            style: {
+              fill: style.color,
+              decal: decalPatterns[phase] || undefined,
+              opacity: 0.85,
+            },
+            emphasis: {
+              style: { opacity: 1, stroke: '#fff', lineWidth: 1 },
+            },
+          };
+        },
+        encode: { x: 0, y: 1, tooltip: 2 },
+      }],
+    };
+    chart.setOption(option);
+    return () => chart.dispose();
+  }, [rows]);
+
+  if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
+  if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
+
+  return <div ref={chartRef} style={{ width: '100%', height: 220 }} />;
 }
 
 export default function MacroPage() {
@@ -316,14 +474,24 @@ export default function MacroPage() {
         <ErrorBoundary><CoverageGrid /></ErrorBoundary>
       </div>
 
-      {/* 周期嵌套图 — 四周期相位哑变量对比 */}
+      {/* 周期嵌套图 — 四周期 composite_z 对比 */}
       <hr className="section-divider" />
       <div id="nesting">
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>周期嵌套</h2>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-          四周期相位信号对比：+2 繁荣 / +1 复苏 / -1 衰退 / -2 萧条
+          四周期合成Z值（composite_z）波动对比：零线以上扩张，以下收缩
         </p>
         <ErrorBoundary><CycleNesting /></ErrorBoundary>
+      </div>
+
+      {/* 周期相位甘特图 */}
+      <hr className="section-divider" />
+      <div id="gantt">
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>相位分布</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+          四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
+        </p>
+        <ErrorBoundary><CycleGantt /></ErrorBoundary>
       </div>
     </div>
     </ErrorBoundary>

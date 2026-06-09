@@ -8,6 +8,10 @@ export const KUZNETS_CONFIG = {
     { key: 'composite_z', name: '合成Z值', color: '#d2991d', type: 'line' },
     { key: 'cycle_val', name: '周期分量', color: '#58a6ff', type: 'line' },
   ],
+  nbsChartSeries: [
+    { key: 'comp_z', name: '综合Z值', color: '#d2991d', type: 'line' },
+    { key: 'house_price_yoy', name: '房价同比', color: '#58a6ff', type: 'line' },
+  ],
   metrics: [
     { key: 'house_price_yoy', label: '房价同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true },
     { key: 'sales_yoy', label: '销售面积同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true },

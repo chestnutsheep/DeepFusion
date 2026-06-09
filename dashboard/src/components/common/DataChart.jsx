@@ -60,6 +60,7 @@ export default function DataChart({
         type: s.type || 'line',
         data: data.map(r => r[s.key]),
         smooth: true,
+        connectNulls: true,
         lineStyle: { color: s.color, width: 2 },
         areaStyle: s.type !== 'bar'
           ? { opacity: 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [

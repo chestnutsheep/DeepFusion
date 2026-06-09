@@ -142,7 +142,7 @@ function HeatmapChart({ industries, dates, matrix }) {
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = industries.map(i => i.name || i.code);
     // 只取最近 20 个交易日
-    const recentDates = dates.slice(-20);
+    const recentDates = dates.slice(-30);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
       for (let xi = 0; xi < recentDates.length; xi++) {

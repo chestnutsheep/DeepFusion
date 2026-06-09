@@ -200,30 +200,42 @@ def data_kuznets_extended() -> str:
 
 @mcp.tool(
     name="cycle_nesting",
-    description="四周期嵌套数据：基钦/朱格拉/库兹涅茨/康波相位哑变量序列（JSON数组），用于周期嵌套图",
+    description="四周期嵌套数据：基钦/朱格拉/库兹涅茨/康波合成Z值+相位序列（JSON数组），用于周期嵌套图与甘特图",
 )
 def cycle_nesting() -> str:
-    """将四周期当前相位转为 +2/+1/-1/-2 哑变量，构建时间对齐的嵌套数据"""
+    """四周期百年+扩展数据对齐：composite_z 原始标准化值 + 离散相位 + 相位名称
+
+    绘图优先使用 composite_z（FRED 扩展数据的原始 zscore，连续平滑），
+    phase_name 用于甘特图颜色映射。
+    保留 _cont / _signal 字段供参考，但不再作为主绘图数据源。
+    """
     from ..shared.phase_utils import (
         get_phase_signal,
         zscore_to_phase_angle, phase_angle_to_signal,
         MACRO_PHASE_NAMES,
     )
+    from ..analysis.macro.cycles.kondratiev import (
+        compute_kitchin_extended,
+        compute_juglar_extended,
+        compute_kuznets_extended,
+    )
 
-    _ck_nest = CacheKey.init("cycles_nesting_v2", ttl=604800, ttl2=2592000)
+    _ck_nest = CacheKey.init("cycles_nesting_v3", ttl=604800, ttl2=2592000)
     cached = _ck_nest.get()
     if cached is not None and isinstance(cached, str):
         return cached
 
-    # 1. 获取四周期数据
-    _, _, kitchin_rows = _compute("kitchin", limit=0)
-    _, _, juglar_rows = _compute("juglar", limit=0)
-    _, _, kuznets_rows = _compute("kuznets", limit=0)
+    # ── 1. 拉取四周期扩展数据（FRED/世界银行，百年+年频） ──
+    _, ki_rows = compute_kitchin_extended()
+    _, ju_rows = compute_juglar_extended()
+    _, ku_rows = compute_kuznets_extended()
     kondratiev_result, _ = _compute_kondratiev("pca")
 
-    # 2. 构建康波逐行数据（含连续相位角）
+    # ── 2. 构建康波逐行数据 ──
     k_years = kondratiev_result.get("years", [])
     k_zscore = kondratiev_result.get("zscore", [])
+
+    # 保留相位角转换逻辑（参考备用），但主绘图使用原始 zscore
     k_zscore_vals = [z if z is not None else 0.0 for z in k_zscore] if k_zscore else []
     k_angles = zscore_to_phase_angle(k_zscore_vals)
     k_cont_signal = phase_angle_to_signal(k_angles)
@@ -248,16 +260,15 @@ def cycle_nesting() -> str:
                 phase = kondratiev_result.get("phase", 0)
             row["phase"] = phase
             row["phase_name"] = MACRO_PHASE_NAMES.get(phase, "未知")
-        if i < len(k_cont_signal):
-            row["cont_signal"] = round(k_cont_signal[i], 4)
+        row["composite_z"] = round(k_zscore_vals[i], 4) if i < len(k_zscore_vals) else None
+        row["cont_signal"] = round(k_cont_signal[i], 4) if i < len(k_cont_signal) else None
         k_rows.append(row)
-    # 最后一行用融合结果
     if k_rows:
         k_rows[-1]["phase"] = kondratiev_result.get("phase", 0)
         k_rows[-1]["phase_name"] = kondratiev_result.get("phase_name", "未知")
 
-    # 3. 对齐到年频：基钦/朱格拉/库兹涅茨 取每年最后一期
-    def _annual_rows(rows, phase_key="phase"):
+    # ── 3. 年频对齐：扩展数据已是年频，直接按 period 索引 ──
+    def _annual_rows(rows):
         by_year: dict[str, dict] = {}
         for r in rows:
             p = str(r.get("period", ""))
@@ -266,13 +277,13 @@ def cycle_nesting() -> str:
                 by_year[y] = r
         return by_year
 
-    kitchin_ann = _annual_rows(kitchin_rows, "stage")
-    juglar_ann = _annual_rows(juglar_rows, "phase")
-    kuznets_ann = _annual_rows(kuznets_rows, "phase")
-    kondratiev_ann = _annual_rows(k_rows, "phase")
+    ki_ann = _annual_rows(ki_rows)
+    ju_ann = _annual_rows(ju_rows)
+    ku_ann = _annual_rows(ku_rows)
+    ko_ann = _annual_rows(k_rows)
 
-    # 4. 为三周期（NBS月频数据）计算连续相位角
-    #    提取各周期的 comp_z/stage 等核心指标做相位角
+    # ── 4. 保留相位角转换（参考备用，不用于主绘图） ──
+    # _RESERVED_PHASE_CONVERSION（存档，供后续对比验证）
     def _extract_zscore_series(ann_rows, key):
         years_sorted = sorted(ann_rows.keys())
         vals = []
@@ -281,59 +292,57 @@ def cycle_nesting() -> str:
             vals.append(v if v is not None else 0.0)
         return years_sorted, vals
 
-    # 基钦：用 stage 值 (1-4) 转为 ±信号再计算
-    ki_years_s, ki_stages = _extract_zscore_series(kitchin_ann, "stage")
-    ki_signals_raw = [get_phase_signal(int(s)) for s in ki_stages]
-    ki_angles = zscore_to_phase_angle(ki_signals_raw)
+    ki_years_s, ki_zs = _extract_zscore_series(ki_ann, "composite_z")
+    ki_angles = zscore_to_phase_angle(ki_zs)
     ki_cont = phase_angle_to_signal(ki_angles)
-    ki_angle_map = {y: v for y, v in zip(ki_years_s, ki_cont)}
+    ki_cont_map = {y: v for y, v in zip(ki_years_s, ki_cont)}
 
-    # 朱格拉：用 comp_z
-    ju_years_s, ju_zs = _extract_zscore_series(juglar_ann, "comp_z")
+    ju_years_s, ju_zs = _extract_zscore_series(ju_ann, "composite_z")
     ju_angles = zscore_to_phase_angle(ju_zs)
     ju_cont = phase_angle_to_signal(ju_angles)
-    ju_angle_map = {y: v for y, v in zip(ju_years_s, ju_cont)}
+    ju_cont_map = {y: v for y, v in zip(ju_years_s, ju_cont)}
 
-    # 库兹涅茨：用 comp_z
-    ku_years_s, ku_zs = _extract_zscore_series(kuznets_ann, "comp_z")
+    ku_years_s, ku_zs = _extract_zscore_series(ku_ann, "composite_z")
     ku_angles = zscore_to_phase_angle(ku_zs)
     ku_cont = phase_angle_to_signal(ku_angles)
-    ku_angle_map = {y: v for y, v in zip(ku_years_s, ku_cont)}
+    ku_cont_map = {y: v for y, v in zip(ku_years_s, ku_cont)}
 
-    # 康波：直接用已计算的 cont_signal
-    ko_angle_map = {}
+    ko_cont_map = {}
     for r in k_rows:
         y = str(r.get("period", ""))[:4]
         if len(y) == 4:
-            ko_angle_map[y] = r.get("cont_signal", 0.0)
+            ko_cont_map[y] = r.get("cont_signal", 0.0)
 
-    # 5. 汇总年份并构建嵌套数据
-    all_years = sorted(set(list(kitchin_ann.keys()) + list(juglar_ann.keys()) +
-                           list(kuznets_ann.keys()) + list(kondratiev_ann.keys())))
+    # ── 5. 汇总年份并构建嵌套数据 ──
+    all_years = sorted(set(list(ki_ann.keys()) + list(ju_ann.keys()) +
+                           list(ku_ann.keys()) + list(ko_ann.keys())))
     nesting = []
     for y in all_years:
         entry: dict = {"period": y}
-        for cid, ann, pk in [
-            ("kitchin", kitchin_ann, "stage"),
-            ("juglar", juglar_ann, "phase"),
-            ("kuznets", kuznets_ann, "phase"),
-            ("kondratiev", kondratiev_ann, "phase"),
+        for cid, ann in [
+            ("kitchin", ki_ann),
+            ("juglar", ju_ann),
+            ("kuznets", ku_ann),
+            ("kondratiev", ko_ann),
         ]:
             row = ann.get(y)
             if row:
-                ph = row.get(pk, 0)
+                ph = row.get("phase", 0)
                 entry[f"{cid}_phase"] = ph
                 entry[f"{cid}_signal"] = get_phase_signal(ph)
-                entry[f"{cid}_name"] = row.get("phase_name") or row.get("stage_name", "未知")
+                entry[f"{cid}_name"] = row.get("phase_name", "未知")
+                # 核心绘图字段：原始标准化 zscore（连续平滑）
+                entry[f"{cid}_z"] = row.get("composite_z")
             else:
                 entry[f"{cid}_phase"] = 0
                 entry[f"{cid}_signal"] = 0.0
                 entry[f"{cid}_name"] = "—"
-        # 连续信号
-        entry["kitchin_cont"] = round(ki_angle_map.get(y, 0.0), 4)
-        entry["juglar_cont"] = round(ju_angle_map.get(y, 0.0), 4)
-        entry["kuznets_cont"] = round(ku_angle_map.get(y, 0.0), 4)
-        entry["kondratiev_cont"] = round(ko_angle_map.get(y, 0.0), 4)
+                entry[f"{cid}_z"] = None
+        # 相位角转换信号（存档备用，与 composite_z 对比验证）
+        entry["kitchin_cont"] = round(ki_cont_map.get(y, 0.0), 4)
+        entry["juglar_cont"] = round(ju_cont_map.get(y, 0.0), 4)
+        entry["kuznets_cont"] = round(ku_cont_map.get(y, 0.0), 4)
+        entry["kondratiev_cont"] = round(ko_cont_map.get(y, 0.0), 4)
         nesting.append(entry)
 
     text = json.dumps(nesting, ensure_ascii=False)

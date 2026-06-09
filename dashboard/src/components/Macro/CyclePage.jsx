@@ -75,6 +75,12 @@ export default function CyclePage({ config, showTitle }) {
   const metrics = config.metrics || [];
   const chartHeight = 320;
 
+  // 根据数据源动态选择绘图系列：扩展数据用 chartSeries，NBS 数据用 nbsChartSeries
+  const isUsingExtData = extResult.data && _parseJSON(extResult.data).length > 0;
+  const activeChartSeries = isUsingExtData
+    ? (config.chartSeries || [])
+    : (config.nbsChartSeries || config.chartSeries || []);
+
   return (
     <div>
       {showTitle && <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>{showTitle}</h2>}
@@ -103,7 +109,7 @@ export default function CyclePage({ config, showTitle }) {
       <div style={{ width: '60%', marginBottom: 20 }}>
         <DataChart
           data={rows}
-          series={config.chartSeries}
+          series={activeChartSeries}
           dateKey="period"
           height={chartHeight}
           zoomStart={zoomStart}
