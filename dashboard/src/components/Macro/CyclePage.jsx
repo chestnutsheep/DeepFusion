@@ -4,13 +4,18 @@ import DataChart from '../common/DataChart.jsx';
 import DataGrid from '../common/DataGrid.jsx';
 import StatusBar from '../common/StatusBar.jsx';
 
-const ZOOM_WINDOW = {
-  data_kitchin:     { start: 70, end: 100 },
-  data_juglar:      { start: 50, end: 100 },
-  data_kuznets:     { start: 40, end: 100 },
-  data_kondratiev:  { start: 20, end: 100 },
-};
-const DEFAULT_WINDOW = { start: 50, end: 100 };
+// 所有图表默认显示全量数据的后 1/5
+const DEFAULT_WINDOW = { start: 80, end: 100 };
+
+/** JSON 字符串 → 数组 */
+function _parseJSON(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 /** 相位→醒目标签样式 */
 const PHASE_BADGE = {
@@ -23,29 +28,40 @@ const PHASE_BADGE = {
 
 export default function CyclePage({ config, showTitle }) {
   const { data: rawData, isLoading } = useMCP(config.queryKey, config.params || {});
+  // 三个小周期额外拉 FRED 扩展数据（百年序列）；传 null args 则不发请求
+  const extResult = useMCP(config.extQueryKey, config.extQueryKey ? {} : null);
 
-  // 用 useMemo 缓存解析，避免每次渲染新数组引用导致 DataChart 销毁重建
+  // 优先使用扩展数据（更长历史），回退到 NBS 数据
   const rows = useMemo(() => {
-    if (!rawData) return [];
-    try {
-      const parsed = JSON.parse(rawData);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    const extRows = extResult.data ? _parseJSON(extResult.data) : [];
+    const nbsRows = rawData ? _parseJSON(rawData) : [];
+    // 扩展数据有 composite_z + cycle_val，NBS 数据有原始指标
+    // 图表使用扩展数据（100年+），指标卡使用 NBS 最新值
+    return extRows.length > 0 ? extRows : nbsRows;
+  }, [rawData, extResult.data]);
+
+  // NBS 最新行用于指标卡
+  const nbsLatest = useMemo(() => {
+    const nbsRows = rawData ? _parseJSON(rawData) : [];
+    return nbsRows[nbsRows.length - 1] || {};
   }, [rawData]);
 
   const latest = rows[rows.length - 1] || {};
   const prev = rows[rows.length - 2] || {};
+  // 指标卡优先使用 NBS 数据（更细粒度），回退到扩展数据
+  const metricsLatest = Object.keys(nbsLatest).length > 0 ? nbsLatest : latest;
 
   if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
-  let phaseValue = latest[config.phaseField];
+  // 扩展数据使用 phase/phase_name，NBS 数据使用 stage_name 等
+  let phaseValue = latest.phase ?? latest[config.phaseField];
   let phaseName = phaseValue;
   if (latest.phase_name && latest.phase_name !== '未知') {
     phaseName = latest.phase_name;
-  } else if (config.phaseField === 'phase') {
+  } else if (latest.stage_name) {
+    phaseName = latest.stage_name;
+  } else if (config.phaseField === 'phase' || latest.phase != null) {
     const phaseNames = ['', '复苏', '繁荣', '衰退', '萧条'];
     phaseName = phaseNames[phaseValue] || phaseValue;
   }
@@ -53,8 +69,8 @@ export default function CyclePage({ config, showTitle }) {
   // 醒目的相位标签
   const badge = PHASE_BADGE[phaseValue] || PHASE_BADGE[0];
 
-  // dataZoom 默认窗口 — 数据全量不变，只控制可视范围
-  const { start: zoomStart, end: zoomEnd } = ZOOM_WINDOW[config.queryKey] || DEFAULT_WINDOW;
+  // dataZoom 默认窗口 — 所有周期统一 1/5
+  const { start: zoomStart, end: zoomEnd } = DEFAULT_WINDOW;
 
   const metrics = config.metrics || [];
   const chartHeight = 320;
@@ -97,7 +113,7 @@ export default function CyclePage({ config, showTitle }) {
 
       {/* 指标卡 — 底部横排 */}
       {metrics.length > 0 && (
-        <DataGrid config={metrics} data={latest} prevData={prev} columns={metrics.length} gap={12} />
+        <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={metrics.length} gap={12} />
       )}
     </div>
   );

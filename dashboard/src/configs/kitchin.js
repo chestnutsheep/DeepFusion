@@ -1,11 +1,12 @@
 export const KITCHIN_CONFIG = {
   queryKey: 'data_kitchin',
+  extQueryKey: 'data_kitchin_extended',
   title: '基钦周期',
   icon: '📉',
   phaseField: 'stage_name',
   chartSeries: [
-    { key: 'inventory_yoy', name: '库存同比', color: '#f85149', type: 'line' },
-    { key: 'demand_yoy', name: '需求同比', color: '#D4A853', type: 'line' },
+    { key: 'composite_z', name: '合成Z值', color: '#D4A853', type: 'line' },
+    { key: 'cycle_val', name: '周期分量', color: '#5bba57', type: 'line' },
   ],
   metrics: [
     { key: 'inventory_yoy', label: '库存同比', unit: '%', dir: true, card: true, higherBetter: null, decimals: 1 },

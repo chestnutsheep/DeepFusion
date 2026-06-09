@@ -252,8 +252,8 @@ function CycleNesting() {
         },
       },
       dataZoom: [
-        { type: 'inside', start: 0, end: 100 },
-        { type: 'slider', start: 0, end: 100, height: 16, bottom: 24,
+        { type: 'inside', start: 80, end: 100 },
+        { type: 'slider', start: 80, end: 100, height: 16, bottom: 24,
           borderColor: 'rgba(212,168,83,0.12)', backgroundColor: 'rgba(26,47,42,0.6)' },
       ],
       // 零线标记

@@ -1,11 +1,12 @@
 export const JUGLAR_CONFIG = {
   queryKey: 'data_juglar',
+  extQueryKey: 'data_juglar_extended',
   title: '朱格拉周期',
   icon: '📈',
   phaseField: 'phase_name',
   chartSeries: [
-    { key: 'comp_z', name: '综合z值', color: '#4e6cce', type: 'line' },
-    { key: 'fix_inv_yoy', name: '固投同比', color: '#c1a332', type: 'line' },
+    { key: 'composite_z', name: '合成Z值', color: '#4e6cce', type: 'line' },
+    { key: 'cycle_val', name: '周期分量', color: '#c1a332', type: 'line' },
   ],
   metrics: [
     { key: 'comp_z', label: '综合z值', unit: '', dir: true, card: true, decimals: 4, higherBetter: true },

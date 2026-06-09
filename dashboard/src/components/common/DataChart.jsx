@@ -26,12 +26,12 @@ echarts.registerTheme('df-dark', {
  * @param {string} dateKey
  * @param {number} height
  * @param {boolean} zoom       是否启用滚轮缩放+拖拽
- * @param {number} zoomStart   dataZoom 初始 start 百分比（默认 0 即最左）
- * @param {number} zoomEnd     dataZoom 初始 end 百分比（默认 100 即最右）
+ * @param {number} zoomStart   dataZoom 初始 start 百分比
+ * @param {number} zoomEnd     dataZoom 初始 end 百分比
  */
 export default function DataChart({
   data, series, dateKey = 'period', height = 400,
-  zoom = true, zoomStart = 0, zoomEnd = 100,
+  zoom = true, zoomStart = 80, zoomEnd = 100,
 }) {
   const chartRef = useRef(null);
   useEffect(() => {
@@ -49,9 +49,9 @@ export default function DataChart({
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
       yAxis: hasDualY
         ? [
-            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 11 },
+            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } } },
-            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 11 },
+            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { show: false } },
           ]
         : { type: 'value' },
@@ -86,7 +86,7 @@ export default function DataChart({
             areaStyle: { color: 'rgba(212,168,83,0.12)' },
           },
           handleStyle: { color: '#CBC0B0' },
-          textStyle: { color: '#CBC0B0', fontSize: 10 },
+          textStyle: { color: '#CBC0B0', fontSize: 12 },
         },
       ];
     }

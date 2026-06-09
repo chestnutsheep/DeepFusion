@@ -1,5 +1,6 @@
 export const KONDRATIEV_CONFIG = {
   queryKey: 'data_kondratiev',
+  extQueryKey: null,
   title: '康波周期',
   icon: '🌊',
   phaseField: 'phase',

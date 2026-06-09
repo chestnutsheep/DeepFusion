@@ -1,13 +1,5 @@
-
-
-
-
-
-
-
-
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useMCP } from '../../hooks/useMCP';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {useMCP} from '../../hooks/useMCP';
 import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
@@ -149,8 +141,8 @@ function HeatmapChart({ industries, dates, matrix }) {
     if (!chartRef.current || !industries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = industries.map(i => i.name || i.code);
-    // 只取最近 10 个交易日，避免太宽
-    const recentDates = dates.slice(-10);
+    // 只取最近 20 个交易日
+    const recentDates = dates.slice(-20);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
       for (let xi = 0; xi < recentDates.length; xi++) {
@@ -363,8 +355,11 @@ function EnergySection() {
 // ── 主组件 ──
 
 export default function MesoLayout() {
-  // 请求最近 20 天数据（含多个交易日），让热力图有足够列
-  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', limit: 500 });
+  // 请求最近 20 个交易日的数据，让热力图有足够列
+  const today = new Date();
+  const startDay = new Date(today.getTime() - 30 * 86400000); // 30自然日≈20交易日
+  const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
+  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', start_date: startStr, limit: 800 });
   const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
   const [activeInd, setActiveInd] = useState('');
 
@@ -395,7 +390,7 @@ export default function MesoLayout() {
 
       {/* 区块一：行业热力图与轮动 */}
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-        <SectionHeader badge="🔥 行业轮动" title="全行业" highlight="景气热力" desc="申万一级行业涨跌幅排行，颜色越红 = 表现越强" />
+        <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，颜色越红 = 表现越强" />
         <CardWrapper style={{ padding: 16 }}>
           <HeatmapChart industries={industries} dates={dates} matrix={matrix} />
         </CardWrapper>
@@ -406,7 +401,7 @@ export default function MesoLayout() {
       {/* 区块二：行业排名 + 行业详情 */}
       <div style={{ paddingBottom: 24 }}>
         <SectionHeader badge="📊 行业排名" title="当期" highlight="TOP / BOTTOM" desc="各维度排名前 5 / 后 5 行业" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, marginBottom: 16 }}>
           <RankingTable title="🔥 涨幅 TOP 5" subtitle="· 今日" items={top5} colorKey="up" />
           <RankingTable title="❄️ 跌幅 TOP 5" subtitle="· 今日" items={bottom5} colorKey="down" />
         </div>
@@ -416,11 +411,11 @@ export default function MesoLayout() {
           {industries.slice(0, 31).map(ind => (
             <button key={ind.code} onClick={() => setActiveInd(ind.name)}
               style={{
-                padding: '3px 10px', borderRadius: 2, fontSize: 11,
+                padding: '4px 14px', borderRadius: 4, fontSize: 12,
                 fontWeight: selName === ind.name ? 700 : 500,
                 background: selName === ind.name ? 'var(--accent-gold)' : 'transparent',
-                color: selName === ind.name ? '#000' : 'var(--text-secondary)',
-                border: '1px solid var(--border-subtle)', cursor: 'pointer',
+                color: selName === ind.name ? '#fff' : 'var(--text-secondary)',
+                border: '1.5px solid var(--border-subtle)', cursor: 'pointer',
               }}>
               {ind.name}
             </button>
