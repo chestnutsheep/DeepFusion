@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useMCP} from '../../hooks/useMCP';
 import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
@@ -134,27 +134,206 @@ function SectionHeader({ badge, title, highlight, desc }) {
   );
 }
 
-// ── 进攻/防御行业分类 ──
-// 进攻型：强周期 + 高Beta + 科技成长
-const OFFENSIVE_NAMES = new Set([
-  '有色金属', '采掘', '钢铁', '化工', '房地产', '非银金融',
-  '国防军工', '电子', '计算机', '通信', '电气设备', '机械设备',
-  '汽车', '医药生物', '新能源汽车', '综合', '传媒',
+// ── 三分法行业分类 ──
+// 强周期：传统经济周期高度敏感，与GDP/投资强相关
+const CYCLICAL_NAMES = new Set([
+  '采掘', '钢铁',                                         // 上游原材料(传统大宗)
+  '房地产', '建筑装饰', '建筑材料',                         // 地产基建链
+  '机械设备',                                               // Capex 周期
+  '汽车',                                                   // 大件可选消费周期
+  '非银金融',                                               // 市场周期(券商)
+  '综合',                                                   // 难归类，归入周期
 ]);
-// 防御型：刚需消费 + 低Beta + 传统基础工业
+// 强防御：穿越周期刚需，低Beta，稳定现金流
 const DEFENSIVE_NAMES = new Set([
-  '银行', '食品饮料', '农林牧渔', '公用事业', '交通运输',
-  '商业贸易', '家用电器', '纺织服装', '轻工制造',
-  '建筑装饰', '建筑材料', '休闲服务', '美容护理',
+  '银行',                                                   // 低估值高分红
+  '食品饮料',                                               // 必选消费
+  '农林牧渔',                                               // 刚需
+  '公用事业',                                               // 必选服务
+  '交通运输',                                               // 基础设施
+  '商业贸易',                                               // 基础消费/零售
+  '纺织服装',                                               // 基础消费
+  '轻工制造',                                               // 基础消费
+  '家用电器',                                               // 偏刚需换代
+  '美容护理',                                               // 传统消费
+]);
+// 进攻型：高成长/高Beta + 第六次康波驱动(新能源金属/新材料/创新药/科技)
+const GROWTH_NAMES = new Set([
+  '有色金属',                                               // 第六次康波: 新能源金属(锂/钴/稀土)
+  '化工',                                                   // 第六次康波: 新材料/半导体材料
+  '电子', '计算机', '通信',                                 // TMT 科技
+  '电气设备',                                               // 新能源/成长
+  '国防军工',                                               // 高弹性
+  '医药生物',                                               // 创新药/器械
+  '传媒',                                                   // 游戏/内容
+  '新能源汽车',                                             // 成长赛道
 ]);
 
-/** 单组热力图 */
-function HeatmapSubChart({ industries, dates, matrix, title, icon, accentColor }) {
+// ── 分类配置表 ──
+const CATEGORY_CONFIG = {
+  cyclical:  { label: '🔄 强周期', names: CYCLICAL_NAMES,  accent: '#D4A853', desc: '经济周期敏感' },
+  defensive: { label: '🛡️ 强防御', names: DEFENSIVE_NAMES, accent: '#5B8FA8', desc: '穿越周期刚需' },
+  growth:    { label: '⚔️ 进攻型', names: GROWTH_NAMES,    accent: '#C47B7B', desc: '高成长高Beta' },
+};
+
+// ── 工具函数 ──
+
+/** 涨跌幅 → 热力色 (treemap 用) */
+function changeToColor(v) {
+  if (v > 3)   return '#c43e3e';
+  if (v > 1.5) return '#e2806f';
+  if (v > 0.3) return '#f5c4b4';
+  if (v > -0.3)return '#e8e0d0';
+  if (v > -1.5)return '#75d378';
+  if (v > -3)  return '#44b63a';
+  return '#217819';
+}
+
+/** 解析 industry_sw_tree 文本 → { "二级行业名": "一级行业名" } 映射 */
+function parseTreeMapping(text) {
+  if (!text) return {};
+  const mapping = {};
+  let currentL1 = null;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('申万') || !line.trim()) continue;
+    // Level 1: ├── 农林牧渔 ... 或 └── ...
+    const l1 = line.match(/^[├└]──\s*(\S+)/);
+    if (l1) { currentL1 = l1[1]; continue; }
+    // Level 2: │   ├── 种植业 ... 或 │   └── ...
+    const l2 = line.match(/│\s+[├└]──\s*(\S+)/);
+    if (l2 && currentL1) mapping[l2[1]] = currentL1;
+  }
+  return mapping;
+}
+
+/** 判断行业所属分类 key */
+function getCategoryOf(name) {
+  if (CYCLICAL_NAMES.has(name))  return 'cyclical';
+  if (DEFENSIVE_NAMES.has(name)) return 'defensive';
+  if (GROWTH_NAMES.has(name))    return 'growth';
+  return 'cyclical'; // 兜底
+}
+
+// ── 下钻组件 ──
+
+/** 行业下钻：二级行业树状图 */
+function IndustryDrilldown({ target, onBack }) {
   const chartRef = useRef(null);
+  const { data: treeRaw } = useMCP('industry_sw_tree', { '深度': 2, '展开': 31 });
+  const today = new Date();
+  const startDay = new Date(today.getTime() - 30 * 86400000);
+  const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
+  const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, limit: 2000 });
+
+  const mapping = useMemo(() => parseTreeMapping(treeRaw), [treeRaw]);
+  const l2Parsed = useMemo(() => parseSWDaily(l2Raw), [l2Raw]);
+
+  const subIndustries = useMemo(() => {
+    if (!l2Parsed.industries.length) return [];
+    // 优先用 tree mapping，回退到名称包含匹配
+    const byMapping = l2Parsed.industries.filter(i => mapping[i.name] === target.industry);
+    if (byMapping.length > 0) return byMapping;
+    // 回退：名称包含关系（如"银行II"包含"银行"，"白酒"在"食品饮料"下但名称不含）
+    return l2Parsed.industries.filter(i => {
+      const parent = mapping[i.name];
+      if (parent) return parent === target.industry;
+      // 最终回退：代码前缀匹配
+      const l1 = l2Parsed.industries.find(j => j.name === target.industry);
+      return l1 && i.code && l1.code && i.code.substring(0, 5) === l1.code.substring(0, 5);
+    });
+  }, [l2Parsed, mapping, target.industry]);
+
   useEffect(() => {
-    if (!chartRef.current || !industries.length || !dates.length) return;
+    if (!chartRef.current || !subIndustries.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
-    const names = industries.map(i => i.name || i.code);
+    const data = subIndustries.map(si => ({
+      name: si.name,
+      value: Math.max(1, si.mktCap / 1e8),
+      itemStyle: { color: changeToColor(si.change), borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
+      _change: si.change,
+      _pe: si.pe,
+      _pb: si.pb,
+      _mktCap: si.mktCap,
+    }));
+    chart.setOption({
+      tooltip: {
+        formatter: p => `${p.name}<br/>涨跌幅: ${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(2)}%<br/>流通市值: ${(p.data._mktCap / 1e8).toFixed(0)}亿<br/>PE: ${p.data._pe.toFixed(1)}  PB: ${p.data._pb.toFixed(2)}`,
+      },
+      series: [{
+        type: 'treemap',
+        data,
+        roam: false,
+        nodeClick: false,
+        breadcrumb: { show: false },
+        label: {
+          show: true,
+          formatter: p => `${p.name}\n${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(1)}%`,
+          fontSize: 11,
+          color: '#F0E8D8',
+        },
+        upperLabel: { show: false },
+        itemStyle: { borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
+      }],
+    });
+    return () => chart.dispose();
+  }, [subIndustries]);
+
+  const avgChange = subIndustries.length ? subIndustries.reduce((s, i) => s + i.change, 0) / subIndustries.length : 0;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <button onClick={onBack} style={{
+          padding: '4px 12px', borderRadius: 6, fontSize: 12,
+          background: 'rgba(212,168,83,0.1)', border: '1px solid var(--border-subtle)',
+          color: 'var(--accent-gold)', cursor: 'pointer',
+        }}>← 返回热力图</button>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{target.industry}</span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>· {target.date} · 二级行业树状图</span>
+        {subIndustries.length > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+            color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
+          }}>
+            均涨 {avgChange.toFixed(2)}% · {subIndustries.length} 子行业
+          </span>
+        )}
+      </div>
+      {subIndustries.length > 0 ? (
+        <div ref={chartRef} style={{ width: '100%', height: 380 }} />
+      ) : (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+          暂无二级行业数据，请先执行 industry_collect 采集
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 热力图交互区 ──
+
+/** 行业热力图 — 三分类Tab + 可点击下钻 */
+function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
+  const [activeCategory, setActiveCategory] = useState('cyclical');
+  const [drillTarget, setDrillTarget] = useState(null); // { industry, date }
+  const chartRef = useRef(null);
+
+  const currentConfig = CATEGORY_CONFIG[activeCategory];
+  const allClassified = useMemo(() => new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]), []);
+
+  const filteredIndustries = useMemo(() => {
+    const base = industries.filter(i => currentConfig.names.has(i.name));
+    if (activeCategory === 'cyclical') {
+      const uncategorized = industries.filter(i => !allClassified.has(i.name));
+      return [...base, ...uncategorized];
+    }
+    return base;
+  }, [industries, activeCategory, currentConfig.names, allClassified]);
+
+  // 热力图渲染（非下钻状态）
+  useEffect(() => {
+    if (drillTarget || !chartRef.current || !filteredIndustries.length || !dates.length) return;
+    const chart = echarts.init(chartRef.current, 'df-dark');
+    const names = filteredIndustries.map(i => i.name || i.code);
     const recentDates = dates.slice(-30);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
@@ -164,59 +343,80 @@ function HeatmapSubChart({ industries, dates, matrix, title, icon, accentColor }
       }
     }
     chart.setOption({
-      "tooltip": {
-        "formatter": p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
+      tooltip: {
+        formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      "grid": { "left": 90, "right": 16, "top": 8, "bottom": 36 },
-      "xAxis": { "type": 'category', "data": recentDates.map(d => d.slice(5)), "axisLabel": { "fontSize": 10, "rotate": 35 } },
-      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 12, "width": 72, "overflow": "truncate" } },
-      "visualMap": {
-        "min": -4, "max": 4, "calculable": true, "orient": 'horizontal', "left": 'center', "bottom": 0,
-        "inRange": { "color": ['rgb(8 86 11)', '#217819', '#44b63a', '#75d378', '#f5c4b4', '#e2806f', '#c43e3e'] },
-        "textStyle": { "color": '#CBC0B0', "fontSize": 11 },
+      grid: { left: 90, right: 16, top: 8, bottom: 36 },
+      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 10, rotate: 35 } },
+      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 12, width: 72, overflow: 'truncate' } },
+      visualMap: {
+        min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
+        inRange: { color: ['rgb(8 86 11)', '#217819', '#44b63a', '#75d378', '#f5c4b4', '#e2806f', '#c43e3e'] },
+        textStyle: { color: '#CBC0B0', fontSize: 11 },
       },
-      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 10, "color": '#F0E8D8' },
-        "emphasis": { "itemStyle": { "shadowBlur": 10, "shadowColor": 'rgb(66 66 66 / 0.5)' } },
-      }]
+      series: [{
+        type: 'heatmap', data,
+        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 10, color: '#F0E8D8' },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.5)' } },
+      }],
+    });
+    // 点击方格 → 下钻
+    chart.on('click', (params) => {
+      if (params.data) {
+        const industryName = names[params.data[1]];
+        const date = recentDates[params.data[0]];
+        setDrillTarget({ industry: industryName, date });
+        onIndustrySelect(industryName);
+      }
     });
     return () => chart.dispose();
-  }, [industries, dates, matrix]);
-  // 每个行业给 28px 高度，保证行高充裕
-  const h = Math.max(220, industries.length * 28 + 50);
+  }, [filteredIndustries, dates, matrix, drillTarget, onIndustrySelect]);
+
+  const avgChange = filteredIndustries.length
+    ? filteredIndustries.reduce((s, i) => s + i.change, 0) / filteredIndustries.length : 0;
+  const h = Math.max(220, filteredIndustries.length * 28 + 50);
+
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: accentColor }}>{icon}</span>
-        <span>{title}</span>
-        <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>· {industries.length} 个行业</span>
-        {industries.length > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
-            color: industries.reduce((s,i) => s + i.change, 0) / industries.length >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
-          }}>
-            均涨 {(industries.reduce((s,i) => s + i.change, 0) / industries.length).toFixed(2)}%
-          </span>
-        )}
+      {/* 三分类 Tab */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+          <button key={key} onClick={() => { setActiveCategory(key); setDrillTarget(null); }}
+            style={{
+              padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+              background: activeCategory === key ? `${cfg.accent}22` : 'transparent',
+              color: activeCategory === key ? cfg.accent : 'var(--text-secondary)',
+              border: `1.5px solid ${activeCategory === key ? cfg.accent : 'var(--border-subtle)'}`,
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+            {cfg.label}
+            <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 4, opacity: 0.7 }}>{cfg.desc}</span>
+          </button>
+        ))}
       </div>
-      <div ref={chartRef} style={{ width: '100%', height: h }} />
-    </div>
-  );
-}
 
-/** 行业热力图 — 进攻/防御双区 */
-function HeatmapChart({ industries, dates, matrix }) {
-  const offensive = industries.filter(i => OFFENSIVE_NAMES.has(i.name));
-  const defensive = industries.filter(i => DEFENSIVE_NAMES.has(i.name));
-  // 兜底：未被分类的行业归入进攻
-  const classified = new Set([...OFFENSIVE_NAMES, ...DEFENSIVE_NAMES]);
-  const uncategorized = industries.filter(i => !classified.has(i.name));
-  const offensiveFinal = uncategorized.length > 0 ? [...offensive, ...uncategorized] : offensive;
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20 }}>
-      <HeatmapSubChart industries={offensiveFinal} dates={dates} matrix={matrix}
-        title="进攻型 · 周期行业" icon="⚔️" accentColor="#D4A853" />
-      <HeatmapSubChart industries={defensive} dates={dates} matrix={matrix}
-        title="防御型 · 逆周期行业" icon="🛡️" accentColor="#5B8FA8" />
+      {/* 热力图 或 下钻 */}
+      {drillTarget ? (
+        <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: currentConfig.accent }}>{currentConfig.label}</span>
+            <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>· {filteredIndustries.length} 个行业</span>
+            {filteredIndustries.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+                color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
+              }}>
+                均涨 {avgChange.toFixed(2)}%
+              </span>
+            )}
+          </div>
+          <div ref={chartRef} style={{ width: '100%', height: h }} />
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
+            💡 点击方格可下钻至二级行业树状图
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -433,16 +633,21 @@ export default function MesoLayout() {
   const top5 = sorted.slice(0, 5);
   const bottom5 = sorted.slice(-5).reverse();
 
+  // 热力图点击 → 联动行业选择
+  const handleIndustrySelect = useCallback((name) => {
+    setActiveInd(name);
+  }, []);
+
   return (
     <div>
       {/* 英雄区 */}
       <ErrorBoundary><Hero industries={industries} /></ErrorBoundary>
 
-      {/* 区块一：行业热力图与轮动 */}
+      {/* 区块一：行业热力图与轮动（可交互Tab+下钻） */}
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-        <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，颜色越红 = 表现越强" />
+        <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
         <CardWrapper style={{ padding: 16 }}>
-          <HeatmapChart industries={industries} dates={dates} matrix={matrix} />
+          <HeatmapSection industries={industries} dates={dates} matrix={matrix} onIndustrySelect={handleIndustrySelect} />
         </CardWrapper>
       </div>
 
@@ -456,23 +661,7 @@ export default function MesoLayout() {
           <RankingTable title="❄️ 跌幅 TOP 5" subtitle="· 今日" items={bottom5} colorKey="down" />
         </div>
 
-        {/* 行业快速导航 */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {industries.slice(0, 31).map(ind => (
-            <button key={ind.code} onClick={() => setActiveInd(ind.name)}
-              style={{
-                padding: '4px 14px', borderRadius: 4, fontSize: 12,
-                fontWeight: selName === ind.name ? 700 : 500,
-                background: selName === ind.name ? 'var(--accent-gold)' : 'transparent',
-                color: selName === ind.name ? '#fff' : 'var(--text-secondary)',
-                border: '1.5px solid var(--border-subtle)', cursor: 'pointer',
-              }}>
-              {ind.name}
-            </button>
-          ))}
-        </div>
-
-        {/* 行业详情 */}
+        {/* 行业详情（由热力图点击驱动） */}
         <ErrorBoundary>
           <IndustryDetail sel={sel} chartData={chartData} latest={latest} prev={prev} />
         </ErrorBoundary>
