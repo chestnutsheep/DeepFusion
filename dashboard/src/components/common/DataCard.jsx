@@ -18,6 +18,12 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
   const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
   const display = value != null ? (typeof value === 'number' ? value.toFixed(decimals) : value) : '—';
 
+  // 先行/滞后/同步 标签颜色
+  const srcStyle = source === '先行' ? { bg: 'rgba(91,186,87,0.12)', c: '#5bba57', bd: 'rgba(91,186,87,0.25)' }
+    : source === '滞后' ? { bg: 'rgba(248,81,73,0.12)', c: '#f85149', bd: 'rgba(248,81,73,0.25)' }
+    : source === '同步' ? { bg: 'rgba(212,168,83,0.12)', c: '#D4A853', bd: 'rgba(212,168,83,0.25)' }
+    : { bg: 'rgba(136,136,136,0.08)', c: 'var(--text-muted)', bd: 'rgba(136,136,136,0.15)' };
+
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
@@ -45,9 +51,15 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
           {arrow && <span style={{ fontSize: 16, color: arrowColor, marginLeft: 2 }}>{arrow}</span>}
         </div>
         {(detail || source) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}>
-            {detail}
-            {source && <span style={{ marginLeft: 8 }}>· {source}</span>}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{detail}</span>
+            {source && (
+              <span style={{
+                padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600,
+                background: srcStyle.bg, color: srcStyle.c, border: `1px solid ${srcStyle.bd}`,
+                whiteSpace: 'nowrap',
+              }}>{source}</span>
+            )}
           </div>
         )}
       </CardWrapper>

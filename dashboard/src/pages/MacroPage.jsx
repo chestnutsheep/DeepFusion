@@ -9,6 +9,7 @@ import {KUZNETS_CONFIG} from '../configs/kuznets.js';
 import {KONDRATIEV_CONFIG} from '../configs/kondratiev.js';
 import {useEffect, useMemo, useRef} from 'react';
 import * as echarts from 'echarts';
+import CardWrapper from '../components/common/CardWrapper.jsx';
 
 const CYCLES = [
   { id: 'kitchin', label: '基钦', config: KITCHIN_CONFIG },
@@ -52,15 +53,15 @@ function MethodCards() {
   const bandpass = parseResult(bandpassResult.data);
 
   const methods = [
-    { ...KONDRATIEV_CONFIG.methodMetrics[0], value: pca.confidence, phase: pca.phase, phaseName: pca.phase_name,
-      globalPhase: pca.global_phase, globalPhaseName: pca.global_phase_name,
-      chinaPhase: pca.china_phase, chinaPhaseName: pca.china_phase_name },
-    { ...KONDRATIEV_CONFIG.methodMetrics[1], value: wavelet.confidence, phase: wavelet.phase, phaseName: wavelet.phase_name,
-      globalPhase: wavelet.global_phase, globalPhaseName: wavelet.global_phase_name,
-      chinaPhase: wavelet.china_phase, chinaPhaseName: wavelet.china_phase_name },
-    { ...KONDRATIEV_CONFIG.methodMetrics[2], value: bandpass.confidence, phase: bandpass.phase, phaseName: bandpass.phase_name,
-      globalPhase: bandpass.global_phase, globalPhaseName: bandpass.global_phase_name,
-      chinaPhase: bandpass.china_phase, chinaPhaseName: bandpass.china_phase_name },
+    { ...KONDRATIEV_CONFIG.methodMetrics[0], value: pca.confidence != null ? pca.confidence : null, phase: pca.phase || 0, phaseName: pca.phase_name || '—',
+      globalPhase: pca.global_phase || 0, globalPhaseName: pca.global_phase_name || '',
+      chinaPhase: pca.china_phase || 0, chinaPhaseName: pca.china_phase_name || '' },
+    { ...KONDRATIEV_CONFIG.methodMetrics[1], value: wavelet.confidence != null ? wavelet.confidence : null, phase: wavelet.phase || 0, phaseName: wavelet.phase_name || '—',
+      globalPhase: wavelet.global_phase || 0, globalPhaseName: wavelet.global_phase_name || '',
+      chinaPhase: wavelet.china_phase || 0, chinaPhaseName: wavelet.china_phase_name || '' },
+    { ...KONDRATIEV_CONFIG.methodMetrics[2], value: bandpass.confidence != null ? bandpass.confidence : null, phase: bandpass.phase || 0, phaseName: bandpass.phase_name || '—',
+      globalPhase: bandpass.global_phase || 0, globalPhaseName: bandpass.global_phase_name || '',
+      chinaPhase: bandpass.china_phase || 0, chinaPhaseName: bandpass.china_phase_name || '' },
   ];
 
   return (
@@ -130,7 +131,7 @@ function CoverageGrid() {
     if (!raw) return '';
     try {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length > 1) return `${arr[0].period}~${arr[arr.length - 1].period}`;
+      if (Array.isArray(arr) && arr.length > 1) return `${arr[0].period} ~ ${arr[arr.length - 1].period}`;
     } catch {}
     return '';
   };
@@ -145,13 +146,17 @@ function CoverageGrid() {
       ? (data.global_phase_name || data.china_phase_name
           ? `🌍${data.global_phase_name || '—'} / 🇨🇳${data.china_phase_name || '—'}`
           : data.phase_name || '—')
-      : (data.phase_name || data.cycle_phase_name || '—');
+      : (data.phase_name || data.cycle_phase_name || data.stage_name || '—');
+    // 覆盖范围：优先用扩展数据（更长），回退到 NBS
+    const coverageRange = extRange || nbsRange || '—';
+    // 置信度：有值才显示
+    const hasConfidence = data.confidence != null && !isNaN(data.confidence);
     return {
       label: h.label, color: h.color,
       phase: phaseDisplay,
-      confidence: data.confidence != null ? (data.confidence * 100).toFixed(1) + '%' : '—',
+      confidence: hasConfidence ? (data.confidence * 100).toFixed(1) + '%' : null,
       period: data.dominant_period != null ? data.dominant_period : '—',
-      nbsRange, extRange,
+      coverageRange,
     };
   });
 
@@ -168,10 +173,11 @@ function CoverageGrid() {
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: r.color }}>{r.label}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
             <div>相位: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.phase}</span></div>
-            <div>置信度: <span style={{ color: 'var(--accent-gold)' }}>{r.confidence}</span></div>
+            {r.confidence != null && (
+              <div>置信度: <span style={{ color: 'var(--accent-gold)' }}>{r.confidence}</span></div>
+            )}
             <div>周期: <span style={{ color: 'var(--text-primary)' }}>{r.period}</span></div>
-            <div>覆盖: <span style={{ color: 'var(--text-primary)' }}>{r.nbsRange || '—'}</span></div>
-            {r.extRange && <div style={{ color: '#5bba57' }}>扩展: {r.extRange}</div>}
+            <div>覆盖: <span style={{ color: 'var(--text-primary)' }}>{r.coverageRange}</span></div>
           </div>
         </div>
       ))}
@@ -248,18 +254,18 @@ function CycleNesting() {
       },
       legend: { data: cycleIds.map(id => NEST_LABELS[id]), bottom: 0 },
       grid: { left: '8%', right: '5%', top: '8%', bottom: '18%', containLabel: true },
-      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
+      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 12 } },
       yAxis: {
         type: 'value', min: yMin, max: yMax,
         axisLabel: {
           formatter(v) {
-            if (v >= 1.5) return '繁荣';
-            if (v >= 0.5) return '复苏';
-            if (v > -0.5) return '—';
-            if (v > -1.5) return '衰退';
-            return '萧条';
+            if (v >= 2) return '繁荣';
+            if (v >= 1) return '复苏';
+            if (v < -2) return '萧条';
+            if (v > -2) return '衰退';
+            return '-';
           },
-          fontSize: 10,
+          fontSize: 11,
         },
       },
       dataZoom: [
@@ -271,7 +277,7 @@ function CycleNesting() {
         // 零线参考
         {
           name: '零线', type: 'line', data: dates.map(() => 0),
-          lineStyle: { color: 'rgba(212,168,83,0.15)', width: 1, type: 'dashed' },
+          lineStyle: { color: 'rgb(248 241 232 / 0.86)', width: 1.5, type: 'dashed' },
           symbol: 'none', silent: true, tooltip: { show: false },
           z: 0,
         },
@@ -298,21 +304,32 @@ function CycleNesting() {
   if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
-  return <div ref={chartRef} style={{ width: '100%', height: 400 }} />;
+  return (
+    <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表5：四周期合成Z值嵌套对比</h3>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
+      </div>
+      <div ref={chartRef} style={{ width: '100%', height: 400 }} />
+    </CardWrapper>
+  );
 }
 
 // ── 相位→甘特图颜色/纹理 ──
 const GANTT_PHASE_STYLE = {
-  1: { color: '#5bba57', pattern: '///', label: '复苏' },   // 斜线纹理
-  2: { color: '#D4A853', pattern: '===', label: '繁荣' },   // 横线纹理
-  3: { color: '#cc4842', pattern: '\\\\\\', label: '衰退' }, // 反斜线纹理
-  4: { color: '#888',    pattern: '...', label: '萧条' },   // 点状纹理
+  1: { color: '#88c9f4', pattern: '///', label: '复苏' },   // 斜线纹理
+  2: { color: '#8dd969', pattern: '===', label: '繁荣' },   // 横线纹理
+  3: { color: '#e2da6f', pattern: '\\\\\\', label: '衰退' }, // 反斜线纹理
+  4: { color: '#fb7888',    pattern: '...', label: '萧条' },   // 点状纹理
   0: { color: '#333',    pattern: '   ', label: '未知' },
 };
 
 /**
- * 四周期相位甘特图：水平条形图，每个周期一行，
- * 按年份展示相位区间，颜色+纹理区分四相位。
+ * 四周期相位甘特图：水平条形图，每个周期一行。
+ * 改进：
+ *  1. 对缺失年份前向填充，保持相位连续性
+ *  2. 合并连续相同相位为区间长条，更像甘特图
+ *  3. 颜色区分相位，纹理区分周期类型
  */
 function CycleGantt() {
   const { data: rawData, isLoading } = useMCP('cycle_nesting', {});
@@ -335,21 +352,55 @@ function CycleGantt() {
     const years = rows.map(r => r.period);
     const yearSet = [...new Set(years)].sort();
 
-    // 为每个周期生成色块数据：[yearIndex, cycleIndex, phase]
-    // ECharts custom series: renderItem 画矩形
-    const seriesData = [];
-    for (let yi = 0; yi < yearSet.length; yi++) {
-      const y = yearSet[yi];
+    // ── 1. 前向填充：让各周期相位在数据起始点后保持连续 ──
+    // 找到每个周期第一个非零相位年份，之后缺失的继承前一年
+    const filledMap = {}; // { period: { kitchin_phase, ... } }
+    const lastKnown = {}; // { cid: { phase, name } }
+    for (const y of yearSet) {
       const row = rows.find(r => r.period === y);
-      if (!row) continue;
-      for (let ci = 0; ci < cycleIds.length; ci++) {
-        const cid = cycleIds[ci];
-        const phase = row[`${cid}_phase`] ?? 0;
-        seriesData.push({
-          value: [yi, ci, phase],
-          phase,
-          name: row[`${cid}_name`] || '—',
-        });
+      const entry = { period: y };
+      for (const cid of cycleIds) {
+        const ph = row?.[`${cid}_phase`] ?? 0;
+        const nm = row?.[`${cid}_name`] || '—';
+        if (ph > 0) {
+          lastKnown[cid] = { phase: ph, name: nm };
+          entry[`${cid}_phase`] = ph;
+          entry[`${cid}_name`] = nm;
+        } else if (lastKnown[cid]) {
+          // 前向填充：继承最近已知相位
+          entry[`${cid}_phase`] = lastKnown[cid].phase;
+          entry[`${cid}_name`] = lastKnown[cid].name;
+        } else {
+          entry[`${cid}_phase`] = 0;
+          entry[`${cid}_name`] = '—';
+        }
+      }
+      filledMap[y] = entry;
+    }
+
+    // ── 2. 合并连续相同相位为区间 ──
+    // 对每个周期，扫描年份序列，把连续相同相位合并为 [startIdx, endIdx, cycleIdx, phase, name]
+    const seriesData = [];
+    for (let ci = 0; ci < cycleIds.length; ci++) {
+      const cid = cycleIds[ci];
+      let runStart = 0;
+      let runPhase = filledMap[yearSet[0]]?.[`${cid}_phase`] ?? 0;
+      let runName = filledMap[yearSet[0]]?.[`${cid}_name`] || '—';
+
+      for (let yi = 1; yi <= yearSet.length; yi++) {
+        const ph = yi < yearSet.length ? (filledMap[yearSet[yi]]?.[`${cid}_phase`] ?? 0) : -1;
+        const nm = yi < yearSet.length ? (filledMap[yearSet[yi]]?.[`${cid}_name`] || '—') : '';
+        if (ph !== runPhase) {
+          // 结束当前 run
+          seriesData.push({
+            value: [runStart, ci, yi - 1, runPhase],
+            phase: runPhase,
+            name: runName,
+          });
+          runStart = yi;
+          runPhase = ph;
+          runName = nm;
+        }
       }
     }
 
@@ -358,14 +409,17 @@ function CycleGantt() {
         formatter(params) {
           const d = params.data;
           if (!d) return '';
-          return `<b>${yearSet[d.value[0]]}</b><br/>${NEST_LABELS[cycleIds[d.value[1]]]}: ${d.name}`;
+          const startYear = yearSet[d.value[0]];
+          const endYear = yearSet[d.value[2]];
+          const yearLabel = startYear === endYear ? startYear : `${startYear} ~ ${endYear}`;
+          return `<b>${yearLabel}</b><br/>${NEST_LABELS[cycleIds[d.value[1]]]}: ${d.name}`;
         },
       },
-      grid: { left: '12%', right: '5%', top: '5%', bottom: '20%', containLabel: true },
+      grid: { left: '8%', right: '8%', top: '5%', bottom: '20%', containLabel: true },
       xAxis: {
         type: 'category',
         data: yearSet,
-        axisLabel: { rotate: 45, fontSize: 9, interval: Math.max(0, Math.floor(yearSet.length / 30) - 1) },
+        axisLabel: { rotate: 45, fontSize: 12, interval: Math.max(0, Math.floor(yearSet.length / 30) - 1) },
       },
       yAxis: {
         type: 'category',
@@ -378,39 +432,39 @@ function CycleGantt() {
         { type: 'slider', start: 80, end: 100, height: 16, bottom: 24,
           borderColor: 'rgba(212,168,83,0.12)', backgroundColor: 'rgba(26,47,42,0.6)' },
       ],
-      // 图例
       visualMap: {
         show: true,
         orient: 'horizontal',
         bottom: 0,
-        itemWidth: 14,
-        itemHeight: 14,
+        itemWidth: 18,
+        itemHeight: 16,
         textStyle: { color: '#CBC0B0', fontSize: 11 },
         categories: ['复苏', '繁荣', '衰退', '萧条', '未知'],
         inRange: {
-          color: ['#5bba57', '#D4A853', '#cc4842', '#888', '#333'],
+          color: ['#88c9f4', '#8dd969', '#e2da6f', '#fb7888', '#333'],
         },
         calculable: false,
-        dimension: 2,
+        dimension: 3,
       },
       series: [{
         type: 'custom',
         data: seriesData,
         renderItem(params, api) {
-          const xIdx = api.value(0);
+          const startIdx = api.value(0);
           const yIdx = api.value(1);
-          const phase = api.value(2);
+          const endIdx = api.value(2);
+          const phase = api.value(3);
 
-          const start = api.coord([xIdx - 0.5, yIdx]);
-          const end = api.coord([xIdx + 0.5, yIdx]);
+          const start = api.coord([startIdx - 0.5, yIdx]);
+          const end = api.coord([endIdx + 0.5, yIdx]);
           if (!start || !end) return;
 
           const style = GANTT_PHASE_STYLE[phase] || GANTT_PHASE_STYLE[0];
           const rectShape = {
             x: start[0],
-            y: start[1] - 4,
+            y: start[1] - 5,
             width: end[0] - start[0],
-            height: 8,
+            height: 10,
           };
 
           // 纹理装饰：用 decal pattern 区分
@@ -428,14 +482,14 @@ function CycleGantt() {
             style: {
               fill: style.color,
               decal: decalPatterns[phase] || undefined,
-              opacity: 0.85,
+              opacity: phase > 0 ? 0.9 : 0.25,
             },
             emphasis: {
               style: { opacity: 1, stroke: '#fff', lineWidth: 1 },
             },
           };
         },
-        encode: { x: 0, y: 1, tooltip: 2 },
+        encode: { x: [0, 2], y: 1, tooltip: 3 },
       }],
     };
     chart.setOption(option);
@@ -445,7 +499,15 @@ function CycleGantt() {
   if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
-  return <div ref={chartRef} style={{ width: '100%', height: 220 }} />;
+  return (
+    <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表6：四周期相位演进甘特图</h3>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
+      </div>
+      <div ref={chartRef} style={{ width: '100%', height: 220 }} />
+    </CardWrapper>
+  );
 }
 
 export default function MacroPage() {
@@ -457,7 +519,7 @@ export default function MacroPage() {
       {CYCLES.map((c, i) => (
         <div key={c.id} id={c.id}>
           <ErrorBoundary>
-            <CyclePage config={c.config} showTitle={c.label} />
+            <CyclePage config={c.config} showTitle={c.label} tableIndex={i + 1} />
           </ErrorBoundary>
           {c.id === 'kondratiev' && <ErrorBoundary><MethodCards /></ErrorBoundary>}
           {i < CYCLES.length - 1 && <hr className="section-divider-thin" />}

@@ -1,0 +1,33 @@
+{
+  "models": [
+    {
+      "id": "default-deepseek-r1",
+      "name": "DeepSeek R1",
+      "modelId": "deepseek-reasoner",
+      "apiKey": "sk-2812de515a334ac1b7ddf16fe9444d97",
+      "apiUrl": "https://api.deepseek.com",
+      "providerUrl": "https://platform.deepseek.com/"
+    },
+    {
+      "id": "default-deepseek-v3",
+      "name": "DeepSeek V3",
+      "modelId": "deepseek-chat",
+      "apiKey": "sk-2812de515a334ac1b7ddf16fe9444d97",
+      "apiUrl": "https://api.deepseek.com",
+      "providerUrl": "https://platform.deepseek.com/"
+    }
+  ],
+  "promptStats": {
+    "2026-04-28": {
+      "num": 1,
+      "prompt_content": [
+        {
+          "id_timestamp": "1777385156602",
+          "prompt": "阅读金融学文件夹内的内容，将Logic文件夹里的内容整理成几个模块",
+          "answer": "很抱歉，我无法直接访问你的本地文件夹或读取文件内容，包括“金融学文件夹”或“Logic文件夹”。我是一个AI助手，没有权限浏览或操作你的本地存储系统。\n\n不过，如果你能提供“Logic文件夹”中的文件内容（例如通过复制粘贴文本、上传文件等），我可以帮助你将其内容整理成几个模块。例如，你可以：\n\n1. 将Logic文件夹中的文件内容复制并粘贴到对话中。\n2. 或者，如果你有文档，可以描述其核心主题、标题或关键点，我会根据这些信息帮你归纳。\n\n请提供具体内容，我会尽快为你整理！",
+          "model": "default-deepseek-v3"
+        }
+      ]
+    }
+  }
+}

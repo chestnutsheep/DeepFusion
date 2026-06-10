@@ -1,5 +1,5 @@
 /**
- * 可复用卡片壳组件 — 统一金边+毛玻璃+自适应
+ * 可复用卡片壳组件 — 统一金边+毛玻璃+自适应+hover效果
  *
  * 用法:
  *   <CardWrapper hoverable onClick={...}>
@@ -10,6 +10,8 @@
  *     单行截断文本
  *   </CardWrapper>
  */
+import { useState, useCallback } from 'react';
+
 export default function CardWrapper({
   children,
   as: Tag = 'div',
@@ -18,14 +20,25 @@ export default function CardWrapper({
   style,
   ...props
 }) {
+  const [hovered, setHovered] = useState(false);
+  const handleEnter = useCallback(() => hoverable && setHovered(true), [hoverable]);
+  const handleLeave = useCallback(() => setHovered(false), []);
+
   const base = {
     background: 'var(--bg-panel)',
-    backdropFilter: 'blur(8px)',
-    border: '1px solid rgba(212,168,83,0.5)',
+    backdropFilter: 'blur(16px) saturate(1.15)',
+    WebkitBackdropFilter: 'blur(16px) saturate(1.15)',
+    border: hovered && hoverable
+      ? '1.5px solid rgba(212,168,83,0.85)'
+      : '1px solid rgba(212,168,83,0.5)',
     borderRadius: 2,
     padding: 12,
     transition: 'all var(--transition, 0.25s ease)',
     overflow: truncate ? 'hidden' : undefined,
+    boxShadow: hovered && hoverable
+      ? 'inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.28), 0 0 12px rgba(212,168,83,0.08)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.2)',
+    transform: hovered && hoverable ? 'translateY(-1px)' : 'none',
   };
 
   if (truncate) {
@@ -40,6 +53,8 @@ export default function CardWrapper({
   return (
     <Tag
       style={{ ...base, ...style }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       {...props}
     >
       {children}

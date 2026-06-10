@@ -1,0 +1,254 @@
+{
+  "main": {
+    "id": "70bc6600b22b8332",
+    "type": "split",
+    "children": [
+      {
+        "id": "2bb009d4b64b86b5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "798d0485dc6ba352",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Science & Technology/Chip/芯片促生.md",
+                "mode": "preview",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "芯片促生"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8e0f5dfe547fe0bf",
+    "type": "split",
+    "children": [
+      {
+        "id": "ee0667739ed87f99",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "96edaf8ff6903863",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "ff3b73e893187c58",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "bef9be109ec100d9",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "c80734787281efa4",
+    "type": "split",
+    "children": [
+      {
+        "id": "5147efff2816d80c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "227ea74fa3e366a0",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "金融学 ( Finance )/Logic/02-OutLine.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "02-OutLine 的反向链接列表"
+            }
+          },
+          {
+            "id": "e8b543270d5c9801",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "金融学 ( Finance )/Logic/02-OutLine.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "02-OutLine 的出链列表"
+            }
+          },
+          {
+            "id": "a2831e6c2fce52d2",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "d359d41291f0f84e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "f6774e16572fbfa7",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "DeepFusion/Academic Supplement/Economics/03-Micro/02-公司治理评估.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "02-公司治理评估 的大纲"
+            }
+          },
+          {
+            "id": "b06e34aacb6fa893",
+            "type": "leaf",
+            "state": {
+              "type": "notemd-sidebar-view",
+              "state": {},
+              "icon": "wand",
+              "title": "Notemd 工作台"
+            }
+          }
+        ],
+        "currentTab": 5
+      }
+    ],
+    "direction": "horizontal",
+    "width": 490.5,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "markdown-importer:打开 Markdown 格式转换器": false,
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false,
+      "notemd:打开 Notemd 侧边栏": false,
+      "obsidian-leaflet-plugin:打开 Leaflet 地图": false,
+      "deepseek-ai-assistant:Open deepseek AI assistant": false
+    }
+  },
+  "active": "798d0485dc6ba352",
+  "lastOpenFiles": [
+    "Science & Technology/稀土/稀土篇  导航.md",
+    "Science & Technology/稀土/关联图 2.md",
+    "Science & Technology/Chip/芯片促生.md",
+    "产业链传递总览.md",
+    "TaskNotes/Tasks/DeepFusion 实践部分修改.md",
+    "DeepFusion/Academic Supplement/宏观经济学/周期与策略（ Cycle and Strategy )/三大周期的核心特征与行业映射.md",
+    "DeepFusion/Academic Supplement/宏观经济学/周期与策略（ Cycle and Strategy )/周期、行业与投资重心.md",
+    "DeepFusion/02-行业相对位置比较.md",
+    "TaskNotes/Views/tasks-default.base",
+    "TaskNotes/Tasks",
+    "TaskNotes/Views/kanban-default.base",
+    "未命名 1.base",
+    "未命名.base",
+    "TaskNotes/Views/calendar-default.base",
+    "未命名.md",
+    "TaskNotes/Views/agenda-default.base",
+    "DeepFusion/Academic Supplement/宏观经济学/周期与策略（ Cycle and Strategy )/Basic Cycle Definition.md",
+    "DeepFusion/Academic Supplement/公司金融/财务基本面内部检验.md",
+    "DeepFusion/Academic Supplement/公司金融/衍生品/I. 股票/第三章：机构行为与内部人信号验证.md",
+    "DeepFusion/Academic Supplement/公司金融/衍生品/I. 股票/第一章：财务基本面内部检验/附件：基本面评分参考.md",
+    "DeepFusion/Academic Supplement/公司金融/衍生品/I. 股票/第一章：财务基本面内部检验/财务基本面分析与制表要求.md",
+    "DeepFusion/Academic Supplement/公司金融/衍生品/I. 股票/第二章：技术指标面/RSI & MACD.md",
+    "DeepFusion/01-Thought Chain.md",
+    "DeepFusion/02-OutLine.md",
+    "DeepFusion/Academic Supplement/Economics/01-Macro/01-宏观增长动力分析.md",
+    "DeepFusion/Academic Supplement/Economics/00-Guide and Basic Theory/02-CAPM.md",
+    "DeepFusion/Academic Supplement/Economics/00-Guide and Basic Theory/01-navigator.md",
+    "DeepFusion/Academic Supplement/Economics/01-Macro/03-财政政策与债务分析.md",
+    "DeepFusion/Academic Supplement/Economics/01-Macro/02-货币流动性监测.md",
+    "DeepFusion/Academic Supplement/Economics/02-Meso/03-资本开支与创新.md",
+    "DeepFusion/Academic Supplement/Economics/02-Meso/02-产业政策图谱.md",
+    "DeepFusion/Academic Supplement/Economics/02-Meso/01-行业相对位置比较.md",
+    "DeepFusion/Academic Supplement/Economics/03-Micro/03-估值与市场情绪.md",
+    "DeepFusion/附件：第二章 评分卡.canvas",
+    "DeepFusion/附件：第一章 评分卡.canvas",
+    "DeepFusion/Academic Supplement",
+    "DeepFusion/Reverse Search",
+    "附件：评分卡 AI Canvas.canvas",
+    "附件：评分卡 AI Canvas 2.canvas",
+    "金融学 ( Finance )/衍生品/I. 股票/第一章：财务基本面内部检验"
+  ]
+}

@@ -9,6 +9,7 @@ import {mcp} from '../services/mcp.js';
  * - 其余：8 小时
  */
 function getStaleTime(toolName) {
+  if (!toolName) return 8 * 60 * 60 * 1000;
   if (toolName.startsWith('macro_')) return 24 * 60 * 60 * 1000;
   if (toolName.startsWith('policy_')) return 30 * 60 * 1000;
   if (toolName === 'search') return 2 * 60 * 1000;

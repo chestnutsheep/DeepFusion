@@ -5,6 +5,7 @@ export const KONDRATIEV_CONFIG = {
   icon: '🌊',
   phaseField: 'phase',
   params: { method: 'pca' },
+  dataSource: '世界银行 / FRED; PCA+带通滤波+手动计算',
   chartSeries: [
     { key: 'global_intensity', name: '全球周期', color: '#42a2dc', type: 'line', yAxisIndex: 0 },
     { key: 'china_intensity', name: '中国周期', color: '#e74c3c', type: 'line', yAxisIndex: 0 },
@@ -27,5 +28,18 @@ export const KONDRATIEV_CONFIG = {
     { key: 'turning_probability', label: '拐点概率', unit: '%', dir: false, card: true, decimals: 1, higherBetter: null, transform: v => (v * 100).toFixed(1) },
     { key: 'dominant_period', label: '主周期', unit: '年', dir: false, card: true, decimals: 1, higherBetter: null },
     { key: 'pca_variance_ratio', label: 'PCA解释度', unit: '%', dir: false, card: true, decimals: 1, higherBetter: true, transform: v => v * 100 },
+  ],
+  turningPoints: [
+    { year: 1782, type: 'trough', label: '第一次工业革命', detail: '蒸汽机广泛应用，棉纺织业繁荣，康波第一波上升期开启' },
+    { year: 1815, type: 'peak', label: '拿破仑战后繁荣顶', detail: '战后重建需求+殖民扩张，英国工业产值见顶后进入衰退' },
+    { year: 1845, type: 'trough', label: '铁路萧条底', detail: '铁路投资泡沫破裂，英国"饥饿的四十年代"结束，钢铁+铁路新周期启动' },
+    { year: 1873, type: 'peak', label: '大萧条前顶', detail: '铁路+钢铁产能过剩，维也纳股市崩盘引发长萧条' },
+    { year: 1896, type: 'trough', label: '电气革命底', detail: '电气化+化工产业兴起，第二次工业革命驱动新一轮长波' },
+    { year: 1920, type: 'peak', label: '一战繁荣顶', detail: '汽车+电气产业繁荣，"咆哮的二十年代"后大萧条' },
+    { year: 1937, type: 'trough', label: '大萧条底', detail: '凯恩斯主义+二战军工需求，第四波康波上升期启动' },
+    { year: 1966, type: 'peak', label: '战后繁荣顶', detail: '汽车+家电普及完成，滞胀时代来临，布雷顿森林体系动摇' },
+    { year: 1982, type: 'trough', label: '信息技术底', detail: '沃尔克遏制通胀+PC革命，第五波康波上升期启动' },
+    { year: 2008, type: 'peak', label: '金融海啸顶', detail: '互联网+金融创新红利耗尽，次贷危机标志第五波康波见顶' },
+    { year: 2020, type: 'trough', label: '疫后萧条底', detail: '全球央行放水+AI革命萌芽，第五波衰退期或第六波孕育期？' },
   ],
 };

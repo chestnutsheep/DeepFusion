@@ -1,0 +1,12 @@
+{
+  "types": {
+    "aliases": "aliases",
+    "cssclasses": "multitext",
+    "tags": "tags",
+    "核心指标": "text",
+    "更新频率": "text",
+    "最后更新": "datetime",
+    "dateModified": "datetime",
+    "dateCreated": "datetime"
+  }
+}

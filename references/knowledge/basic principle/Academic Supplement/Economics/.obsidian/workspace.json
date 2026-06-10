@@ -1,0 +1,199 @@
+{
+  "main": {
+    "id": "cb6eec59cbadd686",
+    "type": "split",
+    "children": [
+      {
+        "id": "6e0a779c2bfb8b65",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0a37438656f9d4c2",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "02-中观分析层/01-行业景气度追踪.md",
+                "mode": "preview",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "01-行业景气度追踪"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "210133e03705e46e",
+    "type": "split",
+    "children": [
+      {
+        "id": "86547a18980263d3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3c510ce78122848e",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "b40698456957a286",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "621aa4d40a867bae",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "2c070998f5590ef8",
+    "type": "split",
+    "children": [
+      {
+        "id": "3be183df44930948",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9b1b9a90e6dfbe98",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "02-中观分析层/01-行业景气度追踪.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "01-行业景气度追踪 的反向链接列表"
+            }
+          },
+          {
+            "id": "46e714c31ffacc9a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "02-中观分析层/01-行业景气度追踪.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "01-行业景气度追踪 的出链列表"
+            }
+          },
+          {
+            "id": "0724f5d3c7bf3f63",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "2728538b162c24ef",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "85f55d994ba561ad",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "02-中观分析层/01-行业景气度追踪.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "01-行业景气度追踪 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:创建新数据库": false
+    }
+  },
+  "active": "0a37438656f9d4c2",
+  "lastOpenFiles": [
+    "05-数据与模板/01-API配置说明.md",
+    "07-板块/稀土/关联图 2.md",
+    "07-板块/稀土/稀土篇  导航.md",
+    "05-数据与模板/01-API配置说明.md",
+    "00-导览与基础理论/01-经济分析.md",
+    "00-导览与基础理论/02-定价理论模型.md",
+    "04-专题研究/03-技术颠覆与产业变迁.md",
+    "04-专题研究/02-全球供应链重构.md",
+    "04-专题研究/01-关键资源战略博弈.md",
+    "03-微观分析层/03-估值与市场情绪.md"
+  ]
+}

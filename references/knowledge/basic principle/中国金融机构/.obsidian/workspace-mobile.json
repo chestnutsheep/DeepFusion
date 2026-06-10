@@ -1,0 +1,248 @@
+{
+  "main": {
+    "id": "6c6256d1fb9f3d0b",
+    "type": "split",
+    "children": [
+      {
+        "id": "a9af74748a364de4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "67b0e95a817845c5",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Academic Supplement/Economics/Attachmnt/周期与策略（ Cycle and Strategy )/02-周期、行业与投资重心.md",
+                "mode": "source",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "02-周期、行业与投资重心"
+            }
+          },
+          {
+            "id": "7e1817cf50a23f8b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "产业链传递总览.md",
+                "mode": "preview",
+                "source": true,
+                "backlinks": true,
+                "backlinkOpts": {
+                  "collapseAll": false,
+                  "extraContext": false,
+                  "sortOrder": "alphabetical",
+                  "showSearch": false,
+                  "searchQuery": "",
+                  "backlinkCollapsed": false,
+                  "unlinkedCollapsed": true
+                }
+              },
+              "icon": "lucide-file",
+              "title": "产业链传递总览"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4d62f0e34fe531a4",
+    "type": "mobile-drawer",
+    "children": [
+      {
+        "id": "cadf48b0a4500e46",
+        "type": "leaf",
+        "state": {
+          "type": "file-explorer",
+          "state": {
+            "sortOrder": "alphabetical",
+            "autoReveal": false
+          },
+          "icon": "lucide-folder-closed",
+          "title": "文件列表"
+        }
+      },
+      {
+        "id": "a4ce7d8db586f02e",
+        "type": "leaf",
+        "state": {
+          "type": "search",
+          "state": {
+            "query": "",
+            "matchingCase": false,
+            "explainSearch": false,
+            "collapseAll": false,
+            "extraContext": false,
+            "sortOrder": "alphabetical"
+          },
+          "icon": "lucide-search",
+          "title": "搜索"
+        }
+      },
+      {
+        "id": "a8ecbfc3987c3b6c",
+        "type": "leaf",
+        "state": {
+          "type": "tag",
+          "state": {
+            "sortOrder": "frequency",
+            "useHierarchy": true,
+            "showSearch": false,
+            "searchQuery": ""
+          },
+          "icon": "lucide-tags",
+          "title": "标签"
+        }
+      },
+      {
+        "id": "5c81beccf447f431",
+        "type": "leaf",
+        "state": {
+          "type": "all-properties",
+          "state": {
+            "sortOrder": "frequency",
+            "showSearch": false,
+            "searchQuery": ""
+          },
+          "icon": "lucide-archive",
+          "title": "添加笔记属性"
+        }
+      },
+      {
+        "id": "903695ed497293dc",
+        "type": "leaf",
+        "state": {
+          "type": "bookmarks",
+          "state": {},
+          "icon": "lucide-bookmark",
+          "title": "书签"
+        }
+      }
+    ],
+    "currentTab": 0
+  },
+  "right": {
+    "id": "8e974315273241cf",
+    "type": "mobile-drawer",
+    "children": [
+      {
+        "id": "3bd3bb5b3f6cdfe1",
+        "type": "leaf",
+        "state": {
+          "type": "backlink",
+          "state": {
+            "file": "产业链传递总览.md",
+            "collapseAll": false,
+            "extraContext": false,
+            "sortOrder": "alphabetical",
+            "showSearch": false,
+            "searchQuery": "",
+            "backlinkCollapsed": false,
+            "unlinkedCollapsed": true
+          },
+          "icon": "links-coming-in",
+          "title": "反向链接"
+        }
+      },
+      {
+        "id": "39acfb02bd0529f1",
+        "type": "leaf",
+        "state": {
+          "type": "outgoing-link",
+          "state": {
+            "file": "RSI & MACD.md",
+            "linksCollapsed": false,
+            "unlinkedCollapsed": true
+          },
+          "icon": "links-going-out",
+          "title": "出链"
+        }
+      },
+      {
+        "id": "9cc8d7f8102f718f",
+        "type": "leaf",
+        "state": {
+          "type": "outline",
+          "state": {
+            "file": "产业链传递总览.md",
+            "followCursor": false,
+            "showSearch": false,
+            "searchQuery": ""
+          },
+          "icon": "lucide-list",
+          "title": "大纲"
+        }
+      }
+    ],
+    "currentTab": 2
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "markdown-importer:打开 Markdown 格式转换器": false,
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "7e1817cf50a23f8b",
+  "lastOpenFiles": [
+    "Token_生产力基础.md",
+    "产业链传递总览.md",
+    "光芯片 Inp.md",
+    "Science & Technology/Chip/Token.md",
+    "光模块演化.md",
+    "Scale_Up_Scale_Out互联.md",
+    "Science & Technology/Chip/产业链传递总览.md",
+    "Science & Technology/Chip/AI 算力需求.md",
+    "Academic Supplement/Economics/Attachmnt/周期与策略（ Cycle and Strategy )/02-周期、行业与投资重心.md",
+    "Academic Supplement/Economics/Attachmnt/周期与策略（ Cycle and Strategy )/周期特征与行业映射.md",
+    "Academic Supplement/Economics/Period and Strategy/02-周期、行业与投资重心.md",
+    "Academic Supplement/Economics/Attachmnt/周期与策略（ Cycle and Strategy )/Basic Cycle Definition.md",
+    "02-OutLine.md",
+    "Academic Supplement/Economics/Period and Strategy/三大周期的核心特征与行业映射.md",
+    "DeepFusion/02-OutLine.md",
+    "公司金融/未命名.md",
+    "公式金融学/衍生品/I. 股票/第二章：技术指标面/RSI & MACD.md",
+    "公式金融学/衍生品/I. 股票/第三章：机构行为与内部人信号验证.md",
+    "第三章：机构行为与内部人信号验证",
+    "公式金融学/衍生品/I. 股票/第一章：财务基本面内部检验/财务基本面分析与制表要求.md",
+    "公式金融学/Logic/01-Thought Chain.md",
+    "金融学 ( Finance )/衍生品/I. 股票/第三章：机构行为与内部人信号验证.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )/美林时钟.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )/朱格拉周期.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )/基钦周期.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )/康波周期.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )/理论依据.md",
+    "宏观经济学/周期与策略（ Cycle and Strategy )",
+    "宏观经济学",
+    "公式金融学/衍生品/I. 股票/第一章：财务基本面内部检验",
+    "公式金融学/衍生品/I. 股票/第二章：技术指标面",
+    "公式金融学/衍生品/II. 基金",
+    "公式金融学/衍生品/I. 股票",
+    "公式金融学/衍生品",
+    "公式金融学/Logic",
+    "公式金融学",
+    "Economics/Attachmnt/附件：第二章 评分卡.canvas",
+    "Economics/Attachmnt/附件：第一章 评分卡.canvas"
+  ]
+}

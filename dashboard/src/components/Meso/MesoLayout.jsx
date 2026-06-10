@@ -21,10 +21,10 @@ function parseSWDaily(csv) {
   const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
   if (!rows.length) return { industries: [], dates: [], matrix: {} };
 
-  // 收集所有日期（去重保序）
+  // 收集所有日期（去重+排序）
   const dateSet = new Set();
   rows.forEach(r => { if (r[2]?.trim()) dateSet.add(r[2].trim()); });
-  const dates = [...dateSet];
+  const dates = [...dateSet].sort();
 
   // 按行业分组，取最新日期作为快照
   const byName = {};
@@ -141,7 +141,7 @@ function HeatmapChart({ industries, dates, matrix }) {
     if (!chartRef.current || !industries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = industries.map(i => i.name || i.code);
-    // 只取最近 20 个交易日
+    // 只取最近 30 个交易日
     const recentDates = dates.slice(-30);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
@@ -156,13 +156,13 @@ function HeatmapChart({ industries, dates, matrix }) {
       },
       "grid": { "left": 90, "right": 30, "top": 10, "bottom": 40 },
       "xAxis": { "type": 'category', "data": recentDates.map(d => d.slice(5)), "axisLabel": { "fontSize": 10, "rotate": 30 } },
-      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 10 } },
+      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 12 } },
       "visualMap": {
         "min": -4, "max": 4, "calculable": true, "orient": 'horizontal', "left": 'center', "bottom": 0,
-        "inRange": { "color": ['#3E6B5C', '#1A2F2A', '#2A4A6A', '#7B5E7B', '#C49BA5', '#D4A853', '#C47B7B'] },
-        "textStyle": { "color": '#CBC0B0', "fontSize": 10 },
+        "inRange": { "color": ['#FFF5F5', '#FFCCCC', '#FF9999', '#FF6666', '#CC3333', '#990000'] },
+        "textStyle": { "color": '#CBC0B0', "fontSize": 12 },
       },
-      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 9, "color": '#F0E8D8' },
+      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 11, "color": '#F0E8D8' },
         "emphasis": { "itemStyle": { "shadowBlur": 10, "shadowColor": 'rgba(0,0,0,0.5)' } },
       }]
     });

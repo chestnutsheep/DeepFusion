@@ -5,7 +5,7 @@
 # DeepFusion 项目规则与 AI 工作流程
 
 > **版本**: 1.1  
-> **适用范围**: 所有参与 DeepFusion 前端开发的 AI 助手（包括 Cursor、Copilot、Claude 等）  
+> **适用范围**: 所有参与 DeepFusion 前端开发的 AI 助手 
 > **核心原则**: 数据驱动 · 配置先行 · 硬编码零容忍 · 遵循 Superpowers 流程 · 卡片自适应布局
 
 ---

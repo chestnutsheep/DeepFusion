@@ -1,0 +1,428 @@
+{
+  "providers": [
+    {
+      "name": "DeepSeek",
+      "apiKey": "sk-2812de515a334ac1b7ddf16fe9444d97",
+      "baseUrl": "https://api.deepseek.com",
+      "model": "deepseek-v4-pro",
+      "temperature": 0.1,
+      "reasoningEffort": "high",
+      "thinkingEnabled": true
+    },
+    {
+      "name": "Qwen",
+      "apiKey": "sk-aac308b7a19747aba0f4779accb939fa",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen3-235b-a22b",
+      "temperature": 0.1,
+      "reasoningEffort": "high"
+    },
+    {
+      "name": "Qwen Code",
+      "apiKey": "",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen3-coder-plus",
+      "temperature": 0.2
+    },
+    {
+      "name": "Doubao",
+      "apiKey": "",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "ep-xxxxxxxxxxxxxxxx",
+      "temperature": 0.3
+    },
+    {
+      "name": "Moonshot",
+      "apiKey": "",
+      "baseUrl": "https://api.moonshot.cn/v1",
+      "model": "kimi-k2-0905-preview",
+      "temperature": 0.3
+    },
+    {
+      "name": "Xiaomi MiMo",
+      "apiKey": "",
+      "baseUrl": "https://api.xiaomimimo.com/v1",
+      "model": "mimo-v2.5-pro",
+      "temperature": 1
+    },
+    {
+      "name": "GLM",
+      "apiKey": "",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-5",
+      "temperature": 0.3
+    },
+    {
+      "name": "Z AI",
+      "apiKey": "",
+      "baseUrl": "https://api.z.ai/api/paas/v4",
+      "model": "glm-5",
+      "temperature": 0.3
+    },
+    {
+      "name": "MiniMax",
+      "apiKey": "",
+      "baseUrl": "https://api.minimaxi.com/v1",
+      "model": "MiniMax-M2.7",
+      "temperature": 0.3
+    },
+    {
+      "name": "Baidu Qianfan",
+      "apiKey": "",
+      "baseUrl": "https://qianfan.baidubce.com/v2",
+      "model": "ernie-4.5-turbo-32k",
+      "temperature": 0.3
+    },
+    {
+      "name": "SiliconFlow",
+      "apiKey": "",
+      "baseUrl": "https://api.siliconflow.cn/v1",
+      "model": "Qwen/QwQ-32B",
+      "temperature": 0.3
+    },
+    {
+      "name": "Huawei Cloud MaaS",
+      "apiKey": "",
+      "baseUrl": "https://api.modelarts-maas.com/v1",
+      "model": "DeepSeek-V3",
+      "temperature": 0.3
+    },
+    {
+      "name": "OpenAI",
+      "apiKey": "",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "gpt-4o",
+      "temperature": 0.5
+    },
+    {
+      "name": "Anthropic",
+      "apiKey": "",
+      "baseUrl": "https://api.anthropic.com",
+      "model": "claude-3-5-sonnet-20240620",
+      "temperature": 0.5
+    },
+    {
+      "name": "Google",
+      "apiKey": "",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1",
+      "model": "gemini-2.0-flash-exp",
+      "temperature": 0.5
+    },
+    {
+      "name": "Mistral",
+      "apiKey": "",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "model": "mistral-large-latest",
+      "temperature": 0.5
+    },
+    {
+      "name": "Azure OpenAI",
+      "apiKey": "",
+      "baseUrl": "",
+      "model": "gpt-4o",
+      "temperature": 0.5,
+      "apiVersion": "2025-01-01-preview"
+    },
+    {
+      "name": "OpenRouter",
+      "apiKey": "",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "anthropic/claude-3.7-sonnet",
+      "temperature": 0.7
+    },
+    {
+      "name": "xAI",
+      "apiKey": "",
+      "baseUrl": "https://api.x.ai/v1",
+      "model": "grok-4",
+      "temperature": 0.7
+    },
+    {
+      "name": "Groq",
+      "apiKey": "",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "model": "moonshotai/kimi-k2-instruct-0905",
+      "temperature": 0.3
+    },
+    {
+      "name": "Together",
+      "apiKey": "",
+      "baseUrl": "https://api.together.xyz/v1",
+      "model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+      "temperature": 0.5
+    },
+    {
+      "name": "Fireworks",
+      "apiKey": "",
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "model": "accounts/fireworks/models/kimi-k2p5",
+      "temperature": 0.5
+    },
+    {
+      "name": "Requesty",
+      "apiKey": "",
+      "baseUrl": "https://router.requesty.ai/v1",
+      "model": "anthropic/claude-3-7-sonnet-latest",
+      "temperature": 0.5
+    },
+    {
+      "name": "OpenAI Compatible",
+      "apiKey": "",
+      "baseUrl": "https://your-openai-compatible-endpoint/v1",
+      "model": "your-model-id",
+      "temperature": 0.5
+    },
+    {
+      "name": "LMStudio",
+      "apiKey": "EMPTY",
+      "baseUrl": "http://localhost:1234/v1",
+      "model": "local-model",
+      "temperature": 0.7
+    },
+    {
+      "name": "Ollama",
+      "apiKey": "",
+      "baseUrl": "http://localhost:11434/api",
+      "model": "llama3",
+      "temperature": 0.7
+    }
+  ],
+  "activeProvider": "DeepSeek",
+  "useCustomConceptNoteFolder": true,
+  "conceptNoteFolder": "Concepts/",
+  "useCustomProcessedFileFolder": true,
+  "processedFileFolder": "Processed/Notes",
+  "generateConceptLogFile": true,
+  "useCustomConceptLogFolder": false,
+  "conceptLogFolderPath": "",
+  "useCustomConceptLogFileName": false,
+  "conceptLogFileName": "Generate.log",
+  "chunkWordCount": 6500,
+  "maxTokens": 20000,
+  "enableDuplicateDetection": true,
+  "processMode": "single",
+  "moveOriginalFileOnProcess": false,
+  "tavilyApiKey": "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",
+  "searchProvider": "tavily",
+  "ddgMaxResults": 5,
+  "ddgFetchTimeout": 15,
+  "maxResearchContentTokens": 3000,
+  "enableResearchInGenerateContent": false,
+  "tavilyMaxResults": 5,
+  "tavilySearchDepth": "basic",
+  "useMultiModelSettings": true,
+  "addLinksProvider": "Qwen",
+  "researchProvider": "DeepSeek",
+  "generateTitleProvider": "GLM",
+  "translateProvider": "Qwen",
+  "extractConceptsProvider": "DeepSeek",
+  "enableStableApiCall": true,
+  "apiCallInterval": 10,
+  "apiCallMaxRetries": 3,
+  "enableApiErrorDebugMode": true,
+  "enableDeveloperMode": false,
+  "developerDiagnosticCallMode": "runtime-stable",
+  "developerDiagnosticStabilityRuns": 3,
+  "developerDiagnosticTimeoutMs": 600000,
+  "addLinksModel": "",
+  "researchModel": "",
+  "generateTitleModel": "",
+  "translateModel": "",
+  "summarizeToMermaidModel": "",
+  "extractConceptsModel": "",
+  "useCustomAddLinksSuffix": false,
+  "addLinksCustomSuffix": "",
+  "useCustomTranslationSuffix": false,
+  "translationCustomSuffix": "_translated",
+  "useCustomTranslationSavePath": false,
+  "translationSavePath": "",
+  "useCustomGenerateTitleOutputFolder": false,
+  "generateTitleOutputFolderName": "_complete",
+  "duplicateCheckScopeMode": "vault",
+  "duplicateCheckScopePaths": "",
+  "extractConceptsMinimalTemplate": true,
+  "extractConceptsAddBacklink": true,
+  "removeCodeFencesOnAddLinks": true,
+  "uiLocale": "auto",
+  "language": "zh-CN",
+  "availableLanguages": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "es",
+      "name": "Español"
+    },
+    {
+      "code": "fr",
+      "name": "Français"
+    },
+    {
+      "code": "de",
+      "name": "Deutsch"
+    },
+    {
+      "code": "it",
+      "name": "Italiano"
+    },
+    {
+      "code": "pt",
+      "name": "Português"
+    },
+    {
+      "code": "zh-CN",
+      "name": "简体中文"
+    },
+    {
+      "code": "zh-TW",
+      "name": "繁體中文"
+    },
+    {
+      "code": "ja",
+      "name": "日本語"
+    },
+    {
+      "code": "ko",
+      "name": "한국어"
+    },
+    {
+      "code": "ru",
+      "name": "Русский"
+    },
+    {
+      "code": "ar",
+      "name": "العربية"
+    },
+    {
+      "code": "hi",
+      "name": "हिन्दी"
+    },
+    {
+      "code": "bn",
+      "name": "বাংলা"
+    },
+    {
+      "code": "nl",
+      "name": "Nederlands"
+    },
+    {
+      "code": "sv",
+      "name": "Svenska"
+    },
+    {
+      "code": "fi",
+      "name": "Suomi"
+    },
+    {
+      "code": "da",
+      "name": "Dansk"
+    },
+    {
+      "code": "no",
+      "name": "Norsk"
+    },
+    {
+      "code": "pl",
+      "name": "Polski"
+    },
+    {
+      "code": "tr",
+      "name": "Türkçe"
+    },
+    {
+      "code": "he",
+      "name": "עברית"
+    },
+    {
+      "code": "th",
+      "name": "ไทย"
+    },
+    {
+      "code": "el",
+      "name": "Ελληνικά"
+    },
+    {
+      "code": "cs",
+      "name": "Čeština"
+    },
+    {
+      "code": "hu",
+      "name": "Magyar"
+    },
+    {
+      "code": "ro",
+      "name": "Română"
+    },
+    {
+      "code": "uk",
+      "name": "Українська"
+    },
+    {
+      "code": "vi",
+      "name": "Tiếng Việt"
+    },
+    {
+      "code": "id",
+      "name": "Bahasa Indonesia"
+    },
+    {
+      "code": "ms",
+      "name": "Bahasa Melayu"
+    }
+  ],
+  "useDifferentLanguagesForTasks": false,
+  "generateTitleLanguage": "en",
+  "researchSummarizeLanguage": "en",
+  "addLinksLanguage": "en",
+  "summarizeToMermaidLanguage": "en",
+  "extractConceptsLanguage": "en",
+  "enableGlobalCustomPrompts": true,
+  "useCustomPromptForAddLinks": false,
+  "customPromptAddLinks": "",
+  "useCustomPromptForGenerateTitle": false,
+  "customPromptGenerateTitle": "",
+  "useCustomPromptForResearchSummarize": false,
+  "customPromptResearchSummarize": "",
+  "summarizeToMermaidProvider": "GLM",
+  "useCustomPromptForSummarizeToMermaid": false,
+  "customPromptSummarizeToMermaid": "",
+  "useCustomPromptForExtractConcepts": false,
+  "customPromptExtractConcepts": "",
+  "useCustomPromptForTranslate": false,
+  "translatePrompt": "",
+  "translateSummarizeToMermaidOutput": false,
+  "useCustomSummarizeToMermaidSuffix": false,
+  "summarizeToMermaidCustomSuffix": "_summ",
+  "useCustomSummarizeToMermaidSavePath": false,
+  "summarizeToMermaidSavePath": "",
+  "enableFocusedLearning": true,
+  "focusedLearningDomain": "\"Macroeconomics\" \"Financial Economics\" \"\"\"\"\"\"\"\"\"",
+  "disableAutoTranslation": false,
+  "enableBatchParallelism": false,
+  "batchConcurrency": 1,
+  "batchSize": 50,
+  "batchInterDelayMs": 1000,
+  "apiCallIntervalMs": 500,
+  "autoMermaidFixAfterGenerate": false,
+  "customWorkflowButtonsDsl": "One-Click Extract::process-current-add-links>batch-generate-from-titles>batch-mermaid-fix\nResearch & Deconstruct::extract-concepts-current>check-remove-duplicate-concepts>generate-diagram>research-and-summarize>summarize-as-mermaid\nUnderstand, Compare and then Merge::check-remove-duplicate-concepts>batch-extract-original-text>summarize-as-mermaid",
+  "customWorkflowErrorStrategy": "stop_on_error",
+  "extractQuestions": "",
+  "extractOriginalTextProvider": "Qwen",
+  "extractOriginalTextModel": "",
+  "extractOriginalTextLanguage": "en",
+  "extractOriginalTextMergedMode": false,
+  "translateExtractOriginalTextOutput": false,
+  "extractOriginalTextUseCustomOutput": false,
+  "extractOriginalTextCustomPath": "",
+  "extractOriginalTextCustomSuffix": "_Extracted",
+  "suppressConceptNotePathWarningForever": false,
+  "useCustomPromptForExtractOriginalText": false,
+  "customPromptExtractOriginalText": "",
+  "enableMermaidErrorDetection": true,
+  "moveMermaidErrorFiles": false,
+  "mermaidErrorFolderPath": "MermaidErrors",
+  "enableExperimentalDiagramPipeline": false,
+  "experimentalDiagramCompatibilityMode": "legacy-mermaid",
+  "_firstLaunch": false
+}
