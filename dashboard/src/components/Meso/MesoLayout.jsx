@@ -134,14 +134,27 @@ function SectionHeader({ badge, title, highlight, desc }) {
   );
 }
 
-/** 行业热力图 — x=日期, y=行业, value=涨跌幅 */
-function HeatmapChart({ industries, dates, matrix }) {
+// ── 进攻/防御行业分类 ──
+// 进攻型：强周期 + 高Beta + 科技成长
+const OFFENSIVE_NAMES = new Set([
+  '有色金属', '采掘', '钢铁', '化工', '房地产', '非银金融',
+  '国防军工', '电子', '计算机', '通信', '电气设备', '机械设备',
+  '汽车', '医药生物', '新能源汽车', '综合', '传媒',
+]);
+// 防御型：刚需消费 + 低Beta + 传统基础工业
+const DEFENSIVE_NAMES = new Set([
+  '银行', '食品饮料', '农林牧渔', '公用事业', '交通运输',
+  '商业贸易', '家用电器', '纺织服装', '轻工制造',
+  '建筑装饰', '建筑材料', '休闲服务', '美容护理',
+]);
+
+/** 单组热力图 */
+function HeatmapSubChart({ industries, dates, matrix, title, icon, accentColor }) {
   const chartRef = useRef(null);
   useEffect(() => {
     if (!chartRef.current || !industries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = industries.map(i => i.name || i.code);
-    // 只取最近 30 个交易日
     const recentDates = dates.slice(-30);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
@@ -154,21 +167,58 @@ function HeatmapChart({ industries, dates, matrix }) {
       "tooltip": {
         "formatter": p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      "grid": { "left": 90, "right": 30, "top": 10, "bottom": 40 },
-      "xAxis": { "type": 'category', "data": recentDates.map(d => d.slice(5)), "axisLabel": { "fontSize": 10, "rotate": 30 } },
-      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 12 } },
+      "grid": { "left": 90, "right": 16, "top": 8, "bottom": 36 },
+      "xAxis": { "type": 'category', "data": recentDates.map(d => d.slice(5)), "axisLabel": { "fontSize": 10, "rotate": 35 } },
+      "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 12, "width": 72, "overflow": "truncate" } },
       "visualMap": {
         "min": -4, "max": 4, "calculable": true, "orient": 'horizontal', "left": 'center', "bottom": 0,
-        "inRange": { "color": ['#2d7d4f', '#5bba57', '#b5d6a7', '#f0f0e8', '#f5c4b4', '#e2806f', '#c43e3e'] },
-        "textStyle": { "color": '#CBC0B0', "fontSize": 12 },
+        "inRange": { "color": ['rgb(8 86 11)', '#217819', '#44b63a', '#75d378', '#f5c4b4', '#e2806f', '#c43e3e'] },
+        "textStyle": { "color": '#CBC0B0', "fontSize": 11 },
       },
-      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 11, "color": '#F0E8D8' },
-        "emphasis": { "itemStyle": { "shadowBlur": 10, "shadowColor": 'rgba(0,0,0,0.5)' } },
+      "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 10, "color": '#F0E8D8' },
+        "emphasis": { "itemStyle": { "shadowBlur": 10, "shadowColor": 'rgb(66 66 66 / 0.5)' } },
       }]
     });
     return () => chart.dispose();
   }, [industries, dates, matrix]);
-  return <div ref={chartRef} style={{ width: '100%', height: Math.max(280, industries.length * 22 + 30) }} />;
+  // 每个行业给 28px 高度，保证行高充裕
+  const h = Math.max(220, industries.length * 28 + 50);
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: accentColor }}>{icon}</span>
+        <span>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>· {industries.length} 个行业</span>
+        {industries.length > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+            color: industries.reduce((s,i) => s + i.change, 0) / industries.length >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
+          }}>
+            均涨 {(industries.reduce((s,i) => s + i.change, 0) / industries.length).toFixed(2)}%
+          </span>
+        )}
+      </div>
+      <div ref={chartRef} style={{ width: '100%', height: h }} />
+    </div>
+  );
+}
+
+/** 行业热力图 — 进攻/防御双区 */
+function HeatmapChart({ industries, dates, matrix }) {
+  const offensive = industries.filter(i => OFFENSIVE_NAMES.has(i.name));
+  const defensive = industries.filter(i => DEFENSIVE_NAMES.has(i.name));
+  // 兜底：未被分类的行业归入进攻
+  const classified = new Set([...OFFENSIVE_NAMES, ...DEFENSIVE_NAMES]);
+  const uncategorized = industries.filter(i => !classified.has(i.name));
+  const offensiveFinal = uncategorized.length > 0 ? [...offensive, ...uncategorized] : offensive;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20 }}>
+      <HeatmapSubChart industries={offensiveFinal} dates={dates} matrix={matrix}
+        title="进攻型 · 周期行业" icon="⚔️" accentColor="#D4A853" />
+      <HeatmapSubChart industries={defensive} dates={dates} matrix={matrix}
+        title="防御型 · 逆周期行业" icon="🛡️" accentColor="#5B8FA8" />
+    </div>
+  );
 }
 
 /** 行业排名 TOP/BOTTOM 表格 */
