@@ -159,7 +159,7 @@ function HeatmapChart({ industries, dates, matrix }) {
       "yAxis": { "type": 'category', "data": names, "axisLabel": { "fontSize": 12 } },
       "visualMap": {
         "min": -4, "max": 4, "calculable": true, "orient": 'horizontal', "left": 'center', "bottom": 0,
-        "inRange": { "color": ['#FFF5F5', '#FFCCCC', '#FF9999', '#FF6666', '#CC3333', '#990000'] },
+        "inRange": { "color": ['#2d7d4f', '#5bba57', '#b5d6a7', '#f0f0e8', '#f5c4b4', '#e2806f', '#c43e3e'] },
         "textStyle": { "color": '#CBC0B0', "fontSize": 12 },
       },
       "series": [{ "type": 'heatmap', data, "label": { "show": true, "formatter": p => `${p.data[2].toFixed(1)}%`, "fontSize": 11, "color": '#F0E8D8' },

@@ -1,19 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Sidebar, Menu, MenuItem, SidebarContext } from 'react-pro-sidebar';
-import { useContext } from 'react';
-import { useAppStore } from '../store/index.js';
-import { mcp } from '../services/mcp.js';
+import {useContext, useEffect, useState} from 'react';
+import {Menu, MenuItem, Sidebar, SidebarContext} from 'react-pro-sidebar';
+import {useAppStore} from '../store/index.js';
+import {mcp} from '../services/mcp.js';
 
 const SUB_NAV = {
   policy: ['stats','list','collect'],
-  macro: ['kitchin','juglar','kuznets','kondratiev','coverage'],
+  macro: ['kitchin','juglar','kuznets','kondratiev','coverage','nesting','gantt'],
   meso: ['heatmap','tree','capital'],
   micro: ['stock','fund','futures','bond','option'],
   global: ['fred','wb','trade'],
 };
 const SUB_LABELS = {
   policy: { stats:'📊 政策统计', list:'📋 文件列表', collect:'🔄 采集管理' },
-  macro: { kitchin:'📉 基钦', juglar:'📈 朱格拉', kuznets:'🏠 库兹涅茨', kondratiev:'🌊 康波', coverage:'📊 宏观覆盖' },
+  macro: { kitchin:'📉 基钦', juglar:'📈 朱格拉', kuznets:'🏠 库兹涅茨', kondratiev:'🌊 康波', coverage:'📊 宏观覆盖', nesting:'🔗 周期嵌套', gantt:'📅 相位分布' },
   meso: { heatmap:'🔥 热力图', tree:'🌳 行业树', capital:'💰 资金流' },
   micro: { stock:'📈 个股', fund:'📦 基金', futures:'⛽ 期货', bond:'📜 债券', option:'🎯 期权' },
   global: { fred:'🇺🇸 FRED', wb:'🌍 World Bank', trade:'📊 贸易' },
@@ -41,11 +40,60 @@ function SidebarContent() {
   const [phase, setPhase] = useState('');
   const [policyCnt, setPolicyCnt] = useState('');
   const [policyBriefs, setPolicyBriefs] = useState([]);
+  const [cyclePhases, setCyclePhases] = useState([]);
+  const [assetAlloc, setAssetAlloc] = useState(null);
 
   useEffect(() => {
     async function f() {
-      try { const k=await mcp.call('data_kitchin'); const arr=JSON.parse(k); if(arr?.length) setPhase(arr[arr.length-1].stage_name||''); } catch(e){}
-      try { const s=await mcp.policy.stats(); const m=s.match(/(\d+)\s*篇/); if(m) setPolicyCnt(m[1]); const r=await mcp.policy.search('','',5); setPolicyBriefs(r.split('\n').slice(1,4).filter(Boolean)); } catch(e){}
+      // 并行拉取四周期数据
+      try {
+        const [kitRaw, jugRaw, kuzRaw, konRaw] = await Promise.all([
+          mcp.call('data_kitchin'),
+          mcp.call('data_juglar'),
+          mcp.call('data_kuznets'),
+          mcp.call('data_kondratiev', { method: 'pca' }),
+        ]);
+        const parseLast = (raw) => {
+          try { const arr = JSON.parse(raw); return arr?.[arr.length - 1] || {}; } catch { return {}; }
+        };
+        const kit = parseLast(kitRaw);
+        const jug = parseLast(jugRaw);
+        const kuz = parseLast(kuzRaw);
+        const kon = parseLast(konRaw);
+        if (kit.stage_name || kit.phase_name) setPhase(kit.stage_name || kit.phase_name);
+        const zDir = (z) => z != null ? (z > 0.2 ? '↑' : z < -0.2 ? '↓' : '→') : '·';
+        const zColor = (z) => z != null ? (z > 0.2 ? '#3fb950' : z < -0.2 ? '#f85149' : '#D4A853') : '#888';
+        setCyclePhases([
+          { name: '基钦', phase: kit.stage_name || kit.phase_name || '—', dir: zDir(kit.composite_z), color: zColor(kit.composite_z) },
+          { name: '朱格拉', phase: jug.stage_name || jug.phase_name || '—', dir: zDir(jug.composite_z), color: zColor(jug.composite_z) },
+          { name: '库兹涅茨', phase: kuz.stage_name || kuz.phase_name || '—', dir: zDir(kuz.composite_z), color: zColor(kuz.composite_z) },
+          { name: '康波', phase: kon.phase_name || kon.global_phase_name || '—', dir: (kon.phase || 0) <= 2 ? '↑' : '↓', color: (kon.phase || 0) <= 2 ? '#3fb950' : '#f85149' },
+        ]);
+        // 基于周期计算建议资产配置
+        let equity = 35, bond = 40, fund = 15, cash = 10;
+        const kz = kit.composite_z || 0;
+        const jz = jug.composite_z || 0;
+        const kp = kon.phase || 0;
+        if (kz > 0.3) { equity += 8; bond -= 8; }
+        else if (kz < -0.3) { equity -= 8; bond += 5; cash += 3; }
+        if (jz > 0.2) { equity += 5; cash -= 5; }
+        else if (jz < -0.2) { equity -= 5; cash += 5; }
+        if (kp <= 2) { equity += 4; bond -= 4; }
+        else { equity -= 6; cash += 3; bond += 3; }
+        equity = Math.max(10, Math.min(65, equity));
+        bond = Math.max(15, Math.min(65, bond));
+        cash = Math.max(5, Math.min(30, cash));
+        fund = 100 - equity - bond - cash;
+        fund = Math.max(5, fund);
+        setAssetAlloc([
+          { label: '权益', ratio: equity, color: '#D4A853' },
+          { label: '债券', ratio: bond, color: '#5B8FA8' },
+          { label: '基金', ratio: fund, color: '#3E6B5C' },
+          { label: '现金', ratio: cash, color: '#C49BA5' },
+        ]);
+      } catch(e) { console.error('cycle data error', e); }
+      // 政策数据
+      try { const s=await mcp.call('policy_stats'); const m=s.match(/(\d+)\s*篇/); if(m) setPolicyCnt(m[1]); const r=await mcp.call('policy_search',{keyword:'',limit:5}); setPolicyBriefs(r.split('\n').slice(1,4).filter(Boolean)); } catch(e){}
     }
     f();
   }, []);
@@ -78,13 +126,13 @@ function SidebarContent() {
           </div>
 
           <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置</div>
+            <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:9,fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
             <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
-              {[['权益','35%','#D4A853'],['债券','40%','#5B8FA8'],['基金','15%','#3E6B5C'],['现金','10%','#C49BA5']].map(([l,p,c]) => (
-                <div key={l} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
-                  <span style={{ width:8,height:8,borderRadius:'50%',background:c,display:'inline-block' }} />
-                  <span style={{ fontSize:13,flex:1 }}>{l}</span>
-                  <span style={{ fontSize:14,fontWeight:700,color:'var(--accent-gold)' }}>{p}</span>
+              {(assetAlloc || [{label:'权益',ratio:35,color:'#D4A853'},{label:'债券',ratio:40,color:'#5B8FA8'},{label:'基金',ratio:15,color:'#3E6B5C'},{label:'现金',ratio:10,color:'#C49BA5'}]).map(a => (
+                <div key={a.label} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
+                  <span style={{ width:8,height:8,borderRadius:'50%',background:a.color,display:'inline-block' }} />
+                  <span style={{ fontSize:13,flex:1 }}>{a.label}</span>
+                  <span style={{ fontSize:14,fontWeight:700,color:'var(--accent-gold)' }}>{a.ratio}%</span>
                 </div>
               ))}
             </div>
@@ -93,7 +141,13 @@ function SidebarContent() {
           <div style={{ margin:'0 16px 12px' }}>
             <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>🔄 基于周期大概方向</div>
             <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
-              {[['基钦','主动补库存','↑','#3fb950'],['朱格拉','弱复苏','→','#D4A853'],['库兹涅茨','L型筑底','↓','#f85149'],['康波','萧条期末','↑','#D4A853']].map(([n,p,d,c]) => (
+              {cyclePhases.length > 0 ? cyclePhases.map(c => (
+                <div key={c.name} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
+                  <span style={{ fontSize:11,color:'var(--text-muted)',width:32 }}>{c.name}</span>
+                  <span style={{ fontSize:14,color:c.color,fontWeight:700 }}>{c.dir}</span>
+                  <span style={{ fontSize:12 }}>{c.phase}</span>
+                </div>
+              )) : [['基钦','—','→','#888'],['朱格拉','—','→','#888'],['库兹涅茨','—','→','#888'],['康波','—','→','#888']].map(([n,p,d,c]) => (
                 <div key={n} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
                   <span style={{ fontSize:11,color:'var(--text-muted)',width:32 }}>{n}</span>
                   <span style={{ fontSize:14,color:c,fontWeight:700 }}>{d}</span>

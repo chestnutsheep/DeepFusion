@@ -260,10 +260,10 @@ function CycleNesting() {
         axisLabel: {
           formatter(v) {
             if (v >= 2) return '繁荣';
-            if (v >= 1) return '复苏';
-            if (v < -2) return '萧条';
+            if (v >= 0.5) return '复苏';
+            if (v > -0.5) return '中性';
             if (v > -2) return '衰退';
-            return '-';
+            return '萧条';
           },
           fontSize: 11,
         },
