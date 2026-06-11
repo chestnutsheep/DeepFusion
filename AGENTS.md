@@ -39,16 +39,17 @@ This project uses Git. See .gitignore for excluded files.
 
 ## Important Notes
 
-### 康波周期：缓存版本锁定 (2026-06-06)
+### 康波周期：缓存版本锁定 (2026-06-11)
 
-当前康波计算已稳定（双线PCA + level-momentum相位判定）。Cycle cache 键名含版本号：
+当前康波计算已稳定（三线PCA + level-momentum相位判定）。Cycle cache 键名含版本号，直接内嵌在缓存键字符串中：
 
-```python
-KONDRATIEV_VER = "2"  # 算法变更时 +1 使旧缓存失效
-_ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
-```
+| 函数 | 缓存键格式 | 当前版本 |
+|------|-----------|---------|
+| `kondratiev_cycle()` | `cycles_report_kondratiev_{method}_v{N}` | v3 |
+| `data_kondratiev()` | `cycles_data_kondratiev_{method}_v{N}` | v5 |
+| `cycle_collect()` | `cycles_report_kondratiev_pca_v{N}` | v3 |
 
-**不要直接改这个缓存键**。以后如果改 `compute_kondratiev()` 的算法逻辑，记得在 `cycles.py` 里把 `KONDRATIEV_VER` +1，否则前端会一直看到旧数据。
+**不要直接改这些缓存键**。以后如果改 `compute_kondratiev()` 的算法逻辑，记得在 `cycles.py` 里把对应的版本号 +1，否则前端会一直看到旧数据。
 
 ### 其它周期
 基钦/朱格拉/库兹涅茨沿用各自的缓存策略，暂无需版本锁定。如有重大算法调整，参照康波的做法加版本号。
@@ -57,12 +58,12 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
 
 ## MCP 工具注册表（完整清单）
 
-> 生成日期: 2026-06-08 | 数据源: 阅读 `deep_fusion/tools/*.py` 全部源码
+> 生成日期: 2026-06-11 | 数据源: 阅读 `deep_fusion/tools/*.py` 全部源码
 
 ```json
 {
   "meta": {
-    "total_tools": 82,
+    "total_tools": 125,
     "api_base": "/api/tools/call",
     "mcp_framework": "fastmcp",
     "return_format_note": "所有工具返回 str 类型。实际格式分为 CSV(表格数据)、JSON(结构化数据)、text(格式化报告) 三类。"
@@ -74,7 +75,7 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
       "tools": {
         "search": {
           "params": { "keyword": "str (必填)", "market": "str (默认sh)" },
-          "return": "text — 股票代码+名称+市场",
+          "return": "JSON — {code, name, market, error?}",
           "data_source": "akshare ak_search_async",
           "data_span": "实时快照"
         },
@@ -332,9 +333,9 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
         },
         "kondratiev_cycle": {
           "params": { "method": "str (默认pca, 可选wavelet/bandpass)" },
-          "return": "text — 康波周期定位报告(PCA合成指数/主周期/相位/机构对比)",
+          "return": "text — 康波周期定位报告(融合线/全球线/中国线 + 主周期/相位/置信度/机构对比)",
           "data_source": "世界银行 (65年长序列, 1960~2024)",
-          "data_span": "1960-2024(年频), 缓存7天(v2版本锁)"
+          "data_span": "1960-2024(年频), 缓存7天(v3版本锁)"
         },
         "chart_kondratiev_cycle": {
           "params": { "method": "str (默认pca)", "output_path": "str" },
@@ -344,9 +345,33 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
         },
         "data_kondratiev": {
           "params": { "method": "str (默认pca)" },
-          "return": "JSON — PCA合成指数序列",
+          "return": "JSON — 三线(PCA融合/全球/中国)逐年数据：zscore+相位+强度+CF周期",
           "data_source": "同kondratiev_cycle",
-          "data_span": "1960-2024, 缓存7天(v2版本锁)"
+          "data_span": "1960-2024, 缓存7天(v5版本锁)"
+        },
+        "data_kitchin_extended": {
+          "params": {},
+          "return": "JSON — 基钦周期FRED扩展版(1919~)，工业生产+制造商库存+M2，年频数组",
+          "data_source": "FRED API, 本地compute_kitchin_extended",
+          "data_span": "1919至今(年频), 缓存7天(v1版本锁)"
+        },
+        "data_juglar_extended": {
+          "params": {},
+          "return": "JSON — 朱格拉周期FRED扩展版(1929~)，非住宅固投+私人固投+GNP+产能利用率，年频数组",
+          "data_source": "FRED API, 本地compute_juglar_extended",
+          "data_span": "1929至今(年频), 缓存7天(v1版本锁)"
+        },
+        "data_kuznets_extended": {
+          "params": {},
+          "return": "JSON — 库兹涅茨周期FRED扩展版(1947~)，美国房价+新屋开工+住宅投资，年频数组",
+          "data_source": "FRED API, 本地compute_kuznets_extended",
+          "data_span": "1947至今(年频), 缓存7天(v1版本锁)"
+        },
+        "cycle_nesting": {
+          "params": {},
+          "return": "JSON — 四周期嵌套数据：基钦/朱格拉/库兹涅茨/康波合成Z值+相位序列",
+          "data_source": "FRED+世界银行扩展数据, 本地周期计算",
+          "data_span": "1919~2024(年频), 缓存7天(v3版本锁)"
         },
         "cycle_collect": {
           "params": {},
@@ -506,9 +531,9 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
         },
         "industry_collect": {
           "params": {},
-          "return": "text — 采集报告: 分类/估值/资金流/行情快照",
-          "data_source": "同花顺+巨潮 → SQLite",
-          "data_span": "最新快照"
+          "return": "text — 采集报告: 分类/估值/资金流/行情快照/申万分级",
+          "data_source": "同花顺+巨潮+申万 → SQLite",
+          "data_span": "最新快照 + 申万三级分级"
         },
         "industry_sw_tree": {
           "params": { "行业": "str (可选)", "深度": "int (默认3)", "展开": "int (默认2)" },
@@ -906,7 +931,7 @@ _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v{KONDRATIEV_VER}", ...)
     "OKX": "加密货币K线/情绪/资金费率/持仓量。",
     "币安": "加密货币AI分析报告。",
     "99qh": "81个大宗商品现货品种(2012年至今)。",
-    "同花顺/巨潮/申万": "行业分类/行情/估值/资金流。",
+    "同花顺/巨潮/申万": "行业分类/行情/估值/资金流/三级分级谱系。",
     "爬虫": "政策文件从6个官网实时HTML抓取。",
     "newsnow": "全球财经快讯(可选, 需配置环境变量)。"
   },

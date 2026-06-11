@@ -1,18 +1,15 @@
 """行业 MCP 工具 — 数据源: 同花顺(ths) + 巨潮(cninfo)，零东方财富依赖。"""
-from io import StringIO
 
-import pandas as pd
 from pydantic import Field
 
+from ..data.sources import caixin_indices as caixin
+from ..data.sources import industry_cninfo as cninfo
+from ..data.sources import industry_collector as collector
+from ..data.sources import industry_ths as ths
+from ..data.sources import multi_factor as mf
+from ..data.sources import spot_prices as spot
 from ..server import mcp
 from ..shared import industry_db as db
-from ..data.sources import industry_ths as ths
-from ..data.sources import industry_cninfo as cninfo
-from ..data.sources import spot_prices as spot
-from ..data.sources import caixin_indices as caixin
-from ..data.sources import industry_collector as collector
-from ..data.sources import multi_factor as mf
-from ..data.sources import caixin_indices as caixin
 
 
 @mcp.tool(
@@ -169,6 +166,14 @@ def industry_collect() -> str:
     df4 = ths.get_industry_summary()
     if df4 is not None and not df4.empty:
         results.append(f"行情快照: {len(df4)} 条")
+
+    # 5. 申万三级行业分级谱系
+    try:
+        from ..data.sources.industry_sw import save_to_db as sw_save
+        sw_total = sw_save()
+        results.append(f"申万分级: {sw_total} 条 (一级/二级/三级)")
+    except Exception as e:
+        errors.append(f"申万分级采集失败: {e}")
 
     stats = db.get_cache_stats()
     lines = ["=== 行业数据采集报告 ==="]

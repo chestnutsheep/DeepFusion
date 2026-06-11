@@ -169,10 +169,11 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         </div>
       )}
 
-      {/* 主内容区：75% 图表 + 2.5% 间距 + 20% 指标卡 */}
-      <div style={{ display: 'flex', gap: '2.5%', marginBottom: 20, alignItems: 'flex-start' }}>
-        {/* 图表区 75% */}
-        <div style={{ width: '75%', flexShrink: 0 }}>
+      {/* 主内容区：根据指标数量N动态布局 */}
+      {(() => {
+        const N = metrics.length;
+        // 公共图表内容
+        const chartContent = (
           <CardWrapper hoverable style={{
             padding: 18,
             transition: 'all 0.25s ease',
@@ -196,15 +197,65 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
             {/* 历史拐点标记 */}
             <TurningPointMarkers chartData={rows} turningPoints={config.turningPoints} />
           </CardWrapper>
-        </div>
+        );
 
-        {/* 指标卡 20% */}
-        {metrics.length > 0 && (
-          <div style={{ width: '20%', flexShrink: 0 }}>
-            <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={1} gap={10} />
+        if (N === 0) {
+          return <div style={{ marginBottom: 20 }}>{chartContent}</div>;
+        }
+
+        const isOdd = N % 2 === 1;
+        const n = Math.floor(N / 2);
+
+        if (isOdd) {
+          // N=2n+1：主图表全宽 + 指标卡下方一字排开
+          return (
+            <div style={{ marginBottom: 20 }}>
+              {chartContent}
+              <div style={{ marginTop: 14 }}>
+                <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={N} gap={12} />
+              </div>
+            </div>
+          );
+        }
+
+        // N=2n：主图表居中 + 左右各n张指标卡垂直排列，总高=图表高度
+        const sideWidth = n <= 2 ? '18%' : '16%';
+        const sideGridStyle = {
+          gridTemplateRows: `repeat(${n}, 1fr)`,
+          height: '100%',
+        };
+
+        return (
+          <div style={{ display: 'flex', gap: 14, marginBottom: 20, alignItems: 'stretch' }}>
+            {/* 左侧指标卡 */}
+            <div style={{ width: sideWidth, flexShrink: 0 }}>
+              <DataGrid
+                config={metrics.slice(0, n)}
+                data={metricsLatest}
+                prevData={prev}
+                columns={1}
+                gap={10}
+                containerStyle={sideGridStyle}
+              />
+            </div>
+            {/* 主图表 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {chartContent}
+            </div>
+            {/* 右侧指标卡 */}
+            <div style={{ width: sideWidth, flexShrink: 0 }}>
+              <DataGrid
+                config={metrics.slice(n)}
+                data={metricsLatest}
+                prevData={prev}
+                columns={1}
+                gap={10}
+                containerStyle={sideGridStyle}
+              />
+            </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* 周期解读说明 */}
       {config.explanation && (

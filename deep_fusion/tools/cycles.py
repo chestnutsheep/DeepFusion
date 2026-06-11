@@ -387,7 +387,7 @@ def cycle_collect() -> str:
             lines.append(f"  {cid:10s} ❌ {e}")
 
     try:
-        _ck_k = CacheKey.init("cycles_report_kondratiev_pca_v2", ttl=604800, ttl2=2592000)
+        _ck_k = CacheKey.init("cycles_report_kondratiev_pca_v3", ttl=604800, ttl2=2592000)
         if _ck_k.get() is None:
             # 走 kondratiev_cycle() 完整路径，它自己写缓存
             text = kondratiev_cycle("pca")

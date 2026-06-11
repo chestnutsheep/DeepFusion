@@ -1,6 +1,6 @@
 import DataCard from './DataCard.jsx';
 
-export default function DataGrid({ config, data, prevData, columns = 3, gap = 16 }) {
+export default function DataGrid({ config, data, prevData, columns = 3, gap = 16, containerStyle }) {
   if (!data) return null;
   const items = config.map(cfg => {
     let value = data[cfg.key];
@@ -12,7 +12,7 @@ export default function DataGrid({ config, data, prevData, columns = 3, gap = 16
     };
   });
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap, ...containerStyle }}>
       {items.map((item, i) => {
         const { key: _key, transform: _transform, ...cardProps } = item;
         return <DataCard key={i} {...cardProps} />;

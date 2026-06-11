@@ -10,9 +10,8 @@
 """
 from __future__ import annotations
 
-import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +95,19 @@ CREATE TABLE IF NOT EXISTS collection_meta (
     table_name TEXT NOT NULL,
     rows INTEGER,
     status TEXT DEFAULT 'ok'
+);
+
+CREATE TABLE IF NOT EXISTS meso_sw_classify (
+    industry_code TEXT PRIMARY KEY,
+    industry_name TEXT,
+    parent_name TEXT,
+    level INTEGER,
+    source TEXT,
+    constituent_count INTEGER,
+    pe_static REAL,
+    pe_ttm REAL,
+    pb REAL,
+    dividend_yield REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_code_date ON meso_industry_daily(industry_code, trade_date);
@@ -373,6 +385,7 @@ def get_cache_stats() -> dict[str, Any]:
         "meso_industry_valuation",
         "meso_industry_fund_flow",
         "meso_industry_financial",
+        "meso_sw_classify",
     ]
     stats = {}
     for t in tables:
