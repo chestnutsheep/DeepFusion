@@ -10,13 +10,14 @@
  *     单行截断文本
  *   </CardWrapper>
  */
-import { useState, useCallback } from 'react';
+import {useCallback, useState} from 'react';
 
 export default function CardWrapper({
   children,
   as: Tag = 'div',
   hoverable = true,
   truncate = false,
+  goldLine = true,
   style,
   ...props
 }) {
@@ -31,13 +32,14 @@ export default function CardWrapper({
     border: hovered && hoverable
       ? '1.5px solid rgba(212,168,83,0.85)'
       : '1px solid rgba(212,168,83,0.5)',
-    borderRadius: 2,
-    padding: 12,
+    borderRadius: 'var(--radius)',
+    padding: 'var(--sp-lg)',
+    position: 'relative',
     transition: 'all var(--transition, 0.25s ease)',
     overflow: truncate ? 'hidden' : undefined,
     boxShadow: hovered && hoverable
-      ? 'inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.28), 0 0 12px rgba(212,168,83,0.08)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.2)',
+      ? 'inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.3), 0 0 18px rgba(212,168,83,0.1)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.22), 0 0 6px rgba(212,168,83,0.03)',
     transform: hovered && hoverable ? 'translateY(-1px)' : 'none',
   };
 
@@ -50,8 +52,11 @@ export default function CardWrapper({
     base.cursor = props.href ? 'pointer' : 'default';
   }
 
+  const className = [goldLine && 'card-gold-line', props.className].filter(Boolean).join(' ') || undefined;
+
   return (
     <Tag
+      className={className}
       style={{ ...base, ...style }}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}

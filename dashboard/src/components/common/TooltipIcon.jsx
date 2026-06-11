@@ -1,5 +1,5 @@
-import { useFloating, autoUpdate, offset, shift, useHover, useInteractions } from '@floating-ui/react';
-import { useState } from 'react';
+import {autoUpdate, offset, shift, useFloating, useHover, useInteractions} from '@floating-ui/react';
+import {useState} from 'react';
 
 /**
  * 悬浮解释图标组件 (TooltipIcon)
@@ -29,7 +29,7 @@ export default function TooltipIcon({ content, position = 'bottom', children }) 
           alignItems: 'center',
           cursor: 'help',
           marginLeft: 4,
-          fontSize: 12,
+          fontSize: 'var(--fs-sm)',
           color: 'var(--text-muted)',
         }}
       >
@@ -44,9 +44,9 @@ export default function TooltipIcon({ content, position = 'bottom', children }) 
             backdropFilter: 'blur(20px)',
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius)',
-            padding: '8px 12px',
-            maxWidth: 260,
-            fontSize: 12,
+            padding: 'var(--sp-md) var(--sp-lg)',
+            maxWidth: 280,
+            fontSize: 'var(--fs-sm)',
             lineHeight: 1.5,
             color: 'var(--text-secondary)',
             zIndex: 1000,

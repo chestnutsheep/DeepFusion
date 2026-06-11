@@ -95,16 +95,16 @@ function Hero({ industries }) {
       <span style={{
         display: 'inline-block', padding: '4px 14px',
         background: 'var(--shadow-glow)', border: '1px solid var(--border-subtle)',
-        borderRadius: 20, fontSize: 11, fontWeight: 600,
+        borderRadius: 20, fontSize: 'var(--fs-sm)', fontWeight: 600,
         color: 'var(--accent-gold)', marginBottom: 10,
       }}>✦ DeepFusion · 中观产业</span>
-      <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>
+      <h1 style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700, letterSpacing: 0.5 }}>
         行业景气与 <span style={{ color: 'var(--accent-gold)' }}>产业链定位</span>
       </h1>
-      <p style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 640, marginTop: 4 }}>
+      <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', maxWidth: 640, marginTop: 4 }}>
         行业热度追踪 · 产业链结构拆解 · 景气轮动信号 · 与宏观/微观联动
       </p>
-      <div style={{ display: 'flex', gap: 18, marginTop: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', gap: 18, marginTop: 10, fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
         <span>◈ 数据源: akshare · 申万行业</span>
         <span>◈ 覆盖: {industries.length} 申万一级行业</span>
         <span>◈ 更新: 日频</span>
@@ -123,13 +123,13 @@ function SectionHeader({ badge, title, highlight, desc }) {
       <span style={{
         display: 'inline-flex', padding: '4px 12px',
         background: 'rgba(123,94,123,0.12)', border: '1px solid rgba(123,94,123,0.2)',
-        borderRadius: 16, fontSize: 10, fontWeight: 600,
+        borderRadius: 16, fontSize: 'var(--fs-sm)', fontWeight: 600,
         color: 'var(--accent-rose)', marginBottom: 6,
       }}>{badge}</span>
-      <h2 style={{ fontSize: 18, fontWeight: 700 }}>
+      <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700 }}>
         {title} <span style={{ color: 'var(--accent-gold)' }}>{highlight}</span>
       </h2>
-      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>{desc}</p>}
+      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 2 }}>{desc}</p>}
     </div>
   );
 }
@@ -180,13 +180,13 @@ const CATEGORY_CONFIG = {
 
 /** 涨跌幅 → 热力色 (treemap 用) */
 function changeToColor(v) {
-  if (v > 3)   return '#c43e3e';
-  if (v > 1.5) return '#e2806f';
-  if (v > 0.3) return '#f5c4b4';
-  if (v > -0.3)return '#e8e0d0';
-  if (v > -1.5)return '#75d378';
-  if (v > -3)  return '#44b63a';
-  return '#217819';
+  if (v > 3)   return '#c85454';
+  if (v > 1.5) return '#e29944';
+  if (v > 0.3) return '#e7e37f';
+  if (v > -0.3)return 'rgb(238 240 233 / 0.81)';
+  if (v > -1.5)return '#b1d56b';
+  if (v > -3)  return '#6ac561';
+  return '#21af7b';
 }
 
 /** 解析 industry_sw_tree 文本 → { "二级行业名": "一级行业名" } 映射 */
@@ -284,14 +284,14 @@ function IndustryDrilldown({ target, onBack }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <button onClick={onBack} style={{
-          padding: '4px 12px', borderRadius: 6, fontSize: 12,
+          padding: '4px 12px', borderRadius: 6, fontSize: 'var(--fs-sm)',
           background: 'rgba(212,168,83,0.1)', border: '1px solid var(--border-subtle)',
           color: 'var(--accent-gold)', cursor: 'pointer',
         }}>← 返回热力图</button>
-        <span style={{ fontSize: 14, fontWeight: 700 }}>{target.industry}</span>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>· {target.date} · 二级行业树状图</span>
+        <span style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>{target.industry}</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· {target.date} · 二级行业树状图</span>
         {subIndustries.length > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
             color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
           }}>
             均涨 {avgChange.toFixed(2)}% · {subIndustries.length} 子行业
@@ -301,7 +301,7 @@ function IndustryDrilldown({ target, onBack }) {
       {subIndustries.length > 0 ? (
         <div ref={chartRef} style={{ width: '100%', height: 380 }} />
       ) : (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
           暂无二级行业数据，请先执行 industry_collect 采集
         </div>
       )}
@@ -334,7 +334,7 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
     if (drillTarget || !chartRef.current || !filteredIndustries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = filteredIndustries.map(i => i.name || i.code);
-    const recentDates = dates.slice(-30);
+    const recentDates = dates.slice(-20);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
       for (let xi = 0; xi < recentDates.length; xi++) {
@@ -347,16 +347,16 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
       grid: { left: 90, right: 16, top: 8, bottom: 36 },
-      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 10, rotate: 35 } },
+      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
       yAxis: { type: 'category', data: names, axisLabel: { fontSize: 12, width: 72, overflow: 'truncate' } },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
         inRange: { color: ['rgb(8 86 11)', '#217819', '#44b63a', '#75d378', '#f5c4b4', '#e2806f', '#c43e3e'] },
-        textStyle: { color: '#CBC0B0', fontSize: 11 },
+        textStyle: { color: '#CBC0B0', fontSize: 13 },
       },
       series: [{
         type: 'heatmap', data,
-        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 10, color: '#F0E8D8' },
+        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#F0E8D8' },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.5)' } },
       }],
     });
@@ -383,14 +383,14 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
         {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
           <button key={key} onClick={() => { setActiveCategory(key); setDrillTarget(null); }}
             style={{
-              padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+              padding: '6px 16px', borderRadius: 6, fontSize: 'var(--fs-sm)', fontWeight: 600,
               background: activeCategory === key ? `${cfg.accent}22` : 'transparent',
               color: activeCategory === key ? cfg.accent : 'var(--text-secondary)',
               border: `1.5px solid ${activeCategory === key ? cfg.accent : 'var(--border-subtle)'}`,
               cursor: 'pointer', transition: 'all 0.2s',
             }}>
             {cfg.label}
-            <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 4, opacity: 0.7 }}>{cfg.desc}</span>
+            <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 400, marginLeft: 4, opacity: 0.7 }}>{cfg.desc}</span>
           </button>
         ))}
       </div>
@@ -400,11 +400,11 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
         <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />
       ) : (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: currentConfig.accent }}>{currentConfig.label}</span>
-            <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>· {filteredIndustries.length} 个行业</span>
+            <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 400, color: 'var(--text-muted)' }}>· {filteredIndustries.length} 个行业</span>
             {filteredIndustries.length > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
                 color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
               }}>
                 均涨 {avgChange.toFixed(2)}%
@@ -412,7 +412,7 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
             )}
           </div>
           <div ref={chartRef} style={{ width: '100%', height: h }} />
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
             💡 点击方格可下钻至二级行业树状图
           </div>
         </div>
@@ -425,19 +425,19 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
 function RankingTable({ title, subtitle, items, colorKey }) {
   const isUp = colorKey === 'up';
   return (
-    <CardWrapper style={{ padding: 16 }}>
-      <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-        {title} <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>{subtitle}</span>
+    <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
+      <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {title} <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>{subtitle}</span>
       </h3>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: 320 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-sm)', minWidth: 320 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: 10, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>排名</th>
-              <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: 10, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>行业</th>
-              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 10, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>涨跌幅</th>
-              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 10, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>PE</th>
-              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 10, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>PB</th>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>排名</th>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>行业</th>
+              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>涨跌幅</th>
+              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>PE</th>
+              <th style={{ textAlign: 'right', padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>PB</th>
             </tr>
           </thead>
           <tbody>
@@ -482,16 +482,16 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
       <SectionHeader badge="🔍 行业详情" title="当前选中" highlight={sel.name} desc="点击行业名称切换" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
         {/* 行业概况 */}
-        <CardWrapper style={{ padding: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-gold)', marginBottom: 8 }}>📊 行业概况</div>
+        <CardWrapper style={{ padding: 'var(--sp-lg)' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-gold)', marginBottom: 8 }}>📊 行业概况</div>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            <li style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+            <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
               <span>收盘指数</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.close.toFixed(2)}</span>
             </li>
-            <li style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+            <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
               <span>PE(TTM)</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.pe.toFixed(1)}</span>
             </li>
-            <li style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+            <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
               <span>PB</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.pb.toFixed(2)}</span>
             </li>
           </ul>
@@ -507,12 +507,12 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
       </div>
       {/* 图表区 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 行业指数走势 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· 近 1 年</span></h3>
+        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
+          <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>📈 行业指数走势 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>· 近 1 年</span></h3>
           <DataChart data={chartData} series={[{ key: 'close', name: `${sel.name}指数`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
         </CardWrapper>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 涨跌幅走势 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· 近期</span></h3>
+        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
+          <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>📊 涨跌幅走势 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>· 近期</span></h3>
           <DataChart data={chartData} series={[{ key: 'change', name: '涨跌幅', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} />
         </CardWrapper>
       </div>
@@ -532,18 +532,18 @@ function ChainView({ industries }) {
   const downstream = sorted.filter(i => ['食品饮料','医药生物','汽车','家用电器','纺织服装','房地产','银行','非银金融','商业贸易','休闲服务'].includes(i.name));
 
   const ChainCard = ({ title, icon, items, borderColor }) => (
-    <CardWrapper style={{ padding: 16, borderLeft: `3px solid ${borderColor}` }}>
-      <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{icon} {title}</h3>
+    <CardWrapper style={{ padding: 'var(--sp-xl)', borderLeft: `3px solid ${borderColor}` }}>
+      <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>{icon} {title}</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
         {items.slice(0, 6).map(i => (
           <span key={i.name} style={{
-            padding: '2px 8px', borderRadius: 6, fontSize: 10,
+            padding: '2px 8px', borderRadius: 6, fontSize: 'var(--fs-xs)',
             background: i.change >= 0 ? 'rgba(196,123,123,0.12)' : 'rgba(62,107,92,0.12)',
             color: i.change >= 0 ? 'var(--accent-red)' : 'var(--accent-green)',
           }}>{i.name} {i.change >= 0 ? '+' : ''}{i.change.toFixed(1)}%</span>
         ))}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
         行业数 {items.length} · 平均涨幅 {items.length ? (items.reduce((s, i) => s + i.change, 0) / items.length).toFixed(2) : '—'}%
       </div>
     </CardWrapper>
@@ -589,12 +589,12 @@ function EnergySection() {
           detail="郑商所主力合约" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>原油价格走势</h3>
+        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
+          <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>原油价格走势</h3>
           <DataChart data={oilData} series={[{ key: 'close', name: '原油', color: '#C47B7B', type: 'line' }]} dateKey="period" height={240} />
         </CardWrapper>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>煤炭价格走势</h3>
+        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
+          <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>煤炭价格走势</h3>
           <DataChart data={coalData} series={[{ key: 'close', name: '动力煤', color: '#7B5E7B', type: 'line' }]} dateKey="period" height={240} />
         </CardWrapper>
       </div>
@@ -646,7 +646,7 @@ export default function MesoLayout() {
       {/* 区块一：行业热力图与轮动（可交互Tab+下钻） */}
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
-        <CardWrapper style={{ padding: 16 }}>
+        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <HeatmapSection industries={industries} dates={dates} matrix={matrix} onIndustrySelect={handleIndustrySelect} />
         </CardWrapper>
       </div>

@@ -19,13 +19,32 @@
   --accent-red: #C47B7B;
   --accent-blue: #5B8FA8;
   --shadow-glow: rgba(212,168,83,0.08);
-  --radius-sm: 2px;
-  --radius: 2px;
-  --radius-lg: 2px;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
   --font-sans: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', 'Inter', 'Fira Sans', sans-serif;
   --font-mono: 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
   --nav-width: 270px;
   --transition: 0.25s ease;
+
+  /* ── 响应式字体阶梯 clamp(min, preferred, max) ── */
+  --fs-2xs:  clamp(11px,  0.25vw + 9px,  13px);
+  --fs-xs:   clamp(12px,  0.3vw + 9.5px, 15px);
+  --fs-sm:   clamp(13px,  0.35vw + 10px, 17px);
+  --fs-base: clamp(14px,  0.4vw + 11px,  19px);
+  --fs-md:   clamp(15px,  0.45vw + 12px, 21px);
+  --fs-lg:   clamp(18px,  0.55vw + 14px, 26px);
+  --fs-xl:   clamp(20px,  0.65vw + 16px, 30px);
+  --fs-2xl:  clamp(24px,  0.85vw + 18px, 36px);
+
+  /* ── 响应式间距阶梯 ── */
+  --sp-2xs: clamp(2px,  0.1vw + 1px,   4px);
+  --sp-xs:  clamp(4px,  0.15vw + 3px,  6px);
+  --sp-sm:  clamp(6px,  0.2vw + 4px,   10px);
+  --sp-md:  clamp(8px,  0.25vw + 6px,  14px);
+  --sp-lg:  clamp(12px, 0.35vw + 8px,  18px);
+  --sp-xl:  clamp(16px, 0.45vw + 10px, 24px);
+  --sp-2xl: clamp(20px, 0.55vw + 14px, 30px);
 }
 
 /* 各主题仅设置独有变量：背景色 RGB 分量 + 面板色 + 辅色 + 背景图 */
@@ -110,8 +129,8 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: var(--bg-img, url('../assets/matin.JPEG')) bottom center / 100% auto no-repeat;
-  opacity: 0.25;
+  background: var(--bg-img, url('../assets/matin.JPEG')) center center / 100% auto no-repeat;
+  opacity: 0.38;
   z-index: -1;
   pointer-events: none;
 }
@@ -123,15 +142,15 @@ body::after {
   inset: 0;
   background:
     linear-gradient(180deg,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 1.0) 0%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 1.0) 25%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.90) 40%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.85) 50%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.50) 65%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.30) 70%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.15) 80%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.05) 85%,
-      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.01) 90%);
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.94) 0%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.88) 12%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.75) 28%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.60) 42%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.42) 58%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.28) 72%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.14) 86%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.06) 94%,
+      rgba(var(--bg-r), var(--bg-g), var(--bg-b), 0.02) 100%);
   pointer-events: none;
   z-index: -1;
 }
@@ -205,3 +224,44 @@ body::after {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--accent-purple); border-radius: 8px; }
+
+/* ── 金线底边装饰 ── */
+.card-gold-line {
+  position: relative;
+}
+.card-gold-line::after {
+  content: '';
+  position: absolute;
+  bottom: var(--sp-sm, 6px);
+  left: var(--sp-lg, 12px);
+  right: var(--sp-lg, 12px);
+  height: 0.5px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(212,168,83,0.3) 8%,
+    rgba(212,168,83,0.65) 30%,
+    rgba(212,168,83,0.8) 50%,
+    rgba(212,168,83,0.65) 70%,
+    rgba(212,168,83,0.3) 92%,
+    transparent 100%);
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+.card-gold-line:hover::after {
+  opacity: 0.6;
+}
+
+/* ── 微妙纹理叠加（质感） ── */
+body > #root {
+  position: relative;
+}
+body > #root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.018;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: overlay;
+}

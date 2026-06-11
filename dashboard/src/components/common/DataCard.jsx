@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useFloating, autoUpdate, offset, shift, useHover, useInteractions } from '@floating-ui/react';
+import {useState} from 'react';
+import {autoUpdate, offset, shift, useFloating, useHover, useInteractions} from '@floating-ui/react';
 import TooltipIcon from './TooltipIcon.jsx';
 import CardWrapper from './CardWrapper.jsx';
 
@@ -39,23 +39,23 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         ref={refs.setReference}
         {...getReferenceProps()}
         hoverable={!!detail}
-        style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-sm)' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-xs)' }}>
+          <span style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-secondary)' }}>{label}</span>
           {tooltip && <TooltipIcon content={tooltip} position="top" />}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ fontSize: 24, fontWeight: 700, color: valueColor }}>{display}</span>
-          {unit && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{unit}</span>}
-          {arrow && <span style={{ fontSize: 16, color: arrowColor, marginLeft: 2 }}>{arrow}</span>}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--sp-xs)' }}>
+          <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700, color: valueColor }}>{display}</span>
+          {unit && <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>{unit}</span>}
+          {arrow && <span style={{ fontSize: 'var(--fs-md)', color: arrowColor, marginLeft: 2 }}>{arrow}</span>}
         </div>
         {(detail || source) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-xs)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{detail}</span>
             {source && (
               <span style={{
-                padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600,
+                padding: '2px var(--sp-sm)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-2xs)', fontWeight: 600,
                 background: srcStyle.bg, color: srcStyle.c, border: `1px solid ${srcStyle.bd}`,
                 whiteSpace: 'nowrap',
               }}>{source}</span>
@@ -64,7 +64,7 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         )}
       </CardWrapper>
       {isOpen && detail && (
-        <div ref={refs.setFloating} style={{ ...floatingStyles, background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 12px', maxWidth: 260, fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }} {...getFloatingProps()}>
+        <div ref={refs.setFloating} style={{ ...floatingStyles, background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius)', padding: 'var(--sp-md) var(--sp-lg)', maxWidth: 280, fontSize: 'var(--fs-sm)', lineHeight: 1.5, color: 'var(--text-secondary)', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }} {...getFloatingProps()}>
           {detail}
         </div>
       )}

@@ -1,6 +1,7 @@
 import {useMemo} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
+import DataCard from '../common/DataCard.jsx';
 import DataGrid from '../common/DataGrid.jsx';
 import StatusBar from '../common/StatusBar.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
@@ -61,11 +62,11 @@ function TurningPointMarkers({ chartData, turningPoints }) {
   if (!markers.length) return null;
 
   return (
-    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div style={{ marginTop: 'var(--sp-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-sm)' }}>
       {markers.map((m, i) => (
         <div key={i} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '3px 8px', borderRadius: 3, fontSize: 10,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-2xs)',
+          padding: '3px var(--sp-sm)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-xs)',
           background: m.type === 'peak' ? 'rgba(248,81,73,0.12)' : 'rgba(91,186,87,0.12)',
           border: `1px solid ${m.type === 'peak' ? '#f85149' : '#5bba57'}`,
           color: m.type === 'peak' ? '#f85149' : '#5bba57',
@@ -147,21 +148,21 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
 
   return (
     <div>
-      {showTitle && <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>{showTitle}</h2>}
+      {showTitle && <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>{showTitle}</h2>}
       <StatusBar phase={phaseName} period={latest.period} />
 
       {/* 相位醒目标签 */}
       {phaseValue > 0 && (
-        <div style={{ marginTop: 8, marginBottom: 12 }}>
+        <div style={{ marginTop: 'var(--sp-md)', marginBottom: 'var(--sp-lg)' }}>
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 4,
-            padding: '4px 12px', fontSize: 14, fontWeight: 700, color: badge.color,
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-xs)',
+            background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 'var(--radius-sm)',
+            padding: '4px var(--sp-md)', fontSize: 'var(--fs-md)', fontWeight: 700, color: badge.color,
             letterSpacing: 1,
           }}>
             {badge.icon} {phaseName}
             {latest.confidence != null && (
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>
+              <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 400, color: 'var(--text-muted)', marginLeft: 'var(--sp-xs)' }}>
                 置信度 {(latest.confidence * 100).toFixed(0)}%
               </span>
             )}
@@ -175,14 +176,14 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         // 公共图表内容
         const chartContent = (
           <CardWrapper hoverable style={{
-            padding: 18,
+            padding: 'var(--sp-xl)',
             transition: 'all 0.25s ease',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-md)' }}>
+              <h3 style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--accent-gold)' }}>
                 {chartTitle}
               </h3>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
                 数据来源：{dataSource}
               </span>
             </div>
@@ -200,7 +201,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         );
 
         if (N === 0) {
-          return <div style={{ marginBottom: 20 }}>{chartContent}</div>;
+          return <div style={{ marginBottom: 'var(--sp-2xl)' }}>{chartContent}</div>;
         }
 
         const isOdd = N % 2 === 1;
@@ -209,49 +210,38 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         if (isOdd) {
           // N=2n+1：主图表全宽 + 指标卡下方一字排开
           return (
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 'var(--sp-2xl)' }}>
               {chartContent}
-              <div style={{ marginTop: 14 }}>
-                <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={N} gap={12} />
+              <div style={{ marginTop: 'var(--sp-lg)' }}>
+                <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={N} gap="var(--sp-md)" />
               </div>
             </div>
           );
         }
 
-        // N=2n：主图表居中 + 左右各n张指标卡垂直排列，总高=图表高度
+        // N=2n：主图表居中 + 左右各n张指标卡，自然高度、均匀分布
         const sideWidth = n <= 2 ? '18%' : '16%';
-        const sideGridStyle = {
-          gridTemplateRows: `repeat(${n}, 1fr)`,
-          height: '100%',
-        };
+
+        // 渲染侧边指标卡的辅助函数
+        const renderSideCards = (cardConfigs) => cardConfigs.map((cfg, i) => {
+          let value = metricsLatest[cfg.key];
+          if (cfg.transform && value != null) value = cfg.transform(value);
+          return <DataCard key={i} {...cfg} value={value} prevValue={prev[cfg.key]} />;
+        });
 
         return (
-          <div style={{ display: 'flex', gap: 14, marginBottom: 20, alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', gap: 'var(--sp-lg)', marginBottom: 'var(--sp-2xl)', alignItems: 'stretch' }}>
             {/* 左侧指标卡 */}
-            <div style={{ width: sideWidth, flexShrink: 0 }}>
-              <DataGrid
-                config={metrics.slice(0, n)}
-                data={metricsLatest}
-                prevData={prev}
-                columns={1}
-                gap={10}
-                containerStyle={sideGridStyle}
-              />
+            <div style={{ width: sideWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: 'var(--sp-md)' }}>
+              {renderSideCards(metrics.slice(0, n))}
             </div>
             {/* 主图表 */}
             <div style={{ flex: 1, minWidth: 0 }}>
               {chartContent}
             </div>
             {/* 右侧指标卡 */}
-            <div style={{ width: sideWidth, flexShrink: 0 }}>
-              <DataGrid
-                config={metrics.slice(n)}
-                data={metricsLatest}
-                prevData={prev}
-                columns={1}
-                gap={10}
-                containerStyle={sideGridStyle}
-              />
+            <div style={{ width: sideWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: 'var(--sp-md)' }}>
+              {renderSideCards(metrics.slice(n))}
             </div>
           </div>
         );
@@ -259,14 +249,14 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
 
       {/* 周期解读说明 */}
       {config.explanation && (
-        <div style={{ marginTop: 20, padding: '14px 16px', background: 'rgba(212,168,83,0.04)', border: '1px solid rgba(212,168,83,0.1)', borderRadius: 2 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 8 }}>
+        <div style={{ marginTop: 'var(--sp-2xl)', padding: 'var(--sp-lg) var(--sp-xl)', background: 'rgba(212,168,83,0.04)', border: '1px solid rgba(212,168,83,0.1)', borderRadius: 'var(--radius)' }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 'var(--sp-md)' }}>
             ⓘ {config.explanation.title} — 指标解读
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-            <p style={{ margin: '0 0 6px' }}><b style={{ color: 'var(--text-primary)' }}>周期定义：</b>{config.explanation.summary}</p>
-            <p style={{ margin: '0 0 6px' }}><b style={{ color: 'var(--text-primary)' }}>合成Z值：</b>{config.explanation.compositeZ}</p>
-            <p style={{ margin: '0 0 6px' }}><b style={{ color: 'var(--text-primary)' }}>周期分量：</b>{config.explanation.cycleComponent}</p>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+            <p style={{ margin: `0 0 var(--sp-xs)` }}><b style={{ color: 'var(--text-primary)' }}>周期定义：</b>{config.explanation.summary}</p>
+            <p style={{ margin: `0 0 var(--sp-xs)` }}><b style={{ color: 'var(--text-primary)' }}>合成Z值：</b>{config.explanation.compositeZ}</p>
+            <p style={{ margin: `0 0 var(--sp-xs)` }}><b style={{ color: 'var(--text-primary)' }}>周期分量：</b>{config.explanation.cycleComponent}</p>
             <p style={{ margin: 0 }}><b style={{ color: 'var(--text-primary)' }}>可靠性：</b>{config.explanation.reliability}</p>
           </div>
         </div>
