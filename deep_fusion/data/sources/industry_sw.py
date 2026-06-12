@@ -157,7 +157,7 @@ def get_daily_analysis(
         symbol=symbol,
         start_date=start_date,
         end_date=end_date,
-        ttl=3600,
+        ttl=86400,
     )
     if df is None or df.empty:
         return pd.DataFrame()
