@@ -42,16 +42,16 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-sm)' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-xs)' }}>
-          <span style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-secondary)' }}>{label}</span>
+          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-secondary)' }}>{label}</span>
           {tooltip && <TooltipIcon content={tooltip} position="top" />}
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--sp-xs)' }}>
-          <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700, color: valueColor }}>{display}</span>
-          {unit && <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>{unit}</span>}
+          <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: valueColor }}>{display}</span>
+          {unit && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{unit}</span>}
           {arrow && <span style={{ fontSize: 'var(--fs-md)', color: arrowColor, marginLeft: 2 }}>{arrow}</span>}
         </div>
         {(detail || source) && (
-          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-xs)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-xs)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{detail}</span>
             {source && (
               <span style={{

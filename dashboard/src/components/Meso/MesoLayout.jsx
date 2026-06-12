@@ -196,6 +196,9 @@ const DEFENSIVE_NAMES = new Set([
   '轻工制造',                                               // 基础消费
   '家用电器',                                               // 偏刚需换代
   '美容护理',                                               // 传统消费
+  '环保',                                                   // 公益属性，穿越周期
+  '社会服务',                                               // 申万2021版(原休闲服务)，刚需服务
+  '休闲服务',                                               // 申万2014版，刚需服务
 ]);
 // 进攻型：高成长/高Beta + 第六次康波驱动(新能源金属/新材料/创新药/科技)
 const GROWTH_NAMES = new Set([
@@ -212,9 +215,48 @@ const GROWTH_NAMES = new Set([
 // ── 分类配置表 ──
 const CATEGORY_CONFIG = {
   cyclical:  { label: '🔄 强周期', names: CYCLICAL_NAMES,  accent: '#D4A853', desc: '经济周期敏感' },
-  defensive: { label: '🛡️ 强防御', names: DEFENSIVE_NAMES, accent: '#5B8FA8', desc: '穿越周期刚需' },
-  growth:    { label: '⚔️ 进攻型', names: GROWTH_NAMES,    accent: '#C47B7B', desc: '高成长高Beta' },
+  defensive: { label: '🛡️ 强防御', names: DEFENSIVE_NAMES, accent: '#5B8FA8', desc: '横盘抱团刚需' },
+  growth:    { label: '⚔️ 进攻型', names: GROWTH_NAMES,    accent: '#C47B7B', desc: '高成长高Beta;风险收益成正比' },
 };
+
+// ── 强周期行业的三周期映射 ──
+// 基钦(库存)周期高敏感：钢铁/采掘(价格随库存波动) + 机械/汽车/家电(补库驱动订单)
+// 朱格拉(资本支出)周期高敏感：建筑材料/建筑装饰(产能投资链) + 机械设备(Capex周期)
+// 库兹涅茨(房地产)周期高敏感：房地产/建筑装饰/建筑材料(地产基建链)
+// 非银金融/综合 受信用周期驱动，归入基钦(最短周期)兜底
+const CYCLE_GROUP_ORDER = ['kitchin', 'juglar', 'kuznets'];
+const CYCLE_GROUPS = {
+  kitchin: {
+    label: '基钦周期', icon: '📦', sub: '库存周期 3~4年',
+    names: ['钢铁', '采掘', '汽车', '非银金融', '综合'],
+  },
+  juglar: {
+    label: '朱格拉周期', icon: '🏭', sub: '资本支出 7~10年',
+    names: ['机械设备', '建筑材料', '建筑装饰'],
+  },
+  kuznets: {
+    label: '库兹涅茨周期', icon: '🏘️', sub: '房地产 15~20年',
+    names: ['房地产'],
+  },
+};
+
+/** 获取行业所属周期组 key */
+function getCycleGroupOf(name) {
+  for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
+    if (grp.names.includes(name)) return key;
+  }
+  return 'kitchin'; // 兜底
+}
+
+/** 按三周期分组排序强周期行业 */
+function sortByCycleGroup(industries) {
+  const order = { kitchin: 0, juglar: 1, kuznets: 2 };
+  return [...industries].sort((a, b) => {
+    const ga = order[getCycleGroupOf(a.name)] ?? 0;
+    const gb = order[getCycleGroupOf(b.name)] ?? 0;
+    return ga - gb;
+  });
+}
 
 // ── 工具函数 ──
 
@@ -265,23 +307,38 @@ function IndustryDrilldown({ target, onBack }) {
   const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
   const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, limit: 5000 });
 
+  // 历史指数走势数据（一级行业级别）
+  const { data: histRaw } = useMCP('industry_daily_query', target.industry ? { industry: target.industry, limit: 120 } : null);
+  const histData = useMemo(() => parseDaily(histRaw), [histRaw]);
+
   const mapping = useMemo(() => parseTreeMapping(treeRaw), [treeRaw]);
   const l2Parsed = useMemo(() => parseSWDaily(l2Raw), [l2Raw]);
 
   const subIndustries = useMemo(() => {
     if (!l2Parsed.industries.length) return [];
     // 优先用 tree mapping，回退到名称包含匹配
+    let base;
     const byMapping = l2Parsed.industries.filter(i => mapping[i.name] === target.industry);
-    if (byMapping.length > 0) return byMapping;
-    // 回退：名称包含关系（如"银行II"包含"银行"，"白酒"在"食品饮料"下但名称不含）
-    return l2Parsed.industries.filter(i => {
-      const parent = mapping[i.name];
-      if (parent) return parent === target.industry;
-      // 最终回退：代码前缀匹配
-      const l1 = l2Parsed.industries.find(j => j.name === target.industry);
-      return l1 && i.code && l1.code && i.code.substring(0, 5) === l1.code.substring(0, 5);
-    });
-  }, [l2Parsed, mapping, target.industry]);
+    if (byMapping.length > 0) base = byMapping;
+    else {
+      // 回退：名称包含关系（如"银行II"包含"银行"，"白酒"在"食品饮料"下但名称不含）
+      base = l2Parsed.industries.filter(i => {
+        const parent = mapping[i.name];
+        if (parent) return parent === target.industry;
+        // 最终回退：代码前缀匹配
+        const l1 = l2Parsed.industries.find(j => j.name === target.industry);
+        return l1 && i.code && l1.code && i.code.substring(0, 5) === l1.code.substring(0, 5);
+      });
+    }
+    // 用目标日期的涨跌幅覆盖最新值，使下钻与热力图点击日期一致
+    if (target.date) {
+      return base.map(si => ({
+        ...si,
+        change: l2Parsed.matrix[si.name]?.[target.date] ?? si.change,
+      }));
+    }
+    return base;
+  }, [l2Parsed, mapping, target.industry, target.date]);
 
   useEffect(() => {
     if (!chartRef.current || !subIndustries.length) return;
@@ -329,7 +386,7 @@ function IndustryDrilldown({ target, onBack }) {
           color: 'var(--accent-gold)', cursor: 'pointer',
         }}>← 返回热力图</button>
         <span style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>{target.industry}</span>
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· {target.date} · 二级行业树状图</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· {target.date} 涨跌幅 · 二级行业树状图</span>
         {subIndustries.length > 0 && (
           <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
             color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
@@ -345,6 +402,17 @@ function IndustryDrilldown({ target, onBack }) {
           暂无二级行业数据，请先执行 industry_collect 采集
         </div>
       )}
+      {histData.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>📈 {target.industry} 指数走势</span>
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· 近 {histData.length} 日</span>
+          </div>
+          <DataChart data={histData} series={[
+            { key: 'close', name: `${target.industry}指数`, color: '#D4A853', type: 'line' },
+          ]} dateKey="period" height={200} />
+        </div>
+      )}
     </div>
   );
 }
@@ -354,12 +422,17 @@ function IndustryDrilldown({ target, onBack }) {
 /** 行业热力图 — 纯图表渲染（控制栏由父组件渲染） */
 function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, activeCategory, displayDays, drillTarget, setDrillTarget }) {
   const chartRef = useRef(null);
-  const currentConfig = CATEGORY_CONFIG[activeCategory];
+
+  // 强周期模式按三周期分组排序
+  const sortedIndustries = useMemo(() =>
+    activeCategory === 'cyclical' ? sortByCycleGroup(filteredIndustries) : filteredIndustries,
+    [activeCategory, filteredIndustries],
+  );
 
   useEffect(() => {
-    if (drillTarget || !chartRef.current || !filteredIndustries.length || !dates.length) return;
+    if (drillTarget || !chartRef.current || !sortedIndustries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
-    const names = filteredIndustries.map(i => i.name || i.code);
+    const names = sortedIndustries.map(i => i.name || i.code);
     const recentDates = dates.slice(-displayDays);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
@@ -372,13 +445,13 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       tooltip: {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      grid: { left: 90, right: 30, top: 8, bottom: 50 },
+      grid: { left: 90, right: 80, top: 8, bottom: 60 },
       xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 11, rotate: 35 } },
       yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 68, overflow: 'truncate' } },
       visualMap: {
-        min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
+        min: -4, max: 4, calculable: true, orient: 'vertical', right: 4, bottom: 40,
         inRange: { color: ['rgb(158 158 158)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
-        textStyle: { color: '#CBC0B0', fontSize: 12 },
+        textStyle: { color: '#CBC0B0', fontSize: 11 },
       },
       series: [{
         type: 'heatmap', data,
@@ -395,23 +468,121 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       }
     });
     return () => chart.dispose();
-  }, [filteredIndustries, dates, matrix, drillTarget, onIndustrySelect, displayDays, setDrillTarget]);
+  }, [sortedIndustries, dates, matrix, drillTarget, onIndustrySelect, displayDays, setDrillTarget]);
 
-  const h = Math.max(320, filteredIndustries.length * 36 + 60);
+  const h = Math.max(380, sortedIndustries.length * 40 + 90);
 
   if (drillTarget) {
     return <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />;
   }
 
   return (
-    <div style={{ maxWidth: 820 }}>
-      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 400, color: 'var(--text-muted)', marginBottom: 6 }}>
-        {currentConfig.label} · {filteredIndustries.length} 个行业 · 近 {displayDays} 日
-      </div>
+    <div style={{ maxWidth: 820, margin: '0 auto' }}>
       <div ref={chartRef} style={{ width: '100%', height: h }} />
-      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
-        💡 点击方格可下钻至二级行业树状图
-      </div>
+    </div>
+  );
+}
+
+/** 三周期数据面板 — 强周期热力图左侧 */
+function CyclePhasePanel({ industries, matrix, dates }) {
+  // 请求三个周期的最新数据
+  const { data: kitchinRaw } = useMCP('data_kitchin', {});
+  const { data: juglarRaw }  = useMCP('data_juglar', {});
+  const { data: kuznetsRaw } = useMCP('data_kuznets', {});
+
+  // 解析最新周期相位
+  const phases = useMemo(() => {
+    const parse = (raw) => {
+      try {
+        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(arr) || !arr.length) return null;
+        return arr[arr.length - 1];
+      } catch { return null; }
+    };
+    return {
+      kitchin: parse(kitchinRaw),
+      juglar:  parse(juglarRaw),
+      kuznets: parse(kuznetsRaw),
+    };
+  }, [kitchinRaw, juglarRaw, kuznetsRaw]);
+
+  // 计算每组行业的 20 日波动率和均值
+  const groupStats = useMemo(() => {
+    const recent = dates.slice(-20);
+    if (!recent.length || !industries.length) return {};
+    const stats = {};
+    for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
+      const groupInds = industries.filter(i => grp.names.includes(i.name));
+      const changes = [];
+      groupInds.forEach(ind => {
+        recent.forEach(d => {
+          const v = matrix[ind.name]?.[d];
+          if (v !== undefined) changes.push(v);
+        });
+      });
+      if (!changes.length) { stats[key] = { vol: null, avg: null }; continue; }
+      const avg = changes.reduce((s, v) => s + v, 0) / changes.length;
+      const vol = Math.sqrt(changes.reduce((s, v) => s + (v - avg) ** 2, 0) / changes.length);
+      stats[key] = { vol, avg };
+    }
+    return stats;
+  }, [industries, matrix, dates]);
+
+  // 相位名映射
+  const phaseLabel = (phase, cycleKey) => {
+    if (!phase) return '—';
+    if (cycleKey === 'kitchin') return phase.cycle_phase_name || phase.stage || '—';
+    return phase.cycle_phase_name || phase.phase || '—';
+  };
+
+  // 相位→颜色
+  const phaseColor = (name) => {
+    if (!name || name === '—') return 'var(--text-muted)';
+    if (['主动补库', '繁荣', '复苏', '主动补库存'].includes(name)) return 'var(--accent-red)';
+    if (['被动去库', '复苏', '被动去库存'].includes(name)) return '#D4A853';
+    if (['被动补库', '衰退', '被动补库存'].includes(name)) return '#7B8FA8';
+    if (['主动去库', '萧条', '主动去库存'].includes(name)) return 'var(--accent-green)';
+    return 'var(--text-secondary)';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260 }}>
+      {CYCLE_GROUP_ORDER.map(key => {
+        const grp = CYCLE_GROUPS[key];
+        const ph = phases[key];
+        const st = groupStats[key] || {};
+        const pName = phaseLabel(ph, key);
+        return (
+          <CardWrapper key={key} style={{ padding: '12px 14px' }}>
+            {/* 周期标题行 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 17 }}>{grp.icon}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)' }}>{grp.label}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{grp.sub}</span>
+            </div>
+            {/* 相位标签 */}
+            <div style={{ marginBottom: 8 }}>
+              <span style={{
+                display: 'inline-block', padding: '3px 12px', borderRadius: 14,
+                fontSize: 14, fontWeight: 800,
+                background: phaseColor(pName).startsWith('var') ? 'rgba(136,136,136,0.1)' : `${phaseColor(pName)}18`,
+                color: phaseColor(pName), border: `1px solid ${phaseColor(pName)}33`,
+              }}>
+                {pName}
+              </span>
+            </div>
+            {/* 数据指标 — 正常文字 */}
+            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              <span>波动率 <b style={{ color: 'var(--text-primary)' }}>{st.vol != null ? st.vol.toFixed(2) : '—'}%</b></span>
+              <span>均值 <b style={{ color: st.avg != null && st.avg >= 0 ? '#E85050' : '#3DBB6E' }}>{st.avg != null ? (st.avg >= 0 ? '+' : '') + st.avg.toFixed(2) : '—'}%</b></span>
+            </div>
+            {/* 关联行业 */}
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>
+              {grp.names.join(' · ')}
+            </div>
+          </CardWrapper>
+        );
+      })}
     </div>
   );
 }
@@ -668,7 +839,7 @@ export default function MesoLayout() {
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
 
-        {/* 控制栏 — 在卡片外部 */}
+        {/* 控制栏 — 在卡片外部，水平排列 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
             <button key={key} onClick={() => { setHeatmapCategory(key); setDrillTarget(null); }}
@@ -685,7 +856,7 @@ export default function MesoLayout() {
 
           {/* 天数选择 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>显示天数</span>
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>天数</span>
             <input
               type="number"
               min={3}
@@ -696,7 +867,7 @@ export default function MesoLayout() {
                 if (!isNaN(v) && v >= 3 && v <= 60) setHeatmapDays(v);
               }}
               style={{
-                width: 52, padding: '3px 6px', borderRadius: 4,
+                width: 46, padding: '3px 6px', borderRadius: 4,
                 fontSize: 'var(--fs-sm)', fontWeight: 600,
                 background: 'var(--bg-panel)', color: 'var(--text-primary)',
                 border: '1px solid var(--border-subtle)', textAlign: 'center',
@@ -718,18 +889,32 @@ export default function MesoLayout() {
               {avgChange >= 0 ? '▲' : '▼'} 均涨 {avgChange.toFixed(2)}%
             </span>
           )}
+
+          {/* 提示文字 — 右侧水平排列 */}
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+            💡 点击方格下钻二级行业
+          </span>
         </div>
 
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
-          <HeatmapChart
-            filteredIndustries={filteredIndustries}
-            dates={dates} matrix={matrix}
-            onIndustrySelect={handleIndustrySelect}
-            activeCategory={heatmapCategory}
-            displayDays={heatmapDays}
-            drillTarget={drillTarget}
-            setDrillTarget={setDrillTarget}
-          />
+          <div style={{ display: heatmapCategory === 'cyclical' ? 'flex' : 'block', gap: 16, alignItems: 'flex-start' }}>
+            {heatmapCategory === 'cyclical' && (
+              <div style={{ flex: '0 0 auto', minWidth: 260, maxWidth: 340 }}>
+                <CyclePhasePanel industries={filteredIndustries} matrix={matrix} dates={dates} />
+              </div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <HeatmapChart
+                filteredIndustries={filteredIndustries}
+                dates={dates} matrix={matrix}
+                onIndustrySelect={handleIndustrySelect}
+                activeCategory={heatmapCategory}
+                displayDays={heatmapDays}
+                drillTarget={drillTarget}
+                setDrillTarget={setDrillTarget}
+              />
+            </div>
+          </div>
         </CardWrapper>
       </div>
 

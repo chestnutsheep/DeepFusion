@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import {describe, expect, it} from 'vitest';
 
 // ── 提取被测逻辑（与 MesoLayout.jsx 同步） ──
 
@@ -10,6 +10,7 @@ const CYCLICAL_NAMES = new Set([
 const DEFENSIVE_NAMES = new Set([
   '银行', '食品饮料', '农林牧渔', '公用事业', '交通运输',
   '商业贸易', '纺织服装', '轻工制造', '家用电器', '美容护理',
+  '环保', '社会服务', '休闲服务',
 ]);
 const GROWTH_NAMES = new Set([
   '有色金属', '化工', '电子', '计算机', '通信',
@@ -98,7 +99,7 @@ describe('Meso 行业热力图 — 分类与工具函数', () => {
       '交通运输','房地产','商业贸易','休闲服务','综合','建筑材料',
       '建筑装饰','电气设备','国防军工','计算机','传媒','通信',
       '银行','非银金融','汽车','机械设备','美容护理','新能源汽车',
-      '煤炭',
+      '煤炭','环保','社会服务',
     ];
     const classified = new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]);
     const missing = SW_FIRST_LEVEL.filter(n => !classified.has(n));
@@ -130,6 +131,13 @@ describe('Meso 行业热力图 — 分类与工具函数', () => {
     expect(getCategoryOf('银行')).toBe('defensive');
     expect(getCategoryOf('有色金属')).toBe('growth');
     expect(getCategoryOf('未知行业')).toBe('cyclical'); // 兜底
+  });
+
+  it('环保和社会服务归入防御', () => {
+    expect(DEFENSIVE_NAMES.has('环保')).toBe(true);
+    expect(DEFENSIVE_NAMES.has('社会服务')).toBe(true);
+    expect(DEFENSIVE_NAMES.has('休闲服务')).toBe(true);
+    expect(CYCLICAL_NAMES.has('环保')).toBe(false);
   });
 });
 
