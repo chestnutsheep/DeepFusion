@@ -28,14 +28,14 @@
   --transition: 0.25s ease;
 
   /* ── 响应式字体阶梯 clamp(min, preferred, max) ── */
-  --fs-2xs:  clamp(11px,  0.25vw + 9px,  13px);
-  --fs-xs:   clamp(12px,  0.3vw + 9.5px, 15px);
-  --fs-sm:   clamp(13px,  0.35vw + 10px, 17px);
-  --fs-base: clamp(14px,  0.4vw + 11px,  19px);
-  --fs-md:   clamp(15px,  0.45vw + 12px, 21px);
-  --fs-lg:   clamp(18px,  0.55vw + 14px, 26px);
-  --fs-xl:   clamp(20px,  0.65vw + 16px, 30px);
-  --fs-2xl:  clamp(24px,  0.85vw + 18px, 36px);
+  --fs-2xs:  clamp(12px,  0.25vw + 9px,  14px);
+  --fs-xs:   clamp(13px,  0.3vw + 9px, 15px);
+  --fs-sm:   clamp(14px,  0.35vw + 10px, 16px);
+  --fs-base: clamp(15px,  0.4vw + 11px,  17px);
+  --fs-md:   clamp(16px,  0.45vw + 12px, 18px);
+  --fs-lg:   clamp(17px,  0.55vw + 14px, 20px);
+  --fs-xl:   clamp(18px,  0.65vw + 16px, 22px);
+  --fs-2xl:  clamp(20px,  0.85vw + 18px, 24px);
 
   /* ── 响应式间距阶梯 ── */
   --sp-2xs: clamp(2px,  0.1vw + 1px,   4px);

@@ -220,23 +220,22 @@ const CATEGORY_CONFIG = {
 };
 
 // ── 强周期行业的三周期映射 ──
-// 基钦(库存)周期高敏感：钢铁/采掘(价格随库存波动) + 机械/汽车/家电(补库驱动订单)
-// 朱格拉(资本支出)周期高敏感：建筑材料/建筑装饰(产能投资链) + 机械设备(Capex周期)
-// 库兹涅茨(房地产)周期高敏感：房地产/建筑装饰/建筑材料(地产基建链)
-// 非银金融/综合 受信用周期驱动，归入基钦(最短周期)兜底
+// 基钦(库存)周期：上游原材料(钢铁/采掘，价格随库存波动) + 产成品库存(汽车/非银/综合)
+// 朱格拉(设备投资)周期：机械设备(Capex周期核心载体)
+// 库兹涅茨(建筑)周期：房地产 + 建筑材料(水泥/玻璃) + 建筑装饰(施工链)
 const CYCLE_GROUP_ORDER = ['kitchin', 'juglar', 'kuznets'];
 const CYCLE_GROUPS = {
   kitchin: {
-    label: '基钦周期', icon: '📦', sub: '库存周期 3~4年',
+    label: '基钦周期', icon: '📦', sub: '库存周期 3~5年',
     names: ['钢铁', '采掘', '汽车', '非银金融', '综合'],
   },
   juglar: {
-    label: '朱格拉周期', icon: '🏭', sub: '资本支出 7~10年',
-    names: ['机械设备', '建筑材料', '建筑装饰'],
+    label: '朱格拉周期', icon: '🏭', sub: '设备投资 8~10年',
+    names: ['机械设备'],
   },
   kuznets: {
-    label: '库兹涅茨周期', icon: '🏘️', sub: '房地产 15~20年',
-    names: ['房地产'],
+    label: '库兹涅茨周期', icon: '🏘️', sub: '建筑/房地产 15~25年',
+    names: ['房地产', '建筑材料', '建筑装饰'],
   },
 };
 
@@ -262,13 +261,13 @@ function sortByCycleGroup(industries) {
 
 /** 涨跌幅 → 热力色 (treemap 用) */
 function changeToColor(v) {
-  if (v > 3)   return '#c85454';
-  if (v > 1.5) return '#db8f36';
-  if (v > 0.3) return '#ccb022';
-  if (v > -0.3)return 'rgb(183 184 183)';
-  if (v > -1.5)return '#b1d56b';
-  if (v > -3)  return '#6ac561';
-  return '#05ad6e';
+  if (v > 3)   return '#c33636';
+  if (v > 1.5) return '#db7126';
+  if (v > 0.3) return '#ccc203';
+  if (v > -0.3)return 'rgb(195 195 195 / 0.96)';
+  if (v > -1.5)return '#97b431';
+  if (v > -3)  return '#3ca039';
+  return '#0e7851';
 }
 
 /** 解析 industry_sw_tree 文本 → { "二级行业名": "一级行业名" } 映射 */
@@ -445,18 +444,18 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       tooltip: {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      grid: { left: 90, right: 80, top: 8, bottom: 60 },
-      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 11, rotate: 35 } },
+      grid: { left: 65, right: 70, top: 20, bottom: 60 },
+      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
       yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 68, overflow: 'truncate' } },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'vertical', right: 4, bottom: 40,
         inRange: { color: ['rgb(158 158 158)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
-        textStyle: { color: '#CBC0B0', fontSize: 11 },
+        textStyle: { color: '#CBC0B0', fontSize: 13 },
       },
       series: [{
         type: 'heatmap', data,
-        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#F0E8D8' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.25)' } },
+        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#ffffff' },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(0 0 0 / 0.6)' } },
       }],
     });
     chart.on('click', (params) => {
@@ -477,7 +476,7 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
   }
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto' }}>
+    <div style={{ maxWidth: 860, margin: '0 auto' }}>
       <div ref={chartRef} style={{ width: '100%', height: h }} />
     </div>
   );
@@ -546,7 +545,7 @@ function CyclePhasePanel({ industries, matrix, dates }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 15, minWidth: 250 }}>
       {CYCLE_GROUP_ORDER.map(key => {
         const grp = CYCLE_GROUPS[key];
         const ph = phases[key];
@@ -558,13 +557,13 @@ function CyclePhasePanel({ industries, matrix, dates }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 17 }}>{grp.icon}</span>
               <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)' }}>{grp.label}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{grp.sub}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{grp.sub}</span>
             </div>
             {/* 相位标签 */}
             <div style={{ marginBottom: 8 }}>
               <span style={{
                 display: 'inline-block', padding: '3px 12px', borderRadius: 14,
-                fontSize: 14, fontWeight: 800,
+                fontSize: 16, fontWeight: 800,
                 background: phaseColor(pName).startsWith('var') ? 'rgba(136,136,136,0.1)' : `${phaseColor(pName)}18`,
                 color: phaseColor(pName), border: `1px solid ${phaseColor(pName)}33`,
               }}>
@@ -572,12 +571,12 @@ function CyclePhasePanel({ industries, matrix, dates }) {
               </span>
             </div>
             {/* 数据指标 — 正常文字 */}
-            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+            <div style={{ display: 'flex', gap: 20, fontSize: 18, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
               <span>波动率 <b style={{ color: 'var(--text-primary)' }}>{st.vol != null ? st.vol.toFixed(2) : '—'}%</b></span>
               <span>均值 <b style={{ color: st.avg != null && st.avg >= 0 ? '#E85050' : '#3DBB6E' }}>{st.avg != null ? (st.avg >= 0 ? '+' : '') + st.avg.toFixed(2) : '—'}%</b></span>
             </div>
             {/* 关联行业 */}
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 15, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>
               {grp.names.join(' · ')}
             </div>
           </CardWrapper>
