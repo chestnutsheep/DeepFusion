@@ -297,9 +297,158 @@ function getCategoryOf(name) {
 
 // ── 下钻组件 ──
 
-/** 行业下钻：二级行业树状图 */
+/** 成分股下钻：查看二级行业的成分股及涨跌幅 */
+function ConstituentDrilldown({ target, onBack }) {
+  // target: { industry_code, industry_name }
+  const { data: consRaw, isLoading } = useMCP(
+    'industry_sw_constituents_detail',
+    target.industry_code ? { 行业代码: target.industry_code, limit: 200 } : null,
+  );
+
+  const constituents = useMemo(() => {
+    if (!consRaw) return [];
+    const lines = consRaw.trim().split('\n');
+    if (lines.length < 2) return [];
+    const col = buildColMap(lines[0]);
+    const iCode  = col['stock_code'] ?? 0;
+    const iName  = col['stock_name'] ?? 1;
+    const iWt    = col['weight'] ?? 2;
+    const iChg   = col['change_pct'] ?? 3;
+    const iPrice = col['price'] ?? 4;
+    const iTurn  = col['turnover'] ?? 5;
+    const iPe    = col['pe_dynamic'] ?? 6;
+    const iPb    = col['pb'] ?? 7;
+    return lines.slice(1).map(l => {
+      const p = l.split(',');
+      return {
+        code: (p[iCode] || '').trim(),
+        name: (p[iName] || '').trim(),
+        weight: safeFloat(p[iWt]),
+        change_pct: safeFloat(p[iChg]),
+        price: safeFloat(p[iPrice]),
+        turnover: safeFloat(p[iTurn]),
+        pe: safeFloat(p[iPe]),
+        pb: safeFloat(p[iPb]),
+      };
+    });
+  }, [consRaw]);
+
+  const [sortKey, setSortKey] = useState('weight');
+  const [sortDesc, setSortDesc] = useState(true);
+
+  const sorted = useMemo(() => {
+    const arr = [...constituents];
+    arr.sort((a, b) => {
+      const va = a[sortKey] ?? -Infinity;
+      const vb = b[sortKey] ?? -Infinity;
+      return sortDesc ? vb - va : va - vb;
+    });
+    return arr;
+  }, [constituents, sortKey, sortDesc]);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDesc(d => !d);
+    else { setSortKey(key); setSortDesc(true); }
+  };
+
+  const avgChange = constituents.length
+    ? constituents.reduce((s, c) => s + (c.change_pct || 0), 0) / constituents.filter(c => c.change_pct != null).length
+    : 0;
+
+  const SortTh = ({ label, field, align = 'right' }) => (
+    <th
+      onClick={() => toggleSort(field)}
+      style={{
+        textAlign: align, padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--accent-gold)',
+        borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label} {sortKey === field ? (sortDesc ? '↓' : '↑') : ''}
+    </th>
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <button onClick={onBack} style={{
+          padding: '4px 12px', borderRadius: 6, fontSize: 'var(--fs-sm)',
+          background: 'rgba(212,168,83,0.1)', border: '1px solid var(--border-subtle)',
+          color: 'var(--accent-gold)', cursor: 'pointer',
+        }}>← 返回二级行业</button>
+        <span style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>{target.industry_name}</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· 成分股当日行情</span>
+        {constituents.length > 0 && (
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
+            color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
+          }}>
+            均涨 {avgChange.toFixed(2)}% · {constituents.length} 只
+          </span>
+        )}
+      </div>
+      {isLoading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
+      ) : sorted.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-sm)', minWidth: 580 }}>
+            <thead>
+              <tr>
+                <SortTh label="代码" field="code" align="left" />
+                <SortTh label="名称" field="name" align="left" />
+                <SortTh label="权重" field="weight" />
+                <SortTh label="涨跌幅" field="change_pct" />
+                <SortTh label="最新价" field="price" />
+                <SortTh label="换手率" field="turnover" />
+                <SortTh label="PE" field="pe" />
+                <SortTh label="PB" field="pb" />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((c, idx) => (
+                <tr key={c.code} style={idx === 0 ? { background: 'var(--shadow-glow)' } : {}}>
+                  <td style={{ padding: '5px 8px', fontWeight: 600, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{c.code}</td>
+                  <td style={{ padding: '5px 8px', fontWeight: 600, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{c.name}</td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+                    {c.weight != null ? c.weight.toFixed(2) : '—'}
+                  </td>
+                  <td style={{
+                    padding: '5px 8px', textAlign: 'right', fontWeight: 700,
+                    color: c.change_pct != null ? (c.change_pct >= 0 ? 'var(--accent-red)' : 'var(--accent-green)') : 'var(--text-muted)',
+                    borderBottom: '1px solid rgba(212,168,83,0.04)',
+                  }}>
+                    {c.change_pct != null ? `${c.change_pct >= 0 ? '+' : ''}${c.change_pct.toFixed(2)}%` : '—'}
+                  </td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+                    {c.price != null ? c.price.toFixed(2) : '—'}
+                  </td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+                    {c.turnover != null ? c.turnover.toFixed(2) : '—'}
+                  </td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+                    {c.pe != null ? c.pe.toFixed(1) : '—'}
+                  </td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+                    {c.pb != null ? c.pb.toFixed(2) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+          暂无成分股数据
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/** 行业下钻：二级行业树状图 + 成分股三级下钻 */
 function IndustryDrilldown({ target, onBack }) {
   const chartRef = useRef(null);
+  const [constituentTarget, setConstituentTarget] = useState(null);
   const { data: treeRaw } = useMCP('industry_sw_tree', { '深度': 2, '展开': 31 });
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000);
@@ -315,21 +464,17 @@ function IndustryDrilldown({ target, onBack }) {
 
   const subIndustries = useMemo(() => {
     if (!l2Parsed.industries.length) return [];
-    // 优先用 tree mapping，回退到名称包含匹配
     let base;
     const byMapping = l2Parsed.industries.filter(i => mapping[i.name] === target.industry);
     if (byMapping.length > 0) base = byMapping;
     else {
-      // 回退：名称包含关系（如"银行II"包含"银行"，"白酒"在"食品饮料"下但名称不含）
       base = l2Parsed.industries.filter(i => {
         const parent = mapping[i.name];
         if (parent) return parent === target.industry;
-        // 最终回退：代码前缀匹配
         const l1 = l2Parsed.industries.find(j => j.name === target.industry);
         return l1 && i.code && l1.code && i.code.substring(0, 5) === l1.code.substring(0, 5);
       });
     }
-    // 用目标日期的涨跌幅覆盖最新值，使下钻与热力图点击日期一致
     if (target.date) {
       return base.map(si => ({
         ...si,
@@ -350,10 +495,11 @@ function IndustryDrilldown({ target, onBack }) {
       _pe: si.pe,
       _pb: si.pb,
       _mktCap: si.mktCap,
+      _code: si.code,
     }));
     chart.setOption({
       tooltip: {
-        formatter: p => `${p.name}<br/>涨跌幅: ${p.data._change != null ? `${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(2)}%` : '—'}<br/>流通市值: ${p.data._mktCap != null ? `${(p.data._mktCap / 1e8).toFixed(0)}亿` : '—'}<br/>PE: ${p.data._pe != null ? p.data._pe.toFixed(1) : '—'}  PB: ${p.data._pb != null ? p.data._pb.toFixed(2) : '—'}`,
+        formatter: p => `${p.name}<br/>涨跌幅: ${p.data._change != null ? `${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(2)}%` : '—'}<br/>流通市值: ${p.data._mktCap != null ? `${(p.data._mktCap / 1e8).toFixed(0)}亿` : '—'}<br/>PE: ${p.data._pe != null ? p.data._pe.toFixed(1) : '—'}  PB: ${p.data._pb != null ? p.data._pb.toFixed(2) : '—'}<br/><span style="color:#D4A853">点击查看成分股</span>`,
       },
       series: [{
         type: 'treemap',
@@ -371,10 +517,24 @@ function IndustryDrilldown({ target, onBack }) {
         itemStyle: { borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
       }],
     });
+    // 点击二级行业方块 → 下钻成分股
+    chart.on('click', (params) => {
+      if (params.data?._code) {
+        setConstituentTarget({
+          industry_code: params.data._code,
+          industry_name: params.data.name,
+        });
+      }
+    });
     return () => chart.dispose();
   }, [subIndustries]);
 
   const avgChange = subIndustries.length ? subIndustries.reduce((s, i) => s + (i.change || 0), 0) / subIndustries.length : 0;
+
+  // 三级下钻：成分股
+  if (constituentTarget) {
+    return <ConstituentDrilldown target={constituentTarget} onBack={() => setConstituentTarget(null)} />;
+  }
 
   return (
     <div>
@@ -891,7 +1051,7 @@ export default function MesoLayout() {
 
           {/* 提示文字 — 右侧水平排列 */}
           <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-            💡 点击方格下钻二级行业
+            💡 点击方格下钻二级行业 → 再点击查看成分股
           </span>
         </div>
 

@@ -189,3 +189,67 @@ def get_constituents(industry_code: str) -> pd.DataFrame:
         elif "计入日期" in c:
             rename[c] = "added_date"
     return df.rename(columns=rename)
+
+
+# ═══════════════════════════════════════════════════════
+#  成分股 + 当日行情聚合
+# ═══════════════════════════════════════════════════════
+
+def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
+    """查询申万指数成分股并聚合当日行情（涨跌幅/最新价/换手率等）。
+
+    数据流：
+      1. get_constituents() → [stock_code, stock_name, weight, added_date]
+      2. stock_zh_a_spot_em → 全A实时行情（含涨跌幅）
+      3. LEFT JOIN on stock_code → 补充 change_pct / price / turnover 等
+
+    Args:
+        industry_code: 申万指数代码，如 "801010"(一级) "801011"(二级) "850111"(三级)
+
+    Returns:
+        DataFrame with columns: stock_code, stock_name, weight, change_pct,
+        price, turnover, pe_dynamic, pb.  按 weight 降序排列。
+        若成分股在行情中无匹配，行情字段为 NaN。
+    """
+    # Step 1: 成分股列表（长期缓存 86400s）
+    cons = get_constituents(industry_code)
+    if cons.empty:
+        return pd.DataFrame()
+
+    # Step 2: 全A实时行情（长期缓存 86400s — 成分股下钻场景不需要秒级更新）
+    spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
+    if spot is None or spot.empty:
+        # 无行情时仅返回成分股基础信息
+        cons = cons.copy()
+        cons["change_pct"] = pd.NA
+        cons["price"] = pd.NA
+        cons["turnover"] = pd.NA
+        cons["pe_dynamic"] = pd.NA
+        cons["pb"] = pd.NA
+        return cons.sort_values("weight", ascending=False).reset_index(drop=True)
+
+    # Step 3: 行情列重命名
+    spot_renamed = spot.rename(columns={
+        "代码": "stock_code",
+        "最新价": "price",
+        "涨跌幅": "change_pct",
+        "换手率": "turnover",
+        "市盈率-动态": "pe_dynamic",
+        "市净率": "pb",
+    })
+
+    # 只保留需要的列
+    quote_cols = ["stock_code", "price", "change_pct", "turnover", "pe_dynamic", "pb"]
+    spot_renamed = spot_renamed[[c for c in quote_cols if c in spot_renamed.columns]]
+
+    # Step 4: LEFT JOIN
+    # 确保成分股 stock_code 为纯6位数字（去市场前缀）
+    cons = cons.copy()
+    cons["stock_code"] = cons["stock_code"].astype(str).str.strip()
+
+    merged = cons.merge(spot_renamed, on="stock_code", how="left")
+
+    # Step 5: 排序 — 权重降序
+    merged = merged.sort_values("weight", ascending=False).reset_index(drop=True)
+
+    return merged

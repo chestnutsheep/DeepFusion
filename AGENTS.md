@@ -94,7 +94,7 @@ from deep_fusion import load_portfolio
 ```json
 {
   "meta": {
-    "total_tools": 125,
+    "total_tools": 126,
     "api_base": "/api/tools/call",
     "mcp_framework": "fastmcp",
     "return_format_note": "所有工具返回 str 类型。实际格式分为 CSV(表格数据)、JSON(结构化数据)、text(格式化报告) 三类。"
@@ -577,6 +577,12 @@ from deep_fusion import load_portfolio
           "return": "CSV — 申万指数成分股",
           "data_source": "申万数据",
           "data_span": "最新成分"
+        },
+        "industry_sw_constituents_detail": {
+          "params": { "行业代码": "str (必填)", "limit": "int (默认50)" },
+          "return": "CSV — 申万指数成分股+当日涨跌幅/最新价/换手率/PE/PB，按权重降序",
+          "data_source": "申万指数成分股(ak.index_component_sw) + 全A实时行情(ak.stock_zh_a_spot_em)",
+          "data_span": "成分股最新 + 实时行情, 缓存86400s"
         },
         "industry_sw_daily": {
           "params": { "symbol": "str (默认'一级行业')", "start_date": "str", "end_date": "str", "limit": "int (默认50)" },

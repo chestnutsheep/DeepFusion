@@ -235,6 +235,21 @@ def industry_sw_constituents(
 
 
 @mcp.tool(
+    name="industry_sw_constituents_detail",
+    description="查询申万指数成分股及当日涨跌幅/最新价/换手率（一/二/三级行业通用），用于二级行业下钻查看个股",
+)
+def industry_sw_constituents_detail(
+    行业代码: str = Field(..., description="申万指数代码，如 801010(一级) / 801011(二级) / 850111(三级)，不传.si后缀"),
+    limit: int = Field(50, description="返回前N只（按权重降序）"),
+) -> str:
+    from ..data.sources.industry_sw import get_constituents_with_quotes
+    df = get_constituents_with_quotes(行业代码)
+    if df is None or df.empty:
+        return f"成分股数据暂不可用 (代码: {行业代码})"
+    return df.head(limit).to_csv(index=False, float_format="%.4f")
+
+
+@mcp.tool(
     name="industry_sw_daily",
     description="申万指数分析日报表：市场表征/一级行业/二级行业/风格指数，含PE/PB/涨跌幅",
 )
