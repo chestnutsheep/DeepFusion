@@ -555,7 +555,7 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
         </CardWrapper>
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>📊 涨跌幅走势 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>· 近期</span></h3>
-          <DataChart data={chartData} series={[{ key: 'change', name: '涨跌幅', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} />
+          <DataChart data={chartData} series={[{ key: 'change', name: '涨跌幅', color: '#6abbdb', type: 'bar' }]} dateKey="period" height={260} />
         </CardWrapper>
       </div>
     </div>
