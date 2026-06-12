@@ -8,15 +8,15 @@
   --bg-sidebar-gradient: linear-gradient(180deg, rgba(20,30,30,0.97), rgba(35,50,50,0.95));
   --bg-body-gradient: linear-gradient(180deg, rgba(26,47,42,0.92), rgba(26,47,42,0.75), rgba(26,47,42,0.4));
   --border-subtle: rgba(212,168,83,0.12);
-  --border-hover: rgba(212,168,83,0.25);
+  --border-hover: rgb(230 187 105 / 0.83);
   --text-primary: #F0E8D8;
   --text-secondary: #d7cfb0;
   --text-muted: #CBC0B0;
   --accent-gold: #D4A853;
   --accent-rose: #C49BA5;
   --accent-purple: #7B5E7B;
-  --accent-green: #3E6B5C;
-  --accent-red: #C47B7B;
+  --accent-green: #8aba56;
+  --accent-red: #e75b75;
   --accent-blue: #5B8FA8;
   --shadow-glow: rgba(212,168,83,0.08);
   --radius-sm: 3px;

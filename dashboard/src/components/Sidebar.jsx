@@ -112,7 +112,7 @@ function SidebarContent() {
     >
       <div style={{ padding: collapsed ? '20px 10px' : '24px 20px 20px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 12, textAlign: collapsed ? 'center' : 'left' }}>
         <h1 style={{ fontSize: collapsed ? 14 : 18, fontWeight: 800, color: 'var(--accent-gold)', letterSpacing: 1, margin: 0 }}>{collapsed ? '◈' : '◈ Deep Fusion'}</h1>
-        {!collapsed && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>宏观·中观·微观·政策·国际</p>}
+        {!collapsed && <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>宏观·中观·微观·政策·国际</p>}
       </div>
 
       {!collapsed && (
@@ -120,38 +120,38 @@ function SidebarContent() {
           <div style={{ margin: '8px 16px 12px', padding: 14, background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <span style={{ width:8, height:8, background:'var(--accent-green)', borderRadius:'50%', display:'inline-block' }} />
-              <span style={{ fontSize:16, fontWeight:700 }}>{new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'})}</span>
+              <span style={{ fontSize:18, fontWeight:700 }}>{new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'})}</span>
             </div>
-            <div style={{ fontSize:11, color:'var(--text-secondary)' }}>{phase ? `基钦相位：${phase}` : '加载中...'}</div>
+            <div style={{ fontSize:13, color:'var(--text-secondary)' }}>{phase ? `基钦相位：${phase}` : '加载中...'}</div>
           </div>
 
           <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:9,fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
+            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:9,fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
             <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               {(assetAlloc || [{label:'权益',ratio:35,color:'#D4A853'},{label:'债券',ratio:40,color:'#5B8FA8'},{label:'基金',ratio:15,color:'#3E6B5C'},{label:'现金',ratio:10,color:'#C49BA5'}]).map(a => (
                 <div key={a.label} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
                   <span style={{ width:8,height:8,borderRadius:'50%',background:a.color,display:'inline-block' }} />
-                  <span style={{ fontSize:13,flex:1 }}>{a.label}</span>
-                  <span style={{ fontSize:14,fontWeight:700,color:'var(--accent-gold)' }}>{a.ratio}%</span>
+                  <span style={{ fontSize:15,flex:1 }}>{a.label}</span>
+                  <span style={{ fontSize:16,fontWeight:700,color:'var(--accent-gold)' }}>{a.ratio}%</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>🔄 基于周期大概方向</div>
-            <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>🔄 基于周期大概方向</div>
+            <div style={{ padding:16, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               {cyclePhases.length > 0 ? cyclePhases.map(c => (
                 <div key={c.name} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
-                  <span style={{ fontSize:11,color:'var(--text-muted)',width:32 }}>{c.name}</span>
-                  <span style={{ fontSize:14,color:c.color,fontWeight:700 }}>{c.dir}</span>
-                  <span style={{ fontSize:12 }}>{c.phase}</span>
+                  <span style={{ fontSize:13,color:'var(--text-muted)',width:32 }}>{c.name}</span>
+                  <span style={{ fontSize:16,color:c.color,fontWeight:700 }}>{c.dir}</span>
+                  <span style={{ fontSize:14 }}>{c.phase}</span>
                 </div>
               )) : [['基钦','—','→','#888'],['朱格拉','—','→','#888'],['库兹涅茨','—','→','#888'],['康波','—','→','#888']].map(([n,p,d,c]) => (
                 <div key={n} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
-                  <span style={{ fontSize:11,color:'var(--text-muted)',width:32 }}>{n}</span>
-                  <span style={{ fontSize:14,color:c,fontWeight:700 }}>{d}</span>
-                  <span style={{ fontSize:12 }}>{p}</span>
+                  <span style={{ fontSize:13,color:'var(--text-muted)',width:32 }}>{n}</span>
+                  <span style={{ fontSize:16,color:c,fontWeight:700 }}>{d}</span>
+                  <span style={{ fontSize:14 }}>{p}</span>
                 </div>
               ))}
             </div>
@@ -159,7 +159,7 @@ function SidebarContent() {
 
           {activeTab === 'policy' && (
             <div style={{ margin:'0 16px 12px' }}>
-              <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
+              <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
               <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
                 {policyBriefs.length>0 ? policyBriefs.map((b,i)=>(
                   <div key={i} style={{ fontSize:11,color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
@@ -172,7 +172,7 @@ function SidebarContent() {
         </>
       )}
 
-      <div style={{ fontSize:12,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: collapsed ? '8px 10px 4px' : '8px 20px 4px', textAlign: collapsed ? 'center' : 'left' }}>
+      <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: collapsed ? '8px 10px 4px' : '8px 20px 4px', textAlign: collapsed ? 'center' : 'left' }}>
         {collapsed ? '📍' : '📍 导航'}
       </div>
       <Menu>
@@ -190,7 +190,7 @@ function SidebarContent() {
             }}
             style={{
               color: activeSub === key ? 'var(--accent-gold)' : 'var(--text-secondary)',
-              fontSize: 13, borderRadius: 8, margin: '2px 8px',
+              fontSize: 15, borderRadius: 8, margin: '2px 8px',
               backgroundColor: activeSub === key ? 'rgba(212,168,83,0.08)' : 'transparent',
             }}
           >

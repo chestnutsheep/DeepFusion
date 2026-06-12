@@ -133,7 +133,7 @@ def industry_daily_query(
     df = db.get_daily(industry_code=code or None, start_date=start_date or None, end_date=end_date or None, limit=limit)
     if df is None or df.empty:
         return "本地无缓存数据，请先用 industry_daily_collect 采集"
-    return df.tail(limit).to_csv(index=False, float_format="%.2f")
+    return df.to_csv(index=False, float_format="%.2f")
 
 
 @mcp.tool(
@@ -248,7 +248,7 @@ def industry_sw_daily(
     df = get_daily_analysis(symbol, start_date or None, end_date or None)
     if df is None or df.empty:
         return f"日报表数据暂不可用 (symbol={symbol})"
-    return df.head(limit).to_csv(index=False, float_format="%.2f")
+    return df.tail(limit).to_csv(index=False, float_format="%.2f")
 
 
 @mcp.tool(

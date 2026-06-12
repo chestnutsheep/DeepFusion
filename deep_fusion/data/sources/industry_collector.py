@@ -1,7 +1,7 @@
 """Industry daily OHLCV data collector."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import akshare as ak
 import pandas as pd
@@ -50,14 +50,19 @@ def collect_all_industry_daily(start_date: str = "20200101", workers: int = 3) -
             }
             df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
+            # 按日期正序排列，计算涨跌幅
+            if "trade_date" in df.columns:
+                df = df.sort_values("trade_date")
+            df["change_pct"] = df["close"].pct_change() * 100
+
             # 写入 DB
             conn = db._connect()
             rows = 0
             for _, r in df.iterrows():
                 conn.execute(
                     """INSERT OR REPLACE INTO meso_industry_daily
-                       (industry_code, trade_date, open, close, high, low, volume, amount)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (industry_code, trade_date, open, close, high, low, volume, amount, change_pct, turnover_rate)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         code,
                         str(r.get("trade_date", ""))[:10],
@@ -67,6 +72,8 @@ def collect_all_industry_daily(start_date: str = "20200101", workers: int = 3) -
                         r.get("low"),
                         r.get("volume"),
                         r.get("amount"),
+                        r.get("change_pct") if pd.notna(r.get("change_pct")) else None,
+                        None,  # turnover_rate 暂无数据源
                     ),
                 )
                 rows += 1

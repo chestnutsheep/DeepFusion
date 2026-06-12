@@ -8,43 +8,69 @@ import * as echarts from 'echarts';
 
 // ── CSV 解析工具 ──
 
+/** 安全解析浮点数，无效值返回 null（DataCard 会显示 "—"） */
+const safeFloat = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+
+/** 通用：解析 CSV 表头 → 列名→索引映射 */
+function buildColMap(headerLine) {
+  const headers = headerLine.split(',').map(h => h.trim());
+  const m = {};
+  headers.forEach((h, i) => { m[h] = i; });
+  return m;
+}
+
 /**
- * 解析 industry_sw_daily 返回的 CSV。
- * 列序: 指数代码(0), 指数名称(1), 发布日期(2), 收盘指数(3), 成交量(4),
- *       涨跌幅(5), 换手率(6), 市盈率(7), 市净率(8), 均价(9),
- *       成交额占比(10), 流通市值(11), 平均流通市值(12), 股息率(13)
- * 
+ * 解析 industry_sw_daily 返回的 CSV（akshare index_analysis_daily_sw）。
+ * 使用表头列名映射，避免 akshare 列序变更导致静默错位。
+ *
  * 返回 { industries: 按行业名索引的最新快照, dates: 所有日期, matrix: 行业×日期涨跌幅矩阵 }
  */
 function parseSWDaily(csv) {
   if (!csv) return { industries: [], dates: [], matrix: {} };
-  const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
-  if (!rows.length) return { industries: [], dates: [], matrix: {} };
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return { industries: [], dates: [], matrix: {} };
+
+  // 建立列名映射
+  const col = buildColMap(lines[0]);
+  const iCode   = col['指数代码'] ?? 0;
+  const iName   = col['指数名称'] ?? 1;
+  const iDate   = col['发布日期'] ?? 2;
+  const iClose  = col['收盘指数'] ?? 3;
+  const iVol    = col['成交量'] ?? 4;
+  const iChange = col['涨跌幅'] ?? 5;
+  const iTurn   = col['换手率'] ?? 6;
+  const iPe     = col['市盈率'] ?? 7;
+  const iPb     = col['市净率'] ?? 8;
+  const iAvg    = col['均价'] ?? 9;
+  const iAmtR   = col['成交额占比'] ?? 10;
+  const iMktCap = col['流通市值'] ?? 11;
+
+  const rows = lines.slice(1).map(l => l.split(','));
 
   // 收集所有日期（去重+排序）
   const dateSet = new Set();
-  rows.forEach(r => { if (r[2]?.trim()) dateSet.add(r[2].trim()); });
+  rows.forEach(r => { const d = r[iDate]?.trim(); if (d) dateSet.add(d); });
   const dates = [...dateSet].sort();
 
   // 按行业分组，取最新日期作为快照
   const byName = {};
   rows.forEach(r => {
-    const name = r[1]?.trim();
+    const name = r[iName]?.trim();
     if (!name) return;
     if (!byName[name]) byName[name] = [];
     byName[name].push({
       name,
-      date: r[2]?.trim(),
-      close: parseFloat(r[3]) || 0,
-      volume: parseFloat(r[4]) || 0,        // 成交量（手）
-      change: parseFloat(r[5]) || 0,         // 涨跌幅 %
-      turnover: parseFloat(r[6]) || 0,       // 换手率 %
-      pe: parseFloat(r[7]) || 0,
-      pb: parseFloat(r[8]) || 0,
-      avgPrice: parseFloat(r[9]) || 0,       // 均价
-      amountRatio: parseFloat(r[10]) || 0,   // 成交额占比 %
-      mktCap: parseFloat(r[11]) || 0,        // 流通市值（元）
-      code: r[0]?.trim(),
+      date: r[iDate]?.trim(),
+      close: safeFloat(r[iClose]),
+      volume: safeFloat(r[iVol]),
+      change: safeFloat(r[iChange]),
+      turnover: safeFloat(r[iTurn]),
+      pe: safeFloat(r[iPe]),
+      pb: safeFloat(r[iPb]),
+      avgPrice: safeFloat(r[iAvg]),
+      amountRatio: safeFloat(r[iAmtR]),
+      mktCap: safeFloat(r[iMktCap]),
+      code: r[iCode]?.trim(),
     });
   });
 
@@ -57,26 +83,40 @@ function parseSWDaily(csv) {
     industries.push(latest);
     // 构建矩阵
     matrix[name] = {};
-    recs.forEach(r => { matrix[name][r.date] = r.change; });
+    recs.forEach(r => { if (r.change != null) matrix[name][r.date] = r.change; });
   }
 
   return { industries, dates, matrix };
 }
 
-/** 行业日线 CSV — 列序同 parseSWDaily */
+/**
+ * 行业日线 CSV — 来自 industry_daily_query（SQLite meso_industry_daily 表）。
+ * 列: industry_code, trade_date, open, close, high, low, volume, amount, change_pct, turnover_rate
+ */
 function parseDaily(csv) {
   if (!csv) return [];
-  return csv.trim().split('\n').slice(1).map(l => {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const col = buildColMap(lines[0]);
+  const iDate  = col['trade_date'] ?? 1;
+  const iClose = col['close'] ?? 3;
+  const iVol   = col['volume'] ?? 6;
+  const iAmt   = col['amount'] ?? 7;
+  const iChg   = col['change_pct'] ?? 8;
+  const iTurn  = col['turnover_rate'] ?? 9;
+
+  return lines.slice(1).map(l => {
     const p = l.split(',');
     return {
-      period: p[2]?.slice(5) || p[2]?.trim() || '',
-      close: parseFloat(p[3]) || 0,
-      volume: parseFloat(p[4]) || 0,
-      change: parseFloat(p[5]) || 0,
-      turnover: parseFloat(p[6]) || 0,
-      mktCap: parseFloat(p[11]) || 0,
+      period: (p[iDate] || '').trim().slice(5),
+      close: safeFloat(p[iClose]),
+      volume: safeFloat(p[iVol]),
+      amount: safeFloat(p[iAmt]),
+      change: safeFloat(p[iChg]),
+      turnover: safeFloat(p[iTurn]),
     };
-  }).filter(d => !isNaN(d.close)).slice(-120);
+  }).filter(d => d.close != null).slice(-120);
 }
 
 // ── 区块组件 ──
@@ -84,7 +124,7 @@ function parseDaily(csv) {
 /** 英雄区 */
 function Hero({ industries }) {
   const topInd = industries.length > 0
-    ? [...industries].sort((a, b) => b.change - a.change)[0]
+    ? [...industries].sort((a, b) => (b.change || 0) - (a.change || 0))[0]
     : null;
   return (
     <div style={{
@@ -108,7 +148,7 @@ function Hero({ industries }) {
         <span>◈ 数据源: akshare · 申万行业</span>
         <span>◈ 覆盖: {industries.length} 申万一级行业</span>
         <span>◈ 更新: 日频</span>
-        {topInd && (
+        {topInd && topInd.change != null && (
           <span>◈ 领涨: <span style={{ color: 'var(--accent-red)' }}>{topInd.name} {topInd.change >= 0 ? '+' : ''}{topInd.change.toFixed(2)}%</span></span>
         )}
       </div>
@@ -181,12 +221,12 @@ const CATEGORY_CONFIG = {
 /** 涨跌幅 → 热力色 (treemap 用) */
 function changeToColor(v) {
   if (v > 3)   return '#c85454';
-  if (v > 1.5) return '#e29944';
-  if (v > 0.3) return '#e7e37f';
-  if (v > -0.3)return 'rgb(238 240 233 / 0.81)';
+  if (v > 1.5) return '#db8f36';
+  if (v > 0.3) return '#ccb022';
+  if (v > -0.3)return 'rgb(183 184 183)';
   if (v > -1.5)return '#b1d56b';
   if (v > -3)  return '#6ac561';
-  return '#21af7b';
+  return '#05ad6e';
 }
 
 /** 解析 industry_sw_tree 文本 → { "二级行业名": "一级行业名" } 映射 */
@@ -223,7 +263,7 @@ function IndustryDrilldown({ target, onBack }) {
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000);
   const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
-  const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, limit: 2000 });
+  const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, limit: 5000 });
 
   const mapping = useMemo(() => parseTreeMapping(treeRaw), [treeRaw]);
   const l2Parsed = useMemo(() => parseSWDaily(l2Raw), [l2Raw]);
@@ -257,7 +297,7 @@ function IndustryDrilldown({ target, onBack }) {
     }));
     chart.setOption({
       tooltip: {
-        formatter: p => `${p.name}<br/>涨跌幅: ${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(2)}%<br/>流通市值: ${(p.data._mktCap / 1e8).toFixed(0)}亿<br/>PE: ${p.data._pe.toFixed(1)}  PB: ${p.data._pb.toFixed(2)}`,
+        formatter: p => `${p.name}<br/>涨跌幅: ${p.data._change != null ? `${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(2)}%` : '—'}<br/>流通市值: ${p.data._mktCap != null ? `${(p.data._mktCap / 1e8).toFixed(0)}亿` : '—'}<br/>PE: ${p.data._pe != null ? p.data._pe.toFixed(1) : '—'}  PB: ${p.data._pb != null ? p.data._pb.toFixed(2) : '—'}`,
       },
       series: [{
         type: 'treemap',
@@ -267,9 +307,9 @@ function IndustryDrilldown({ target, onBack }) {
         breadcrumb: { show: false },
         label: {
           show: true,
-          formatter: p => `${p.name}\n${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(1)}%`,
-          fontSize: 11,
-          color: '#F0E8D8',
+          formatter: p => `${p.name}\n${p.data._change != null ? `${p.data._change >= 0 ? '+' : ''}${p.data._change.toFixed(1)}%` : '—'}`,
+          fontSize: 18,
+          color: '#141414',
         },
         upperLabel: { show: false },
         itemStyle: { borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
@@ -278,7 +318,7 @@ function IndustryDrilldown({ target, onBack }) {
     return () => chart.dispose();
   }, [subIndustries]);
 
-  const avgChange = subIndustries.length ? subIndustries.reduce((s, i) => s + i.change, 0) / subIndustries.length : 0;
+  const avgChange = subIndustries.length ? subIndustries.reduce((s, i) => s + (i.change || 0), 0) / subIndustries.length : 0;
 
   return (
     <div>
@@ -346,18 +386,18 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
       tooltip: {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      grid: { left: 90, right: 16, top: 8, bottom: 36 },
+      grid: { left: 90, right: 30, top: 8, bottom: 50 },
       xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
-      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 12, width: 72, overflow: 'truncate' } },
+      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 14, width: 72, overflow: 'truncate' } },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
-        inRange: { color: ['rgb(8 86 11)', '#217819', '#44b63a', '#75d378', '#f5c4b4', '#e2806f', '#c43e3e'] },
+        inRange: { color: ['rgb(158 158 158)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
         textStyle: { color: '#CBC0B0', fontSize: 13 },
       },
       series: [{
         type: 'heatmap', data,
-        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#F0E8D8' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.5)' } },
+        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 14, color: '#F0E8D8' },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.25)' } },
       }],
     });
     // 点击方格 → 下钻
@@ -373,7 +413,7 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
   }, [filteredIndustries, dates, matrix, drillTarget, onIndustrySelect]);
 
   const avgChange = filteredIndustries.length
-    ? filteredIndustries.reduce((s, i) => s + i.change, 0) / filteredIndustries.length : 0;
+    ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
   const h = Math.max(220, filteredIndustries.length * 28 + 50);
 
   return (
@@ -449,9 +489,9 @@ function RankingTable({ title, subtitle, items, colorKey }) {
                   padding: '6px 8px', textAlign: 'right', fontWeight: 700,
                   color: isUp ? 'var(--accent-red)' : 'var(--accent-green)',
                   borderBottom: '1px solid rgba(212,168,83,0.04)',
-                }}>{i.change >= 0 ? '+' : ''}{i.change.toFixed(2)}%</td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{i.pe.toFixed(1)}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{i.pb.toFixed(2)}</td>
+                }}>{i.change != null ? `${i.change >= 0 ? '+' : ''}${i.change.toFixed(2)}%` : '—'}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{i.pe != null ? i.pe.toFixed(1) : '—'}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{i.pb != null ? i.pb.toFixed(2) : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -465,13 +505,11 @@ function RankingTable({ title, subtitle, items, colorKey }) {
 function IndustryDetail({ sel, chartData, latest, prev }) {
   if (!sel) return null;
   // 流通市值：后端返回单位为元，转亿元
-  const mktCapYi = sel.mktCap ? (sel.mktCap / 1e8) : 0;
+  const mktCapYi = sel.mktCap ? (sel.mktCap / 1e8) : null;
   const metrics = [
     { key: 'close', label: '收盘指数', unit: '', decimals: 2, higherBetter: true },
     { key: 'change', label: '涨跌幅', unit: '%', decimals: 2, higherBetter: true },
     { key: 'turnover', label: '换手率', unit: '%', decimals: 2, higherBetter: null },
-  ];
-  const staticMetrics = [
     { key: 'pe', label: 'PE(TTM)', value: sel.pe, decimals: 1, higherBetter: null },
     { key: 'pb', label: 'PB', value: sel.pb, decimals: 2, higherBetter: null },
     { key: 'mktCap', label: '流通市值', value: mktCapYi, decimals: 0, unit: '亿', higherBetter: null },
@@ -486,23 +524,27 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-gold)', marginBottom: 8 }}>📊 行业概况</div>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-              <span>收盘指数</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.close.toFixed(2)}</span>
+              <span>行业代码</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.code || '—'}</span>
             </li>
             <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-              <span>PE(TTM)</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.pe.toFixed(1)}</span>
+              <span>日期</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.date || '—'}</span>
             </li>
             <li style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', padding: '3px 0', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-              <span>PB</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{sel.pb.toFixed(2)}</span>
+              <span>分类</span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{getCategoryOf(sel.name) === 'cyclical' ? '强周期' : getCategoryOf(sel.name) === 'defensive' ? '强防御' : '进攻型'}</span>
             </li>
           </ul>
         </CardWrapper>
-        {/* 涨跌指标卡 */}
+        {/* 指标卡（去重：不再重复展示收盘/PE/PB） */}
         {metrics.map(m => (
-          <DataCard key={m.key} label={m.label} value={latest[m.key]} prevValue={prev[m.key]} unit={m.unit} decimals={m.decimals} higherBetter={m.higherBetter} />
-        ))}
-        {/* 静态指标 */}
-        {staticMetrics.map(m => (
-          <DataCard key={m.key} label={m.label} value={m.value} unit={m.unit} decimals={m.decimals} higherBetter={m.higherBetter} />
+          <DataCard
+            key={m.key}
+            label={m.label}
+            value={m.value != null ? m.value : latest[m.key]}
+            prevValue={m.value == null ? prev[m.key] : undefined}
+            unit={m.unit}
+            decimals={m.decimals}
+            higherBetter={m.higherBetter}
+          />
         ))}
       </div>
       {/* 图表区 */}
@@ -538,13 +580,13 @@ function ChainView({ industries }) {
         {items.slice(0, 6).map(i => (
           <span key={i.name} style={{
             padding: '2px 8px', borderRadius: 6, fontSize: 'var(--fs-xs)',
-            background: i.change >= 0 ? 'rgba(196,123,123,0.12)' : 'rgba(62,107,92,0.12)',
-            color: i.change >= 0 ? 'var(--accent-red)' : 'var(--accent-green)',
-          }}>{i.name} {i.change >= 0 ? '+' : ''}{i.change.toFixed(1)}%</span>
+            background: (i.change || 0) >= 0 ? 'rgba(196,123,123,0.12)' : 'rgba(62,107,92,0.12)',
+            color: (i.change || 0) >= 0 ? 'var(--accent-red)' : 'var(--accent-green)',
+          }}>{i.name} {i.change != null ? `${i.change >= 0 ? '+' : ''}${i.change.toFixed(1)}%` : '—'}</span>
         ))}
       </div>
       <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-        行业数 {items.length} · 平均涨幅 {items.length ? (items.reduce((s, i) => s + i.change, 0) / items.length).toFixed(2) : '—'}%
+        行业数 {items.length} · 平均涨幅 {items.length ? (items.reduce((s, i) => s + (i.change || 0), 0) / items.length).toFixed(2) : '—'}%
       </div>
     </CardWrapper>
   );
@@ -568,9 +610,13 @@ function EnergySection() {
 
   const parsePrice = (csv) => {
     if (!csv) return [];
-    return csv.trim().split('\n').slice(1).map(l => {
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) return [];
+    const col = buildColMap(lines[0]);
+    const ci = col['close'] ?? 4;
+    return lines.slice(1).map(l => {
       const p = l.split(',');
-      return { period: p[0]?.slice(5) || '', close: parseFloat(p[1]) || 0 };
+      return { period: (p[0] || '').slice(5), close: parseFloat(p[ci]) || 0 };
     }).filter(d => !isNaN(d.close)).slice(-60);
   };
 
@@ -629,7 +675,7 @@ export default function MesoLayout() {
   const prev = chartData[chartData.length - 2] || {};
 
   // 排序
-  const sorted = useMemo(() => [...industries].sort((a, b) => b.change - a.change), [industries]);
+  const sorted = useMemo(() => [...industries].sort((a, b) => (b.change || 0) - (a.change || 0)), [industries]);
   const top5 = sorted.slice(0, 5);
   const bottom5 = sorted.slice(-5).reverse();
 

@@ -239,9 +239,11 @@ def get_daily(
         params.append(end_date)
 
     where = " AND ".join(conditions) if conditions else "1=1"
-    sql = f"SELECT * FROM meso_industry_daily WHERE {where} ORDER BY trade_date"
     if limit > 0:
-        sql += f" DESC LIMIT {limit}"
+        # 取最新 N 条并保持日期正序：先倒序取 limit 条，再正序排列
+        sql = f"SELECT * FROM (SELECT * FROM meso_industry_daily WHERE {where} ORDER BY trade_date DESC LIMIT {limit}) ORDER BY trade_date ASC"
+    else:
+        sql = f"SELECT * FROM meso_industry_daily WHERE {where} ORDER BY trade_date"
     df = pd.read_sql_query(sql, conn, params=params)
     conn.close()
     return df
