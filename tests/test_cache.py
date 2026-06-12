@@ -1,4 +1,4 @@
-from deep_fusion import CacheKey
+from deep_fusion.cache import CacheKey
 
 
 class TestCacheKey:

@@ -351,30 +351,16 @@ function IndustryDrilldown({ target, onBack }) {
 
 // ── 热力图交互区 ──
 
-/** 行业热力图 — 三分类Tab + 可点击下钻 */
-function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
-  const [activeCategory, setActiveCategory] = useState('cyclical');
-  const [drillTarget, setDrillTarget] = useState(null); // { industry, date }
+/** 行业热力图 — 纯图表渲染（控制栏由父组件渲染） */
+function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, activeCategory, displayDays, drillTarget, setDrillTarget }) {
   const chartRef = useRef(null);
-
   const currentConfig = CATEGORY_CONFIG[activeCategory];
-  const allClassified = useMemo(() => new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]), []);
 
-  const filteredIndustries = useMemo(() => {
-    const base = industries.filter(i => currentConfig.names.has(i.name));
-    if (activeCategory === 'cyclical') {
-      const uncategorized = industries.filter(i => !allClassified.has(i.name));
-      return [...base, ...uncategorized];
-    }
-    return base;
-  }, [industries, activeCategory, currentConfig.names, allClassified]);
-
-  // 热力图渲染（非下钻状态）
   useEffect(() => {
     if (drillTarget || !chartRef.current || !filteredIndustries.length || !dates.length) return;
     const chart = echarts.init(chartRef.current, 'df-dark');
     const names = filteredIndustries.map(i => i.name || i.code);
-    const recentDates = dates.slice(-20);
+    const recentDates = dates.slice(-displayDays);
     const data = [];
     for (let yi = 0; yi < names.length; yi++) {
       for (let xi = 0; xi < recentDates.length; xi++) {
@@ -387,20 +373,19 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
       grid: { left: 90, right: 30, top: 8, bottom: 50 },
-      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
-      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 14, width: 72, overflow: 'truncate' } },
+      xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 11, rotate: 35 } },
+      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 68, overflow: 'truncate' } },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
         inRange: { color: ['rgb(158 158 158)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
-        textStyle: { color: '#CBC0B0', fontSize: 13 },
+        textStyle: { color: '#CBC0B0', fontSize: 12 },
       },
       series: [{
         type: 'heatmap', data,
-        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 14, color: '#F0E8D8' },
+        label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#F0E8D8' },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(66 66 66 / 0.25)' } },
       }],
     });
-    // 点击方格 → 下钻
     chart.on('click', (params) => {
       if (params.data) {
         const industryName = names[params.data[1]];
@@ -410,53 +395,23 @@ function HeatmapSection({ industries, dates, matrix, onIndustrySelect }) {
       }
     });
     return () => chart.dispose();
-  }, [filteredIndustries, dates, matrix, drillTarget, onIndustrySelect]);
+  }, [filteredIndustries, dates, matrix, drillTarget, onIndustrySelect, displayDays, setDrillTarget]);
 
-  const avgChange = filteredIndustries.length
-    ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
-  const h = Math.max(220, filteredIndustries.length * 28 + 50);
+  const h = Math.max(320, filteredIndustries.length * 36 + 60);
+
+  if (drillTarget) {
+    return <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />;
+  }
 
   return (
-    <div>
-      {/* 三分类 Tab */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
-          <button key={key} onClick={() => { setActiveCategory(key); setDrillTarget(null); }}
-            style={{
-              padding: '6px 16px', borderRadius: 6, fontSize: 'var(--fs-sm)', fontWeight: 600,
-              background: activeCategory === key ? `${cfg.accent}22` : 'transparent',
-              color: activeCategory === key ? cfg.accent : 'var(--text-secondary)',
-              border: `1.5px solid ${activeCategory === key ? cfg.accent : 'var(--border-subtle)'}`,
-              cursor: 'pointer', transition: 'all 0.2s',
-            }}>
-            {cfg.label}
-            <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 400, marginLeft: 4, opacity: 0.7 }}>{cfg.desc}</span>
-          </button>
-        ))}
+    <div style={{ maxWidth: 820 }}>
+      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 400, color: 'var(--text-muted)', marginBottom: 6 }}>
+        {currentConfig.label} · {filteredIndustries.length} 个行业 · 近 {displayDays} 日
       </div>
-
-      {/* 热力图 或 下钻 */}
-      {drillTarget ? (
-        <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />
-      ) : (
-        <div>
-          <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: currentConfig.accent }}>{currentConfig.label}</span>
-            <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 400, color: 'var(--text-muted)' }}>· {filteredIndustries.length} 个行业</span>
-            {filteredIndustries.length > 0 && (
-              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
-                color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
-              }}>
-                均涨 {avgChange.toFixed(2)}%
-              </span>
-            )}
-          </div>
-          <div ref={chartRef} style={{ width: '100%', height: h }} />
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
-            💡 点击方格可下钻至二级行业树状图
-          </div>
-        </div>
-      )}
+      <div ref={chartRef} style={{ width: '100%', height: h }} />
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 4, textAlign: 'center' }}>
+        💡 点击方格可下钻至二级行业树状图
+      </div>
     </div>
   );
 }
@@ -659,6 +614,26 @@ export default function MesoLayout() {
   const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
   const [activeInd, setActiveInd] = useState('');
 
+  // 热力图控制状态（提升到父组件，控制栏渲染在 CardWrapper 外部）
+  const [heatmapCategory, setHeatmapCategory] = useState('cyclical');
+  const [heatmapDays, setHeatmapDays] = useState(20);
+  const [drillTarget, setDrillTarget] = useState(null);
+
+  // 计算 filteredIndustries（与 HeatmapChart 内部逻辑一致）
+  const allClassified = useMemo(() => new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]), []);
+  const heatmapConfig = CATEGORY_CONFIG[heatmapCategory];
+  const filteredIndustries = useMemo(() => {
+    const base = industries.filter(i => heatmapConfig.names.has(i.name));
+    if (heatmapCategory === 'cyclical') {
+      const uncategorized = industries.filter(i => !allClassified.has(i.name));
+      return [...base, ...uncategorized];
+    }
+    return base;
+  }, [industries, heatmapCategory, heatmapConfig.names, allClassified]);
+
+  const avgChange = filteredIndustries.length
+    ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
+
   // 数据加载完成后自动选中第一个行业
   useEffect(() => {
     if (!activeInd && industries.length > 0) {
@@ -692,8 +667,69 @@ export default function MesoLayout() {
       {/* 区块一：行业热力图与轮动（可交互Tab+下钻） */}
       <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
+
+        {/* 控制栏 — 在卡片外部 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+            <button key={key} onClick={() => { setHeatmapCategory(key); setDrillTarget(null); }}
+              style={{
+                padding: '6px 16px', borderRadius: 6, fontSize: 'var(--fs-sm)', fontWeight: 600,
+                background: heatmapCategory === key ? `${cfg.accent}22` : 'transparent',
+                color: heatmapCategory === key ? cfg.accent : 'var(--text-secondary)',
+                border: `1.5px solid ${heatmapCategory === key ? cfg.accent : 'var(--border-subtle)'}`,
+                cursor: 'pointer', transition: 'all 0.2s',
+              }}>
+              {cfg.label}
+            </button>
+          ))}
+
+          {/* 天数选择 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>显示天数</span>
+            <input
+              type="number"
+              min={3}
+              max={60}
+              value={heatmapDays}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 3 && v <= 60) setHeatmapDays(v);
+              }}
+              style={{
+                width: 52, padding: '3px 6px', borderRadius: 4,
+                fontSize: 'var(--fs-sm)', fontWeight: 600,
+                background: 'var(--bg-panel)', color: 'var(--text-primary)',
+                border: '1px solid var(--border-subtle)', textAlign: 'center',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* 均涨跌 — 醒目显示 */}
+          {filteredIndustries.length > 0 && (
+            <span style={{
+              fontSize: 18, fontWeight: 800, letterSpacing: '0.5px',
+              color: avgChange >= 0 ? '#E85050' : '#3DBB6E',
+              marginLeft: 4,
+              textShadow: avgChange >= 0
+                ? '0 0 12px rgba(232,80,80,0.35)'
+                : '0 0 12px rgba(61,187,110,0.35)',
+            }}>
+              {avgChange >= 0 ? '▲' : '▼'} 均涨 {avgChange.toFixed(2)}%
+            </span>
+          )}
+        </div>
+
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
-          <HeatmapSection industries={industries} dates={dates} matrix={matrix} onIndustrySelect={handleIndustrySelect} />
+          <HeatmapChart
+            filteredIndustries={filteredIndustries}
+            dates={dates} matrix={matrix}
+            onIndustrySelect={handleIndustrySelect}
+            activeCategory={heatmapCategory}
+            displayDays={heatmapDays}
+            drillTarget={drillTarget}
+            setDrillTarget={setDrillTarget}
+          />
         </CardWrapper>
       </div>
 

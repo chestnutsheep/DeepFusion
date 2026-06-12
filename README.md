@@ -267,7 +267,11 @@ DeepFusion/
 │   ├── cache.py              # 双层缓存（L1 内存 / L2 磁盘）
 │   ├── prompts.py            # 7 个 SOP 分析提示词
 │   ├── resources.py          # 14 个投研资源
+│   ├── analysis/             # 周期分析引擎（engine/kondratiev/juglar/kuznets/kitchin）
+│   ├── data/                 # 数据源层（nbs_client/fred/world_bank/data_lake）
 │   ├── shared/               # 共享模块
+│   │   ├── chart_helpers.py  # 图表公共工具（阶段着色/字体/日期轴/Agg后端）
+│   │   ├── phase_utils.py    # 相位命名映射（KOND_RENAME 等）
 │   │   ├── constants.py      # 环境变量/URL/UA/DB_CONFIG 常量
 │   │   ├── fields.py         # Pydantic Field 定义
 │   │   ├── indicators.py     # 19 个技术指标计算
@@ -275,6 +279,8 @@ DeepFusion/
 │   │   ├── normalize.py      # DataFrame → CSV 标准化
 │   │   ├── schema.py         # 输出列名映射
 │   │   ├── industry_db.py    # SQLite 行业数据库辅助
+│   │   ├── cycle_db.py       # SQLite 周期数据库辅助（FRED/世界银行）
+│   │   ├── policy_db.py      # SQLite 政策数据库辅助
 │   │   ├── request.py        # HTTP session + UA 轮换 + 代理
 │   │   └── utils.py          # ak_cache / ak_cache_async + EM 回退
 │   └── tools/                # 14 个工具模块
@@ -293,7 +299,7 @@ DeepFusion/
 │       └── stocks.py         # 股票基础（5 个工具）
 ├── agents/skills/            # 10 个投研 SOP 技能
 ├── references/               # 投研参考文档
-├── tests/                    # 测试套件（8 个测试文件）
+├── tests/                    # 测试套件（12 个测试文件，52 个测试用例）
 ├── .env.example              # 环境变量模板
 ├── proxy_setup.md            # 代理设置指南
 ├── registry_add.bat          # Windows 代理注册脚本

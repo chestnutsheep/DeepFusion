@@ -54,6 +54,37 @@ This project uses Git. See .gitignore for excluded files.
 ### 其它周期
 基钦/朱格拉/库兹涅茨沿用各自的缓存策略，暂无需版本锁定。如有重大算法调整，参照康波的做法加版本号。
 
+### 代码架构：去重与共享模块 (2026-06-12)
+
+以下模块从重复代码中提取，供多模块复用。**修改时需确认所有消费方不受影响**：
+
+| 模块 | 位置 | 职责 | 消费方 |
+|------|------|------|--------|
+| `chart_helpers` | `deep_fusion/shared/chart_helpers.py` | 图表公共工具：阶段着色 `shade_phases`/`apply_phase_shading`、字体加载 `setup_chart_font`、日期轴 `setup_date_axes`、Agg 后端 `setup_matplotlib_agg` | `kondratiev.py` 四个 `_gen_*_chart` 函数 |
+| `phase_utils` | `deep_fusion/shared/phase_utils.py` | 相位命名映射 `KOND_RENAME = {1:"回升期",2:"繁荣期",3:"衰退期",4:"萧条期"}` | `kondratiev.py` 图表标签、前端对接 |
+| `nbs_client` | `deep_fusion/data/sources/nbs_client.py` | NBS 数据获取权威实现（`_NbsClient` 单例 + 8 个 `_fetch_nbs_*` 函数） | `tools/cycles.py`、`kondratiev.py`（间接） |
+
+**关键去重**：
+- `kondratiev.py` 不再有独立的 `_NbsClient` 副本（~390 行已删除），统一使用 `data/sources/nbs_client.py`
+- `kondratiev.py` 不再有 `_simple_zscore` 独立实现，已 alias 到 `engine._zscore`
+- `kondratiev.py` 死代码块（return 后不可达代码 ~100 行）已删除
+
+### 测试导入规范 (2026-06-12)
+
+`CacheKey` 定义在 `deep_fusion/cache.py`，**未** 从 `deep_fusion/__init__.py` 导出。测试文件必须直接导入：
+
+```python
+# ✅ 正确
+from deep_fusion.cache import CacheKey
+from deep_fusion.shared.utils import load_portfolio, save_portfolio
+
+# ❌ 错误（会触发 ImportError，阻断整个测试套件 collection）
+from deep_fusion import CacheKey
+from deep_fusion import load_portfolio
+```
+
+同样，`load_portfolio` / `save_portfolio` 在 `deep_fusion/shared/utils.py`，不在顶层包。
+
 ---
 
 ## MCP 工具注册表（完整清单）

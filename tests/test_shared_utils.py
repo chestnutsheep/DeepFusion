@@ -3,7 +3,7 @@ import tempfile
 
 import pytest
 
-from deep_fusion import CacheKey
+from deep_fusion.cache import CacheKey
 
 
 class TestAkCache:
@@ -25,7 +25,7 @@ class TestAkCache:
 
 class TestPortfolioIO:
     def test_load_portfolio_non_existent(self):
-        from deep_fusion import load_portfolio
+        from deep_fusion.shared.utils import load_portfolio
         result = load_portfolio()
         assert isinstance(result, dict)
 
@@ -37,7 +37,7 @@ class TestPortfolioIO:
         return tmpfile
 
     def test_save_and_load(self, temp_portfolio):
-        from deep_fusion import save_portfolio, load_portfolio
+        from deep_fusion.shared.utils import save_portfolio, load_portfolio
         data = {"000001": {"symbol": "000001", "price": 10.0, "volume": 100}}
         save_portfolio(data)
         loaded = load_portfolio()

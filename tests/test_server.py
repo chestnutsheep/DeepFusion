@@ -4,7 +4,7 @@ import pytest
 class TestServer:
     def test_mcp_instance(self):
         from deep_fusion import mcp
-        assert mcp.name == "Deep Fusion"
+        assert mcp.name == "DeepFusion"
         assert mcp.version == "0.1.0"
 
     @pytest.mark.asyncio
