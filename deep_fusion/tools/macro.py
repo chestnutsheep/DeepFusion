@@ -7,21 +7,18 @@ from ..server import mcp
 from ..shared.utils import ak_cache
 
 
-
-
-
 def _fetch_with_priority(
     indicator: str,
     akshare_fn,
     limit=0,
     akshare_ttl=604800,
     akshare_ttl2=1209600,
-    max_age_days=None,
 ):
+    """优先从 data_lake SQLite 取数据（永不过期），无数据时才从 akshare 拉取并入库。"""
     df = None
     source = None
 
-    if data_lake.has_data(indicator, max_age_days=max_age_days):
+    if data_lake.has_data(indicator):
         df = data_lake.query(indicator, limit=limit)
         source = "data_lake"
 
@@ -200,7 +197,7 @@ def macro_monetary(
 def macro_gdp(
     limit: int = Field(20, description="返回数量", strict=False),
 ):
-    df, _ = _fetch_with_priority("GDP", ak.macro_china_gdp, limit=limit, max_age_days=90)
+    df, _ = _fetch_with_priority("GDP", ak.macro_china_gdp, limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")
@@ -213,7 +210,7 @@ def macro_gdp(
 def macro_cpi(
     limit: int = Field(24, description="返回数量", strict=False),
 ):
-    df, _ = _fetch_with_priority("CPI", ak.macro_china_cpi, limit=limit, max_age_days=45)
+    df, _ = _fetch_with_priority("CPI", ak.macro_china_cpi, limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")
@@ -226,7 +223,7 @@ def macro_cpi(
 def macro_pmi(
     limit: int = Field(24, description="返回数量", strict=False),
 ):
-    df, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=limit, max_age_days=45)
+    df, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")
@@ -278,7 +275,7 @@ def macro_industrial_value_add(
     limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("INDUSTRIAL_VALUE_ADD", ak.macro_china_industrial_production_yoy,
-                                 limit=limit, max_age_days=45)
+                                 limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")
@@ -291,7 +288,7 @@ def macro_industrial_value_add(
 def macro_inventory_growth(
     limit: int = Field(24, description="返回数量", strict=False),
 ):
-    df, _ = _fetch_with_priority("INVENTORY", None, limit=limit, max_age_days=45)
+    df, _ = _fetch_with_priority("INVENTORY", None, limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")
@@ -305,7 +302,7 @@ def macro_fixed_investment(
     limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("FIXED_INVESTMENT", None,
-                                 limit=limit, max_age_days=45)
+                                 limit=limit)
     if df is None or df.empty:
         return ""
     return df.to_csv(index=False, float_format="%.2f")

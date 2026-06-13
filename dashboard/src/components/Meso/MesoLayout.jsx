@@ -217,6 +217,7 @@ const CATEGORY_CONFIG = {
   cyclical:  { label: '🔄 强周期', names: CYCLICAL_NAMES,  accent: '#D4A853', desc: '经济周期敏感' },
   defensive: { label: '🛡️ 强防御', names: DEFENSIVE_NAMES, accent: '#5B8FA8', desc: '横盘抱团刚需' },
   growth:    { label: '⚔️ 进攻型', names: GROWTH_NAMES,    accent: '#C47B7B', desc: '高成长高Beta;风险收益成正比' },
+  custom:    { label: '⭐ 自选',   names: null,             accent: '#9B7EC8', desc: '自选行业热力图' },
 };
 
 // ── 强周期行业的三周期映射 ──
@@ -449,6 +450,10 @@ function ConstituentDrilldown({ target, onBack }) {
 function IndustryDrilldown({ target, onBack }) {
   const chartRef = useRef(null);
   const [constituentTarget, setConstituentTarget] = useState(null);
+
+  // 自选二级模式下直接跳成分股
+  const skipToConstituents = target.skip_to_constituents;
+
   const { data: treeRaw } = useMCP('industry_sw_tree', { '深度': 2, '展开': 31 });
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000);
@@ -532,8 +537,9 @@ function IndustryDrilldown({ target, onBack }) {
   const avgChange = subIndustries.length ? subIndustries.reduce((s, i) => s + (i.change || 0), 0) / subIndustries.length : 0;
 
   // 三级下钻：成分股
-  if (constituentTarget) {
-    return <ConstituentDrilldown target={constituentTarget} onBack={() => setConstituentTarget(null)} />;
+  if (constituentTarget || skipToConstituents) {
+    const cTarget = constituentTarget || { industry_code: target.industry_code, industry_name: target.industry };
+    return <ConstituentDrilldown target={cTarget} onBack={skipToConstituents ? onBack : () => setConstituentTarget(null)} />;
   }
 
   return (
@@ -576,10 +582,108 @@ function IndustryDrilldown({ target, onBack }) {
   );
 }
 
+// ── 自选行业选择器 ──
+
+/** 自选行业多选器 — 支持切换一级/二级行业数据源 */
+function IndustryPicker({ allIndustries, selectedNames, onToggle, level, setLevel, l2Industries }) {
+  const [search, setSearch] = useState('');
+  const sourceIndustries = level === 1 ? allIndustries : l2Industries;
+  const filtered = search
+    ? sourceIndustries.filter(i => i.name.includes(search) || (i.code || '').includes(search))
+    : sourceIndustries;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px',
+      background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 8,
+      maxHeight: 420, overflow: 'hidden',
+    }}>
+      {/* 级别切换 */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[1, 2].map(lv => (
+          <button key={lv} onClick={() => setLevel(lv)} style={{
+            padding: '4px 14px', borderRadius: 5, fontSize: 'var(--fs-xs)', fontWeight: 600,
+            background: level === lv ? 'rgba(155,126,200,0.2)' : 'transparent',
+            color: level === lv ? '#9B7EC8' : 'var(--text-muted)',
+            border: `1px solid ${level === lv ? '#9B7EC8' : 'var(--border-subtle)'}`,
+            cursor: 'pointer',
+          }}>
+            {lv === 1 ? '一级行业' : '二级行业'}
+          </button>
+        ))}
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: 'auto', lineHeight: '28px' }}>
+          已选 {selectedNames.length} / {filtered.length}
+        </span>
+      </div>
+
+      {/* 搜索 */}
+      <input
+        type="text"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="搜索行业名称或代码..."
+        style={{
+          width: '100%', padding: '5px 10px', borderRadius: 5, fontSize: 'var(--fs-sm)',
+          background: 'var(--bg-primary)', color: 'var(--text-primary)',
+          border: '1px solid var(--border-subtle)', outline: 'none',
+        }}
+      />
+
+      {/* 全选/清空 */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => onToggle(filtered.map(i => i.name), true)} style={{
+          padding: '2px 10px', borderRadius: 4, fontSize: 'var(--fs-xs)',
+          background: 'transparent', border: '1px solid var(--border-subtle)',
+          color: 'var(--accent-gold)', cursor: 'pointer',
+        }}>全选</button>
+        <button onClick={() => onToggle([], false)} style={{
+          padding: '2px 10px', borderRadius: 4, fontSize: 'var(--fs-xs)',
+          background: 'transparent', border: '1px solid var(--border-subtle)',
+          color: 'var(--text-muted)', cursor: 'pointer',
+        }}>清空</button>
+      </div>
+
+      {/* 行业列表 */}
+      <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexWrap: 'wrap', gap: 4, alignContent: 'flex-start' }}>
+        {filtered.map(i => {
+          const checked = selectedNames.includes(i.name);
+          return (
+            <label key={i.name} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px',
+              borderRadius: 5, fontSize: 'var(--fs-xs)', cursor: 'pointer',
+              background: checked ? 'rgba(155,126,200,0.18)' : 'transparent',
+              border: `1px solid ${checked ? '#9B7EC844' : 'var(--border-subtle)'}`,
+              color: checked ? '#9B7EC8' : 'var(--text-secondary)',
+              transition: 'all 0.15s',
+            }}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => {
+                  const next = checked
+                    ? selectedNames.filter(n => n !== i.name)
+                    : [...selectedNames, i.name];
+                  onToggle(next, true);
+                }}
+                style={{ display: 'none' }}
+              />
+              {i.name}
+              {i.change != null && (
+                <span style={{ fontSize: 10, color: i.change >= 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                  {i.change >= 0 ? '+' : ''}{i.change.toFixed(1)}
+                </span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── 热力图交互区 ──
 
 /** 行业热力图 — 纯图表渲染（控制栏由父组件渲染） */
-function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, activeCategory, displayDays, drillTarget, setDrillTarget }) {
+function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, activeCategory, displayDays, drillTarget, setDrillTarget, customLevel }) {
   const chartRef = useRef(null);
 
   // 强周期模式按三周期分组排序
@@ -604,25 +708,33 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       tooltip: {
         formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
       },
-      grid: { left: 65, right: 70, top: 20, bottom: 60 },
+      grid: { left: 95, right: 50, top: 20, bottom: 60 },
       xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
-      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 68, overflow: 'truncate' } },
+      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 85, overflow: 'truncate' } },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'vertical', right: 4, bottom: 40,
-        inRange: { color: ['rgb(158 158 158)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
+        inRange: { color: ['rgb(206 206 206)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
         textStyle: { color: '#CBC0B0', fontSize: 13 },
       },
       series: [{
         type: 'heatmap', data,
         label: { show: true, formatter: p => `${p.data[2].toFixed(1)}%`, fontSize: 12, color: '#ffffff' },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(0 0 0 / 0.6)' } },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(0 0 0 / 0.8)' } },
       }],
     });
     chart.on('click', (params) => {
       if (params.data) {
         const industryName = names[params.data[1]];
         const date = recentDates[params.data[0]];
-        setDrillTarget({ industry: industryName, date });
+        // 自选二级行业模式 → 直接跳成分股下钻
+        if (activeCategory === 'custom' && customLevel === 2) {
+          const ind = sortedIndustries.find(i => i.name === industryName);
+          if (ind && ind.code) {
+            setDrillTarget({ industry: industryName, date, industry_code: ind.code, skip_to_constituents: true });
+          }
+        } else {
+          setDrillTarget({ industry: industryName, date });
+        }
         onIndustrySelect(industryName);
       }
     });
@@ -635,8 +747,17 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
     return <IndustryDrilldown target={drillTarget} onBack={() => setDrillTarget(null)} />;
   }
 
+  // 自选模式无选中行业
+  if (activeCategory === 'custom' && sortedIndustries.length === 0) {
+    return (
+      <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
+        请在上方选择行业后生成热力图
+      </div>
+    );
+  }
+
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+    <div style={{ maxWidth: 950, margin: '0 auto' }}>
       <div ref={chartRef} style={{ width: '100%', height: h }} />
     </div>
   );
@@ -949,17 +1070,38 @@ export default function MesoLayout() {
   const [heatmapDays, setHeatmapDays] = useState(20);
   const [drillTarget, setDrillTarget] = useState(null);
 
-  // 计算 filteredIndustries（与 HeatmapChart 内部逻辑一致）
+  // ── 自选模式状态 ──
+  const [customLevel, setCustomLevel] = useState(1); // 1=一级 2=二级
+  const [customSelected, setCustomSelected] = useState([]); // 选中的行业名
+
+  // 二级行业数据
+  const l2Result = useMCP('industry_sw_daily', customLevel === 2 ? { symbol: '二级行业', start_date: startStr, limit: 5000 } : null);
+  const l2Parsed = useMemo(() => parseSWDaily(l2Result.data), [l2Result.data]);
+
+  // 自选模式用的行业列表和矩阵
+  const customIndustries = customLevel === 1 ? industries : l2Parsed.industries;
+  const customMatrix = customLevel === 1 ? matrix : l2Parsed.matrix;
+  const customDates = customLevel === 1 ? dates : l2Parsed.dates;
+
+  // 计算 filteredIndustries
   const allClassified = useMemo(() => new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]), []);
   const heatmapConfig = CATEGORY_CONFIG[heatmapCategory];
   const filteredIndustries = useMemo(() => {
+    // 自选模式：用自定义选中的行业
+    if (heatmapCategory === 'custom') {
+      return customIndustries.filter(i => customSelected.includes(i.name));
+    }
     const base = industries.filter(i => heatmapConfig.names.has(i.name));
     if (heatmapCategory === 'cyclical') {
       const uncategorized = industries.filter(i => !allClassified.has(i.name));
       return [...base, ...uncategorized];
     }
     return base;
-  }, [industries, heatmapCategory, heatmapConfig.names, allClassified]);
+  }, [industries, heatmapCategory, heatmapConfig?.names, allClassified, customIndustries, customSelected]);
+
+  // 自选模式的热力图数据（传给 HeatmapChart）
+  const activeMatrix = heatmapCategory === 'custom' ? customMatrix : matrix;
+  const activeDates = heatmapCategory === 'custom' ? customDates : dates;
 
   const avgChange = filteredIndustries.length
     ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
@@ -1055,22 +1197,38 @@ export default function MesoLayout() {
           </span>
         </div>
 
+        {/* 自选模式：行业选择器 */}
+        {heatmapCategory === 'custom' && (
+          <IndustryPicker
+            allIndustries={industries}
+            l2Industries={l2Parsed.industries}
+            selectedNames={customSelected}
+            onToggle={(namesOrList, isList) => {
+              if (isList) setCustomSelected(namesOrList);
+              else setCustomSelected([]);
+            }}
+            level={customLevel}
+            setLevel={lv => { setCustomLevel(lv); setCustomSelected([]); }}
+          />
+        )}
+
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <div style={{ display: heatmapCategory === 'cyclical' ? 'flex' : 'block', gap: 16, alignItems: 'flex-start' }}>
             {heatmapCategory === 'cyclical' && (
               <div style={{ flex: '0 0 auto', minWidth: 260, maxWidth: 340 }}>
-                <CyclePhasePanel industries={filteredIndustries} matrix={matrix} dates={dates} />
+                <CyclePhasePanel industries={filteredIndustries} matrix={activeMatrix} dates={activeDates} />
               </div>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <HeatmapChart
                 filteredIndustries={filteredIndustries}
-                dates={dates} matrix={matrix}
+                dates={activeDates} matrix={activeMatrix}
                 onIndustrySelect={handleIndustrySelect}
                 activeCategory={heatmapCategory}
                 displayDays={heatmapDays}
                 drillTarget={drillTarget}
                 setDrillTarget={setDrillTarget}
+                customLevel={customLevel}
               />
             </div>
           </div>

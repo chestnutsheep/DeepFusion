@@ -82,29 +82,7 @@ function MethodCards() {
               unit="%"
               higherBetter={m.higherBetter}
               decimals={1}
-              detail={m.detail}
-              source={
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {m.globalPhaseName && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 2,
-                      background: gps.bg, border: `1px solid ${gps.border}`, borderRadius: 3,
-                      padding: '1px 5px', fontSize: 11, fontWeight: 600, color: gps.border,
-                    }}>
-                      🌍{gps.arrow} {m.globalPhaseName}
-                    </span>
-                  )}
-                  {m.chinaPhaseName && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 2,
-                      background: cps.bg, border: `1px solid ${cps.border}`, borderRadius: 3,
-                      padding: '1px 5px', fontSize: 11, fontWeight: 600, color: cps.border,
-                    }}>
-                      🇨🇳{cps.arrow} {m.chinaPhaseName}
-                    </span>
-                  )}
-                </div>
-              }
+              detail={`${m.detail || ''}${m.globalPhaseName ? ` | 🌍${gps.arrow}${m.globalPhaseName}` : ''}${m.chinaPhaseName ? ` | 🇨🇳${cps.arrow}${m.chinaPhaseName}` : ''}`}
             />
           );
         })}

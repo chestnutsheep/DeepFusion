@@ -18,11 +18,12 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
   const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
   const display = value != null ? (typeof value === 'number' ? value.toFixed(decimals) : value) : '—';
 
-  // 先行/滞后/同步 标签颜色
-  const srcStyle = source === '先行' ? { bg: 'rgba(91,186,87,0.12)', c: '#5bba57', bd: 'rgba(91,186,87,0.25)' }
-    : source === '滞后' ? { bg: 'rgba(248,81,73,0.12)', c: '#f85149', bd: 'rgba(248,81,73,0.25)' }
-    : source === '同步' ? { bg: 'rgba(212,168,83,0.12)', c: '#D4A853', bd: 'rgba(212,168,83,0.25)' }
-    : { bg: 'rgba(136,136,136,0.08)', c: 'var(--text-muted)', bd: 'rgba(136,136,136,0.15)' };
+  // 先行/滞后/同步 标签 — 极简小点
+  const srcDot = source === '先行' ? '#5bba57'
+    : source === '滞后' ? '#f85149'
+    : source === '同步' ? '#D4A853'
+    : source === '综合' ? '#58a6ff'
+    : null;
 
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
@@ -39,29 +40,25 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         ref={refs.setReference}
         {...getReferenceProps()}
         hoverable={!!detail}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-sm)' }}
+        style={{ padding: 'var(--sp-md) var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 2 }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-xs)' }}>
-          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-secondary)' }}>{label}</span>
+        {/* 标签行：名称 + 来源小点 + tooltip */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 20 }}>
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
+          {srcDot && (
+            <span title={source} style={{
+              width: 6, height: 6, borderRadius: '50%', background: srcDot, flexShrink: 0,
+              boxShadow: `0 0 4px ${srcDot}55`,
+            }} />
+          )}
           {tooltip && <TooltipIcon content={tooltip} position="top" />}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--sp-xs)' }}>
-          <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: valueColor }}>{display}</span>
-          {unit && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{unit}</span>}
-          {arrow && <span style={{ fontSize: 'var(--fs-md)', color: arrowColor, marginLeft: 2 }}>{arrow}</span>}
+        {/* 数值行 */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{ fontSize: 'var(--fs-lg)', fontWeight: 800, color: valueColor, lineHeight: 1.2 }}>{display}</span>
+          {unit && <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', fontWeight: 500 }}>{unit}</span>}
+          {arrow && <span style={{ fontSize: 'var(--fs-xs)', color: arrowColor, fontWeight: 700 }}>{arrow}</span>}
         </div>
-        {(detail || source) && (
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-xs)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{detail}</span>
-            {source && (
-              <span style={{
-                padding: '2px var(--sp-sm)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-2xs)', fontWeight: 600,
-                background: srcStyle.bg, color: srcStyle.c, border: `1px solid ${srcStyle.bd}`,
-                whiteSpace: 'nowrap',
-              }}>{source}</span>
-            )}
-          </div>
-        )}
       </CardWrapper>
       {isOpen && detail && (
         <div ref={refs.setFloating} style={{ ...floatingStyles, background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius)', padding: 'var(--sp-md) var(--sp-lg)', maxWidth: 280, fontSize: 'var(--fs-sm)', lineHeight: 1.5, color: 'var(--text-secondary)', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }} {...getFloatingProps()}>

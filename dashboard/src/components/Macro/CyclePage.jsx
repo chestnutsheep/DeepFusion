@@ -1,11 +1,10 @@
 import {useMemo} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
-import DataCard from '../common/DataCard.jsx';
 import DataGrid from '../common/DataGrid.jsx';
 import StatusBar from '../common/StatusBar.jsx';
+import PhaseWheel from '../common/PhaseWheel.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
-import TooltipIcon from '../common/TooltipIcon.jsx';
 
 // 所有图表默认显示全量数据的后 1/5
 const DEFAULT_WINDOW = { start: 80, end: 100 };
@@ -44,40 +43,6 @@ function fillLatestMetrics(rows, keys) {
     }
   }
   return result;
-}
-
-/** 历史拐点标记渲染组件 */
-function TurningPointMarkers({ chartData, turningPoints }) {
-  if (!turningPoints?.length || !chartData?.length) return null;
-  // 找到数据中对应的年份位置
-  const markers = turningPoints
-    .map(tp => {
-      const idx = chartData.findIndex(r => {
-        const p = r.period || '';
-        return p.startsWith(String(tp.year)) || p === String(tp.year);
-      });
-      return idx >= 0 ? { ...tp, idx } : null;
-    })
-    .filter(Boolean);
-  if (!markers.length) return null;
-
-  return (
-    <div style={{ marginTop: 'var(--sp-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-sm)' }}>
-      {markers.map((m, i) => (
-        <div key={i} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-2xs)',
-          padding: '3px var(--sp-sm)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-xs)',
-          background: m.type === 'peak' ? 'rgba(248,81,73,0.12)' : 'rgba(91,186,87,0.12)',
-          border: `1px solid ${m.type === 'peak' ? '#f85149' : '#5bba57'}`,
-          color: m.type === 'peak' ? '#f85149' : '#5bba57',
-          fontWeight: 600,
-        }}>
-          {m.type === 'peak' ? '▼' : '▲'} {m.year} {m.label}
-          <TooltipIcon content={m.detail} position="top" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export default function CyclePage({ config, showTitle, tableIndex }) {
@@ -149,28 +114,41 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
   return (
     <div>
       {showTitle && <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>{showTitle}</h2>}
-      <StatusBar phase={phaseName} period={latest.period} />
 
-      {/* 相位醒目标签 */}
-      {phaseValue > 0 && (
-        <div style={{ marginTop: 'var(--sp-md)', marginBottom: 'var(--sp-lg)' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-xs)',
-            background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 'var(--radius-sm)',
-            padding: '4px var(--sp-md)', fontSize: 'var(--fs-md)', fontWeight: 700, color: badge.color,
-            letterSpacing: 1,
-          }}>
-            {badge.icon} {phaseName}
-            {latest.confidence != null && (
-              <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 400, color: 'var(--text-muted)', marginLeft: 'var(--sp-xs)' }}>
-                置信度 {(latest.confidence * 100).toFixed(0)}%
-              </span>
+      {/* 相位概览：PhaseWheel + 关键指标 */}
+      <CardWrapper style={{ padding: 'var(--sp-lg) var(--sp-xl)', marginBottom: 'var(--sp-lg)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-xl)', flexWrap: 'wrap' }}>
+          <PhaseWheel phase={phaseValue} phaseName={phaseName} cycleName={config.title} size={160} />
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <StatusBar phase={phaseName} period={latest.period} />
+            {/* 相位详情行 */}
+            {phaseValue > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 'var(--radius-sm)',
+                  padding: '4px 14px', fontSize: 'var(--fs-md)', fontWeight: 700, color: badge.color,
+                  letterSpacing: 0.5,
+                }}>
+                  {badge.icon} {phaseName}
+                </span>
+                {latest.confidence != null && (
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+                    置信度 <b style={{ color: 'var(--accent-gold)' }}>{(latest.confidence * 100).toFixed(0)}%</b>
+                  </span>
+                )}
+                {latest.dominant_period != null && (
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+                    主周期 <b style={{ color: 'var(--text-primary)' }}>{latest.dominant_period.toFixed(1)}年</b>
+                  </span>
+                )}
+              </div>
             )}
-          </span>
+          </div>
         </div>
-      )}
+      </CardWrapper>
 
-      {/* 主内容区：根据指标数量N动态布局 */}
+      {/* 主内容区：图表全宽 + 指标卡下方横排 */}
       {(() => {
         const N = metrics.length;
         // 公共图表内容
@@ -180,7 +158,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
             transition: 'all 0.25s ease',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-md)' }}>
-              <h3 style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--accent-gold)' }}>
+              <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--accent-gold)', fontFamily: "'Microsoft YaHei', sans-serif" }}>
                 {chartTitle}
               </h3>
               <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
@@ -194,9 +172,8 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
               height={chartHeight}
               zoomStart={DEFAULT_WINDOW.start}
               zoomEnd={DEFAULT_WINDOW.end}
+              annotations={config.turningPoints}
             />
-            {/* 历史拐点标记 */}
-            <TurningPointMarkers chartData={rows} turningPoints={config.turningPoints} />
           </CardWrapper>
         );
 
@@ -204,44 +181,15 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
           return <div style={{ marginBottom: 'var(--sp-2xl)' }}>{chartContent}</div>;
         }
 
-        const isOdd = N % 2 === 1;
-        const n = Math.floor(N / 2);
-
-        if (isOdd) {
-          // N=2n+1：主图表全宽 + 指标卡下方一字排开
-          return (
-            <div style={{ marginBottom: 'var(--sp-2xl)' }}>
-              {chartContent}
-              <div style={{ marginTop: 'var(--sp-lg)' }}>
-                <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={N} gap="var(--sp-md)" />
-              </div>
-            </div>
-          );
-        }
-
-        // N=2n：主图表居中 + 左右各n张指标卡，自然高度、均匀分布
-        const sideWidth = n <= 2 ? '18%' : '16%';
-
-        // 渲染侧边指标卡的辅助函数
-        const renderSideCards = (cardConfigs) => cardConfigs.map((cfg, i) => {
-          let value = metricsLatest[cfg.key];
-          if (cfg.transform && value != null) value = cfg.transform(value);
-          return <DataCard key={i} {...cfg} value={value} prevValue={prev[cfg.key]} />;
-        });
+        // 统一布局：图表全宽 + 指标卡下方网格
+        // 列数：≤4张用4列，5-6张用3列，>6张用4列
+        const gridCols = N <= 4 ? N : N <= 6 ? 3 : 4;
 
         return (
-          <div style={{ display: 'flex', gap: 'var(--sp-lg)', marginBottom: 'var(--sp-2xl)', alignItems: 'stretch' }}>
-            {/* 左侧指标卡 */}
-            <div style={{ width: sideWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: 'var(--sp-md)' }}>
-              {renderSideCards(metrics.slice(0, n))}
-            </div>
-            {/* 主图表 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {chartContent}
-            </div>
-            {/* 右侧指标卡 */}
-            <div style={{ width: sideWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', gap: 'var(--sp-md)' }}>
-              {renderSideCards(metrics.slice(n))}
+          <div style={{ marginBottom: 'var(--sp-2xl)' }}>
+            {chartContent}
+            <div style={{ marginTop: 'var(--sp-lg)' }}>
+              <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={gridCols} gap="var(--sp-md)" />
             </div>
           </div>
         );

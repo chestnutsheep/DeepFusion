@@ -1,10 +1,7 @@
 import json
 import logging
-import os
 import sqlite3
-import time
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 
@@ -12,6 +9,8 @@ from .shared.constants import DATA_LAKE_FILE
 
 _LOGGER = logging.getLogger(__name__)
 
+# TTL 已废弃——data_lake 永不过期，历史宏观数据入库后持久保存，手动/定时重采覆盖。
+# 保留 _INDICATOR_TTL 仅供 get_stats() 参考展示信息用。
 _INDICATOR_TTL = {
     "CPI": 35,
     "PPI": 35,
@@ -122,12 +121,11 @@ def query(indicator: str, limit: int = 0) -> pd.DataFrame | None:
 
 
 def has_data(indicator: str, max_age_days: int | None = None) -> bool:
-    ttl = max_age_days or _INDICATOR_TTL.get(indicator, 90)
+    """检查指标是否有数据。永不过期——历史宏观数据不变，手动重采覆盖。"""
     conn = _get_conn()
     cursor = conn.execute(
-        "SELECT COUNT(*) FROM macro_data WHERE indicator = ? "
-        "AND fetched_at >= datetime('now', ?)",
-        (indicator, f"-{ttl} days"),
+        "SELECT COUNT(*) FROM macro_data WHERE indicator = ?",
+        (indicator,),
     )
     count = cursor.fetchone()[0]
     conn.close()

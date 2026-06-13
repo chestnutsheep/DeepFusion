@@ -110,6 +110,19 @@ CREATE TABLE IF NOT EXISTS meso_sw_classify (
     dividend_yield REAL
 );
 
+CREATE TABLE IF NOT EXISTS meso_spot_quotes (
+    stock_code TEXT PRIMARY KEY,
+    stock_name TEXT,
+    price REAL,
+    change_pct REAL,
+    turnover REAL,
+    pe_dynamic REAL,
+    pb REAL,
+    total_mv REAL,
+    circ_mv REAL,
+    collected_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_daily_code_date ON meso_industry_daily(industry_code, trade_date);
 CREATE INDEX IF NOT EXISTS idx_daily_date ON meso_industry_daily(trade_date);
 """
@@ -346,36 +359,90 @@ def get_fund_flow(limit: int = 20) -> pd.DataFrame:
     return df
 
 
+# ── 全A实时行情快照 ──────────────────────────────────
+
+
+def save_spot_quotes(df: pd.DataFrame):
+    """保存全A实时行情快照（来自 stock_zh_a_spot_em）。
+
+    每次全量覆盖：先清空旧数据再插入新数据。
+    """
+    # 列映射: akshare 中文列名 → SQLite 英文列名
+    rename = {
+        "代码": "stock_code",
+        "名称": "stock_name",
+        "最新价": "price",
+        "涨跌幅": "change_pct",
+        "换手率": "turnover",
+        "市盈率-动态": "pe_dynamic",
+        "市净率": "pb",
+        "总市值": "total_mv",
+        "流通市值": "circ_mv",
+    }
+    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+    keep_cols = [c for c in ["stock_code", "stock_name", "price", "change_pct",
+                              "turnover", "pe_dynamic", "pb", "total_mv", "circ_mv"]
+                 if c in df.columns]
+    df = df[keep_cols]
+
+    conn = _connect()
+    conn.execute("DELETE FROM meso_spot_quotes")
+    now = datetime.now().isoformat()
+    rows = 0
+    for _, r in df.iterrows():
+        conn.execute(
+            """INSERT INTO meso_spot_quotes
+               (stock_code, stock_name, price, change_pct, turnover, pe_dynamic, pb, total_mv, circ_mv, collected_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                str(r.get("stock_code", "")).strip(),
+                r.get("stock_name"),
+                r.get("price"),
+                r.get("change_pct"),
+                r.get("turnover"),
+                r.get("pe_dynamic"),
+                r.get("pb"),
+                r.get("total_mv"),
+                r.get("circ_mv"),
+                now,
+            ),
+        )
+        rows += 1
+    conn.commit()
+    _log_collection("meso_spot_quotes", rows)
+    conn.close()
+    return rows
+
+
+def get_spot_quotes(codes: list[str] | None = None) -> pd.DataFrame:
+    """获取全A行情快照。codes 非空时只返回指定股票代码的数据。"""
+    conn = _connect()
+    if codes:
+        placeholders = ",".join("?" * len(codes))
+        df = pd.read_sql_query(
+            f"SELECT * FROM meso_spot_quotes WHERE stock_code IN ({placeholders})",
+            conn, params=codes,
+        )
+    else:
+        df = pd.read_sql_query("SELECT * FROM meso_spot_quotes", conn)
+    conn.close()
+    return df
+
+
 # ── 缓存状态 ──────────────────────────────────────────
 
 
 def has_recent_data(table: str, max_age_hours: int = 24) -> bool:
-    """检查表是否有最近采集数据。"""
+    """检查表是否有数据。永不过期——行业数据入库后持久保存，手动重采覆盖。"""
     conn = _connect()
-    # 兼容新旧表结构
     try:
-        row = conn.execute(
-            "SELECT MAX(collected_at) FROM collection_meta WHERE table_name=? AND status='ok'",
-            (table,),
-        ).fetchone()
-    except sqlite3.OperationalError:
-        # 旧表: 用 section_name 代替 table_name
-        try:
-            row = conn.execute(
-                "SELECT MAX(collected_at) FROM collection_meta WHERE section_name=? AND status='ok'",
-                (table,),
-            ).fetchone()
-        except sqlite3.OperationalError:
-            conn.close()
-            return False
+        cnt = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    except Exception:
+        # 兼容 collection_meta 不存在的情况
+        conn.close()
+        return False
     conn.close()
-    if row and row[0]:
-        try:
-            last = datetime.fromisoformat(row[0])
-            return (datetime.now() - last).total_seconds() < max_age_hours * 3600
-        except Exception:
-            pass
-    return False
+    return cnt > 0
 
 
 def get_cache_stats() -> dict[str, Any]:
@@ -388,6 +455,7 @@ def get_cache_stats() -> dict[str, Any]:
         "meso_industry_fund_flow",
         "meso_industry_financial",
         "meso_sw_classify",
+        "meso_spot_quotes",
     ]
     stats = {}
     for t in tables:

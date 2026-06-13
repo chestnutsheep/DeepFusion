@@ -31,6 +31,28 @@ from ..data.sources.nbs_client import (
     _fetch_nbs_capacity_util, _fetch_house_price_yoy,
 )
 
+# ── PMI / M2 拉取函数（data_lake-first + akshare 回退） ──
+
+def _fetch_pmi():
+    """PMI 月度数据 → (periods, values) 供 CycleEngine 使用"""
+    import akshare as ak
+    from .macro import _fetch_with_priority
+    from ..analysis.macro.cycles.engine import _parse_ak
+    df, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=0)
+    if df is None or df.empty:
+        return [], []
+    return _parse_ak(df, "制造业-指数")
+
+def _fetch_m2_yoy():
+    """M2 同比增速 → (periods, values) 供 CycleEngine 使用"""
+    import akshare as ak
+    from .macro import _fetch_with_priority
+    from ..analysis.macro.cycles.engine import _parse_ak
+    df, _ = _fetch_with_priority("M2", ak.macro_china_m2_yearly, limit=0)
+    if df is None or df.empty:
+        return [], []
+    return _parse_ak(df, "今值")
+
 # ── FN_MAP — _nbs() 延迟解析用 ──────────────────────────
 _FN_MAP: dict[str, Any] = {
     "fetch_nbs_inventory_yoy": _fetch_nbs_inventory_yoy,
@@ -62,6 +84,9 @@ _FN_MAP: dict[str, Any] = {
     "fetch_re_new_start": _fetch_nbs_re_new_start,
     "fetch_capacity_util": _fetch_nbs_capacity_util,
     "fetch_house_price": _fetch_house_price_yoy,
+    # PMI / M2 — data_lake-first 拉取
+    "fetch_pmi": _fetch_pmi,
+    "fetch_m2_yoy": _fetch_m2_yoy,
 }
 
 # ============================================================

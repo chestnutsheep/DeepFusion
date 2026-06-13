@@ -1,7 +1,9 @@
 """行业 MCP 工具 — 数据源: 同花顺(ths) + 巨潮(cninfo)，零东方财富依赖。"""
 
+import akshare as ak
 from pydantic import Field
 
+from ..cache import ak_cache
 from ..data.sources import caixin_indices as caixin
 from ..data.sources import industry_cninfo as cninfo
 from ..data.sources import industry_collector as collector
@@ -174,6 +176,17 @@ def industry_collect() -> str:
         results.append(f"申万分级: {sw_total} 条 (一级/二级/三级)")
     except Exception as e:
         errors.append(f"申万分级采集失败: {e}")
+
+    # 6. 全A实时行情快照（供成分股 PE/PB 查询）
+    try:
+        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
+        if spot is not None and not spot.empty:
+            rows = db.save_spot_quotes(spot)
+            results.append(f"全A行情快照: {rows} 条")
+        else:
+            errors.append("全A行情快照: stock_zh_a_spot_em 返回空")
+    except Exception as e:
+        errors.append(f"全A行情快照采集失败: {e}")
 
     stats = db.get_cache_stats()
     lines = ["=== 行业数据采集报告 ==="]

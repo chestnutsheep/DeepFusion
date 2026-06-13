@@ -200,8 +200,8 @@ def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
 
     数据流：
       1. get_constituents() → [stock_code, stock_name, weight, added_date]
-      2. stock_zh_a_spot_em → 全A实时行情（含涨跌幅）
-      3. LEFT JOIN on stock_code → 补充 change_pct / price / turnover 等
+      2. 优先从 SQLite meso_spot_quotes 读行情 → 无数据时 fallback 到 akshare stock_zh_a_spot_em
+      3. LEFT JOIN on stock_code → 补充 change_pct / price / turnover / pe_dynamic / pb
 
     Args:
         industry_code: 申万指数代码，如 "801010"(一级) "801011"(二级) "850111"(三级)
@@ -216,40 +216,51 @@ def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
     if cons.empty:
         return pd.DataFrame()
 
-    # Step 2: 全A实时行情（长期缓存 86400s — 成分股下钻场景不需要秒级更新）
-    spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
-    if spot is None or spot.empty:
-        # 无行情时仅返回成分股基础信息
-        cons = cons.copy()
-        cons["change_pct"] = pd.NA
-        cons["price"] = pd.NA
-        cons["turnover"] = pd.NA
-        cons["pe_dynamic"] = pd.NA
-        cons["pb"] = pd.NA
-        return cons.sort_values("weight", ascending=False).reset_index(drop=True)
+    # Step 2a: 优先从 SQLite meso_spot_quotes 读行情快照
+    codes = cons["stock_code"].astype(str).str.strip().tolist()
+    spot_renamed = db.get_spot_quotes(codes)
 
-    # Step 3: 行情列重命名
-    spot_renamed = spot.rename(columns={
-        "代码": "stock_code",
-        "最新价": "price",
-        "涨跌幅": "change_pct",
-        "换手率": "turnover",
-        "市盈率-动态": "pe_dynamic",
-        "市净率": "pb",
-    })
+    # Step 2b: SQLite 无数据时，fallback 到 akshare 实时 API
+    if spot_renamed.empty:
+        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
+        if spot is None or spot.empty:
+            # 无行情时仅返回成分股基础信息
+            cons = cons.copy()
+            cons["change_pct"] = pd.NA
+            cons["price"] = pd.NA
+            cons["turnover"] = pd.NA
+            cons["pe_dynamic"] = pd.NA
+            cons["pb"] = pd.NA
+            return cons.sort_values("weight", ascending=False).reset_index(drop=True)
+
+        # 行情列重命名
+        spot_renamed = spot.rename(columns={
+            "代码": "stock_code",
+            "最新价": "price",
+            "涨跌幅": "change_pct",
+            "换手率": "turnover",
+            "市盈率-动态": "pe_dynamic",
+            "市净率": "pb",
+        })
+
+        # 同时存入 SQLite，下次直接命中
+        try:
+            db.save_spot_quotes(spot)
+        except Exception:
+            pass
 
     # 只保留需要的列
     quote_cols = ["stock_code", "price", "change_pct", "turnover", "pe_dynamic", "pb"]
     spot_renamed = spot_renamed[[c for c in quote_cols if c in spot_renamed.columns]]
 
-    # Step 4: LEFT JOIN
+    # Step 3: LEFT JOIN
     # 确保成分股 stock_code 为纯6位数字（去市场前缀）
     cons = cons.copy()
     cons["stock_code"] = cons["stock_code"].astype(str).str.strip()
 
     merged = cons.merge(spot_renamed, on="stock_code", how="left")
 
-    # Step 5: 排序 — 权重降序
+    # Step 4: 排序 — 权重降序
     merged = merged.sort_values("weight", ascending=False).reset_index(drop=True)
 
     return merged

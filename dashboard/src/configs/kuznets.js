@@ -17,18 +17,18 @@ export const KUZNETS_CONFIG = {
   ],
   metrics: [
     // ── 房价侧（核心驱动） ──
-    { key: 'house_price_yoy', label: '🏠 房价同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 'house_price_yoy', label: '房价同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '70大中城市新建住宅价格同比（核心权重0.5）。>0房价上涨→周期向上。此为最直观的房地产周期温度计，直接反映市场热度。注意：70城指数统计方法2011年起有调整，前后期不完全可比。',
       source: '同步' },
     // ── 量侧（先行指标） ──
-    { key: 'sales_yoy', label: '📈 销售面积同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 'sales_yoy', label: '销售面积同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '商品房销售面积同比增速（辅助权重0.2，先行指标）。领先房价6-12个月，反映购房需求热度。注意：此为面积增速而非金额，受成交结构影响。',
       source: '先行' },
-    { key: 'new_start_yoy', label: '📈 新开工同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 'new_start_yoy', label: '新开工同比', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '房屋新开工面积同比增速（辅助权重0.2）。领先房地产投资约6-12个月，是开发商预期的前瞻指标。注意：开工到竣工约2-3年，新开工变化影响远期供给。',
       source: '先行' },
     // ── 投资侧（滞后指标） ──
-    { key: 're_yoy', label: '🏗️ 房地产开发投资', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 're_yoy', label: '房地产开发投资', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '房地产开发投资完成额同比增速（辅助权重0.1，滞后指标）。反映已开工项目的施工强度，滞后销售6-12个月。注意：含土地购置费，非纯建安投资。',
       source: '滞后' },
   ],

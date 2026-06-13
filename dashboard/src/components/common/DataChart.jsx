@@ -28,10 +28,12 @@ echarts.registerTheme('df-dark', {
  * @param {boolean} zoom       是否启用滚轮缩放+拖拽
  * @param {number} zoomStart   dataZoom 初始 start 百分比
  * @param {number} zoomEnd     dataZoom 初始 end 百分比
+ * @param {object[]} annotations 拐点标注 [{ year, type:'peak'|'trough', label, detail }]
  */
 export default function DataChart({
   data, series, dateKey = 'period', height = 400,
   zoom = true, zoomStart = 80, zoomEnd = 100,
+  annotations,
 }) {
   const chartRef = useRef(null);
   useEffect(() => {
@@ -55,22 +57,98 @@ export default function DataChart({
               splitLine: { show: false } },
           ]
         : { type: 'value' },
-      series: series.map(s => ({
-        name: s.name,
-        type: s.type || 'line',
-        data: data.map(r => r[s.key]),
-        smooth: true,
-        connectNulls: true,
-        lineStyle: { color: s.color, width: 2 },
-        areaStyle: s.type !== 'bar'
-          ? { opacity: 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
-            ]) }
-          : undefined,
-        itemStyle: s.type === 'bar' ? { color: s.color } : undefined,
-        symbol: 'none',
-        ...(s.yAxisIndex != null ? { yAxisIndex: s.yAxisIndex } : {}),
-      })),
+      series: series.map((s, sIdx) => {
+        const entry = {
+          name: s.name,
+          type: s.type || 'line',
+          data: data.map(r => r[s.key]),
+          smooth: true,
+          connectNulls: true,
+          lineStyle: { color: s.color, width: 2 },
+          areaStyle: s.type !== 'bar'
+            ? { opacity: 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
+              ]) }
+            : undefined,
+          itemStyle: s.type === 'bar' ? { color: s.color } : undefined,
+          symbol: 'none',
+          ...(s.yAxisIndex != null ? { yAxisIndex: s.yAxisIndex } : {}),
+        };
+        // 只在第一个系列上添加拐点标注
+        if (sIdx === 0 && annotations?.length) {
+          const dates = data.map(r => r[dateKey]);
+          const markLineData = [];
+          const markPointData = [];
+          for (const ann of annotations) {
+            const yearStr = String(ann.year);
+            // 找到最匹配的 x 轴值（以年份开头的 period）
+            const matchIdx = dates.findIndex(d => {
+              const ds = String(d);
+              return ds.startsWith(yearStr) || ds === yearStr;
+            });
+            if (matchIdx < 0) continue;
+            const xVal = dates[matchIdx];
+            const yVal = data[matchIdx]?.[s.key];
+            if (yVal == null || isNaN(yVal)) continue;
+            const isPeak = ann.type === 'peak';
+            const color = isPeak ? '#f85149' : '#5bba57';
+            // markLine：垂直虚线
+            markLineData.push({
+              xAxis: xVal,
+              label: {
+                show: true,
+                formatter: `${isPeak ? '▼' : '▲'} ${ann.year} ${ann.label}`,
+                color,
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: 'Microsoft YaHei, sans-serif',
+                position: 'insideEndTop',
+                rotate: 0,
+              },
+              lineStyle: {
+                color,
+                type: 'dashed',
+                width: 1.2,
+                opacity: 0.55,
+              },
+            });
+            // markPoint：数据点上的标记
+            markPointData.push({
+              coord: [xVal, yVal],
+              symbol: isPeak ? 'path://M0,0L6,-10L-6,-10Z' : 'path://M0,0L6,10L-6,10Z',
+              symbolSize: 16,
+              itemStyle: { color },
+              label: { show: false },
+              // 自定义 tooltip
+              _annDetail: ann.detail,
+              _annLabel: `${isPeak ? '▼' : '▲'} ${ann.year} ${ann.label}`,
+            });
+          }
+          if (markLineData.length) {
+            entry.markLine = {
+              silent: false,
+              animation: false,
+              symbol: 'none',
+              data: markLineData,
+            };
+          }
+          if (markPointData.length) {
+            entry.markPoint = {
+              animation: false,
+              data: markPointData,
+              tooltip: {
+                formatter: (params) => {
+                  const d = params.data;
+                  return d?._annLabel
+                    ? `<div style="font-weight:700;margin-bottom:4px">${d._annLabel}</div><div style="font-size:12px;opacity:.85;max-width:240px;line-height:1.5">${d._annDetail || ''}</div>`
+                    : '';
+                },
+              },
+            };
+          }
+        }
+        return entry;
+      }),
     };
     if (zoom) {
       option.dataZoom = [
@@ -93,6 +171,6 @@ export default function DataChart({
     }
     chart.setOption(option);
     return () => chart.dispose();
-  }, [data, series, dateKey, zoom, zoomStart, zoomEnd]);
+  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations]);
   return <div ref={chartRef} style={{ width: '100%', height }} />;
 }

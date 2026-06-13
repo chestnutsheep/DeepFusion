@@ -146,8 +146,23 @@ class IndicatorDef:
         if self.fetch_fn:
             self._cache = self.fetch_fn()
         elif self.akshare_fn:
+            # DB-first: 先查 cycle_data.db，有数据直接返回，不重复拉 akshare
+            from ....shared.cycle_db import get as db_get, set as db_set
+            db_data = db_get(self.key)
+            if db_data is not None and not db_data.empty:
+                dates = db_data["date"].astype(str).tolist()
+                vals = [float(v) if v is not None else None for v in db_data["value"]]
+                self._cache = dates, vals
+                return self._cache
+            # DB 无数据，走 akshare
             df, col = _ak_safe(self.akshare_fn, self.akshare_col or "")
-            self._cache = _parse_ak(df, col)
+            periods, values = _parse_ak(df, col)
+            if periods:
+                try:
+                    db_set(self.key, periods, values)
+                except Exception:
+                    pass
+            self._cache = periods, values
         else:
             self._cache = [], []
         return self._cache

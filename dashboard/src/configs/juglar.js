@@ -16,21 +16,21 @@ export const JUGLAR_CONFIG = {
   ],
   metrics: [
     // ── 投资侧（核心驱动） ──
-    { key: 'fix_inv_yoy', label: '📈 固定资产投资', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 'fix_inv_yoy', label: '固定资产投资', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '固定资产投资完成额累计同比增速（同步指标）。反映企业资本开支意愿，朱格拉周期的核心观测变量。',
       source: '同步' },
-    { key: 'equip_yoy', label: '📈 设备工器具购置', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
+    { key: 'equip_yoy', label: '设备工器具购置', unit: '%', dir: true, card: true, decimals: 1, higherBetter: true,
       tooltip: '设备工器具购置投资同比增速（核心权重0.4）。直接衡量设备更新周期强度，朱格拉最敏感指标。',
       source: '先行' },
-    { key: 'manufacturing_yoy', label: '📈 制造业投资', unit: '%', dir: false, card: true, decimals: 1, higherBetter: true,
+    { key: 'manufacturing_yoy', label: '制造业投资', unit: '%', dir: false, card: true, decimals: 1, higherBetter: true,
       tooltip: '制造业固定资产投资同比增速（辅助权重0.25）。设备更新和扩产的核心领域，投资周期风向标。',
       source: '同步' },
     // ── 产能侧 ──
-    { key: 'capacity_util', label: '📊 产能利用率', unit: '%', dir: false, card: true, decimals: 1, higherBetter: true,
+    { key: 'capacity_util', label: '产能利用率', unit: '%', dir: false, card: true, decimals: 1, higherBetter: true,
       tooltip: '工业企业产能利用率（季度，辅助权重0.2）。>75%产能偏紧→投资扩张动力强，<73%产能过剩→投资收缩。',
       source: '滞后' },
     // ── 综合判定 ──
-    { key: 'comp_z', label: '🔬 综合Z值', unit: '', dir: true, card: true, decimals: 4, higherBetter: true,
+    { key: 'comp_z', label: '综合Z值', unit: '', dir: true, card: true, decimals: 4, higherBetter: true,
       tooltip: '朱格拉周期综合Z值，由设备投资(0.4)+制造业固投(0.25)+固投总量(0.15)+产能利用率(0.2)标准化后加权合成。>0投资景气上行。',
       source: '综合' },
   ],

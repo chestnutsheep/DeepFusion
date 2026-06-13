@@ -58,8 +58,8 @@
 }
 [data-theme="crepuscule"] {
   --bg-r: 15; --bg-g: 26; --bg-b: 46;
-  --bg-panel: rgb(22 41 80 / 0.4); --bg-panel-hover: rgb(36 56 93 / 0.6);
-  --bg-sidebar: rgba(15,26,46,0.98); --bg-sidebar-gradient: linear-gradient(180deg, rgba(15,26,46,0.97), rgba(25,40,70,0.95));
+  --bg-panel: rgb(22 41 80 / 0.75); --bg-panel-hover: rgb(36 56 93 / 0.85);
+  --bg-sidebar: rgb(21 31 51 / 0.98); --bg-sidebar-gradient: linear-gradient(180deg, rgb(29 40 66 / 0.97), rgba(25,40,70,0.95));
   --border-subtle: rgba(180,140,100,0.15); --text-primary: #E0D8C8; --text-secondary: #A09888; --text-muted: #938B81;
   --shadow-glow: rgba(180,140,100,0.10);
   --bg-img: url('../assets/crepuscule.JPEG');

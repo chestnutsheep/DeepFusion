@@ -40,8 +40,8 @@ CYCLES: dict[str, CycleConfig] = {
             _nbs("fetch_ind_yoy", "demand_yoy"),
             _nbs("fetch_inventory_yoy", "inventory_yoy"),
             _nbs("fetch_fix_inv_monthly", "fix_inv_yoy"),
-            IndicatorDef(key="pmi", akshare_fn="macro_china_pmi", akshare_col="制造业采购经理人指数"),
-            IndicatorDef(key="m2_yoy", akshare_fn="macro_china_m2_yearly", akshare_col="货币供应量同比增速"),
+            _nbs("fetch_pmi", "pmi"),
+            _nbs("fetch_m2_yoy", "m2_yoy"),
         ],
         core_key="inventory_yoy", requires=["demand_yoy"], ma_window=3,
         classify_fn=_classify_kitchin,
@@ -56,8 +56,8 @@ CYCLES: dict[str, CycleConfig] = {
             _nbs("fetch_fix_inv_monthly", "fix_inv_yoy"),         # 辅助 0.15
             _nbs("fetch_capacity_util", "capacity_util"),         # 辅助 0.2
             _nbs("fetch_ind_yoy", "ind_yoy"),
-            IndicatorDef(key="ppi_yoy", akshare_fn="macro_china_ppi", akshare_col="工业生产者出厂价格指数"),
-            IndicatorDef(key="pmi", akshare_fn="macro_china_pmi", akshare_col="制造业采购经理人指数"),
+            IndicatorDef(key="ppi_yoy", akshare_fn="macro_china_ppi", akshare_col="当月同比增长"),
+            _nbs("fetch_pmi", "pmi"),
         ],
         core_key="fix_inv_yoy", requires=["manufacturing_yoy", "fix_inv_yoy"], ma_window=6,
         classify_fn=_classify_juglar,
@@ -71,7 +71,7 @@ CYCLES: dict[str, CycleConfig] = {
             _nbs("fetch_re_sales_area", "sales_yoy"),             # 辅助 0.2
             _nbs("fetch_re_new_start", "new_start_yoy"),          # 辅助 0.2
             _nbs("fetch_re_dev_yoy", "re_yoy"),                   # 辅助 0.1
-            IndicatorDef(key="pmi", akshare_fn="macro_china_pmi", akshare_col="制造业采购经理人指数"),
+            _nbs("fetch_pmi", "pmi"),
         ],
         core_key="house_price_yoy", requires=["sales_yoy", "re_yoy"], ma_window=6,
         classify_fn=_classify_kuznets,
