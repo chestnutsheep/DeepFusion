@@ -10,5 +10,6 @@
     </content>
     <orderEntry type="jdk" jdkName="uv (DeepFusion)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="deep-fusion" />
   </component>
 </module>

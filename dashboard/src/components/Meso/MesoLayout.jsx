@@ -220,6 +220,16 @@ const CATEGORY_CONFIG = {
   custom:    { label: '⭐ 自选',   names: null,             accent: '#9B7EC8', desc: '自选行业热力图' },
 };
 
+// ── 自选组合持久化 ──
+const COMBO_STORAGE_KEY = 'meso_saved_combos';
+const COMBO_COLORS = ['#C47B7B', '#7BAAC4', '#7BC47B', '#C4A87B', '#A87BC4', '#7BC4B8', '#C47BA8', '#B8C47B'];
+function loadSavedCombos() {
+  try { return JSON.parse(localStorage.getItem(COMBO_STORAGE_KEY) || '[]'); } catch { return []; }
+}
+function persistCombos(combos) {
+  localStorage.setItem(COMBO_STORAGE_KEY, JSON.stringify(combos));
+}
+
 // ── 强周期行业的三周期映射 ──
 // 基钦(库存)周期：上游原材料(钢铁/采掘，价格随库存波动) + 产成品库存(汽车/非银/综合)
 // 朱格拉(设备投资)周期：机械设备(Capex周期核心载体)
@@ -685,6 +695,81 @@ function IndustryPicker({ allIndustries, selectedNames, onToggle, level, setLeve
 /** 行业热力图 — 纯图表渲染（控制栏由父组件渲染） */
 function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, activeCategory, displayDays, drillTarget, setDrillTarget, customLevel }) {
   const chartRef = useRef(null);
+  const [cycleTooltip, setCycleTooltip] = useState(null);
+
+  // 强周期模式：请求三周期数据，用于信号灯标记
+  const isCyclical = activeCategory === 'cyclical';
+  const { data: kitchinRaw } = useMCP('data_kitchin', isCyclical ? {} : null);
+  const { data: juglarRaw }  = useMCP('data_juglar', isCyclical ? {} : null);
+  const { data: kuznetsRaw } = useMCP('data_kuznets', isCyclical ? {} : null);
+
+  // 相位→颜色（与原来 CyclePhasePanel 一致）
+  const phaseColor = (name) => {
+    if (!name) return '#888';
+    if (['主动补库', '繁荣', '主动补库存'].includes(name)) return '#E85050';
+    if (['被动去库', '复苏', '被动去库存'].includes(name)) return '#D4A853';
+    if (['被动补库', '衰退', '被动补库存'].includes(name)) return '#7B8FA8';
+    if (['主动去库', '萧条', '主动去库存'].includes(name)) return '#3DBB6E';
+    return '#888';
+  };
+  // 相位→rich text 标签名
+  const phaseTag = (name) => {
+    if (!name) return 'dotUnknown';
+    if (['主动补库', '繁荣', '主动补库存'].includes(name)) return 'dotBoom';
+    if (['被动去库', '复苏', '被动去库存'].includes(name)) return 'dotRecovery';
+    if (['被动补库', '衰退', '被动补库存'].includes(name)) return 'dotRecession';
+    if (['主动去库', '萧条', '主动去库存'].includes(name)) return 'dotDepression';
+    return 'dotUnknown';
+  };
+
+  // 解析最新周期相位 → 行业名→周期信息映射
+  const cyclePhaseMap = useMemo(() => {
+    if (!isCyclical) return {};
+    const parseLatest = (raw) => {
+      try {
+        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(arr) || !arr.length) return null;
+        return arr[arr.length - 1];
+      } catch { return null; }
+    };
+    const phases = {
+      kitchin: parseLatest(kitchinRaw),
+      juglar:  parseLatest(juglarRaw),
+      kuznets: parseLatest(kuznetsRaw),
+    };
+    const map = {};
+    for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
+      const ph = phases[key];
+      const pName = ph ? (key === 'kitchin' ? (ph.cycle_phase_name || ph.stage) : (ph.cycle_phase_name || ph.phase)) : null;
+      for (const name of grp.names) {
+        map[name] = { cycleKey: key, phaseName: pName, phase: ph, group: grp };
+      }
+    }
+    return map;
+  }, [isCyclical, kitchinRaw, juglarRaw, kuznetsRaw]);
+
+  // 每组行业的20日波动率和均值（用于tooltip）
+  const groupStats = useMemo(() => {
+    if (!isCyclical) return {};
+    const recent = dates.slice(-20);
+    if (!recent.length || !filteredIndustries.length) return {};
+    const stats = {};
+    for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
+      const groupInds = filteredIndustries.filter(i => grp.names.includes(i.name));
+      const changes = [];
+      groupInds.forEach(ind => {
+        recent.forEach(d => {
+          const v = matrix[ind.name]?.[d];
+          if (v !== undefined) changes.push(v);
+        });
+      });
+      if (!changes.length) { stats[key] = { vol: null, avg: null }; continue; }
+      const avg = changes.reduce((s, v) => s + v, 0) / changes.length;
+      const vol = Math.sqrt(changes.reduce((s, v) => s + (v - avg) ** 2, 0) / changes.length);
+      stats[key] = { vol, avg };
+    }
+    return stats;
+  }, [isCyclical, filteredIndustries, matrix, dates]);
 
   // 强周期模式按三周期分组排序
   const sortedIndustries = useMemo(() =>
@@ -704,13 +789,55 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
         if (val !== undefined) data.push([xi, yi, val]);
       }
     }
+
+    const hasCycleDots = isCyclical && Object.keys(cyclePhaseMap).length > 0;
+
+    // Y轴 rich text 样式 — 信号灯圆点
+    const dotStyle = (color) => ({
+      color,
+      fontSize: 22,
+      padding: [0, 6, 4, 0],
+      textShadowBlur: 8,
+      textShadowColor: `${color}66`,
+    });
+
     chart.setOption({
       tooltip: {
-        formatter: p => `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`,
+        formatter: p => {
+          if (p.componentType === 'yAxis') return null; // 由自定义 tooltip 处理
+          return `${names[p.data[1]]}<br/>${recentDates[p.data[0]]}: ${p.data[2] >= 0 ? '+' : ''}${p.data[2].toFixed(2)}%`;
+        },
       },
-      grid: { left: 95, right: 50, top: 20, bottom: 60 },
+      grid: { left: hasCycleDots ? 120 : 95, right: 50, top: 20, bottom: 60 },
       xAxis: { type: 'category', data: recentDates.map(d => d.slice(5)), axisLabel: { fontSize: 12, rotate: 35 } },
-      yAxis: { type: 'category', data: names, axisLabel: { fontSize: 13, width: 85, overflow: 'truncate' } },
+      yAxis: {
+        type: 'category',
+        data: names,
+        triggerEvent: isCyclical,
+        axisLabel: {
+          fontSize: 13,
+          width: hasCycleDots ? 105 : 85,
+          overflow: 'truncate',
+          ...(hasCycleDots ? {
+            formatter: function(name) {
+              const info = cyclePhaseMap[name];
+              if (info) {
+                const tag = phaseTag(info.phaseName);
+                return `{${tag}|●} {name|${name}}`;
+              }
+              return `{name|${name}}`;
+            },
+            rich: {
+              name: { fontSize: 13, width: 82, overflow: 'truncate' },
+              dotBoom: dotStyle('#E85050'),
+              dotRecovery: dotStyle('#D4A853'),
+              dotRecession: dotStyle('#7B8FA8'),
+              dotDepression: dotStyle('#3DBB6E'),
+              dotUnknown: dotStyle('#888'),
+            },
+          } : {}),
+        },
+      },
       visualMap: {
         min: -4, max: 4, calculable: true, orient: 'vertical', right: 4, bottom: 40,
         inRange: { color: ['rgb(206 206 206)', '#048152', '#47a83d', '#91c133', '#ccb022', '#db8f36', '#c85454'] },
@@ -722,6 +849,33 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgb(0 0 0 / 0.8)' } },
       }],
     });
+
+    // Y轴标签 hover → 显示周期信号灯悬浮卡片
+    if (isCyclical) {
+      chart.on('mouseover', function(params) {
+        if (params.componentType === 'yAxis') {
+          const name = params.value;
+          const info = cyclePhaseMap[name];
+          if (info) {
+            const evt = params.event?.event || params.event;
+            const rect = chartRef.current.getBoundingClientRect();
+            setCycleTooltip({
+              name,
+              info,
+              stats: groupStats[info.cycleKey] || {},
+              x: evt.clientX - rect.left,
+              y: evt.clientY - rect.top,
+            });
+          }
+        }
+      });
+      chart.on('mouseout', function(params) {
+        if (params.componentType === 'yAxis') {
+          setCycleTooltip(null);
+        }
+      });
+    }
+
     chart.on('click', (params) => {
       if (params.data) {
         const industryName = names[params.data[1]];
@@ -739,7 +893,7 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       }
     });
     return () => chart.dispose();
-  }, [sortedIndustries, dates, matrix, drillTarget, onIndustrySelect, displayDays, setDrillTarget]);
+  }, [sortedIndustries, dates, matrix, drillTarget, onIndustrySelect, displayDays, setDrillTarget, isCyclical, cyclePhaseMap, groupStats]);
 
   const h = Math.max(380, sortedIndustries.length * 40 + 90);
 
@@ -757,112 +911,48 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
   }
 
   return (
-    <div style={{ maxWidth: 950, margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: '100%' }}>
       <div ref={chartRef} style={{ width: '100%', height: h }} />
-    </div>
-  );
-}
-
-/** 三周期数据面板 — 强周期热力图左侧 */
-function CyclePhasePanel({ industries, matrix, dates }) {
-  // 请求三个周期的最新数据
-  const { data: kitchinRaw } = useMCP('data_kitchin', {});
-  const { data: juglarRaw }  = useMCP('data_juglar', {});
-  const { data: kuznetsRaw } = useMCP('data_kuznets', {});
-
-  // 解析最新周期相位
-  const phases = useMemo(() => {
-    const parse = (raw) => {
-      try {
-        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (!Array.isArray(arr) || !arr.length) return null;
-        return arr[arr.length - 1];
-      } catch { return null; }
-    };
-    return {
-      kitchin: parse(kitchinRaw),
-      juglar:  parse(juglarRaw),
-      kuznets: parse(kuznetsRaw),
-    };
-  }, [kitchinRaw, juglarRaw, kuznetsRaw]);
-
-  // 计算每组行业的 20 日波动率和均值
-  const groupStats = useMemo(() => {
-    const recent = dates.slice(-20);
-    if (!recent.length || !industries.length) return {};
-    const stats = {};
-    for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
-      const groupInds = industries.filter(i => grp.names.includes(i.name));
-      const changes = [];
-      groupInds.forEach(ind => {
-        recent.forEach(d => {
-          const v = matrix[ind.name]?.[d];
-          if (v !== undefined) changes.push(v);
-        });
-      });
-      if (!changes.length) { stats[key] = { vol: null, avg: null }; continue; }
-      const avg = changes.reduce((s, v) => s + v, 0) / changes.length;
-      const vol = Math.sqrt(changes.reduce((s, v) => s + (v - avg) ** 2, 0) / changes.length);
-      stats[key] = { vol, avg };
-    }
-    return stats;
-  }, [industries, matrix, dates]);
-
-  // 相位名映射
-  const phaseLabel = (phase, cycleKey) => {
-    if (!phase) return '—';
-    if (cycleKey === 'kitchin') return phase.cycle_phase_name || phase.stage || '—';
-    return phase.cycle_phase_name || phase.phase || '—';
-  };
-
-  // 相位→颜色
-  const phaseColor = (name) => {
-    if (!name || name === '—') return 'var(--text-muted)';
-    if (['主动补库', '繁荣', '复苏', '主动补库存'].includes(name)) return 'var(--accent-red)';
-    if (['被动去库', '复苏', '被动去库存'].includes(name)) return '#D4A853';
-    if (['被动补库', '衰退', '被动补库存'].includes(name)) return '#7B8FA8';
-    if (['主动去库', '萧条', '主动去库存'].includes(name)) return 'var(--accent-green)';
-    return 'var(--text-secondary)';
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 15, minWidth: 250 }}>
-      {CYCLE_GROUP_ORDER.map(key => {
-        const grp = CYCLE_GROUPS[key];
-        const ph = phases[key];
-        const st = groupStats[key] || {};
-        const pName = phaseLabel(ph, key);
-        return (
-          <CardWrapper key={key} style={{ padding: '12px 14px' }}>
-            {/* 周期标题行 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 17 }}>{grp.icon}</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)' }}>{grp.label}</span>
-              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{grp.sub}</span>
-            </div>
-            {/* 相位标签 */}
-            <div style={{ marginBottom: 8 }}>
-              <span style={{
-                display: 'inline-block', padding: '3px 12px', borderRadius: 14,
-                fontSize: 16, fontWeight: 800,
-                background: phaseColor(pName).startsWith('var') ? 'rgba(136,136,136,0.1)' : `${phaseColor(pName)}18`,
-                color: phaseColor(pName), border: `1px solid ${phaseColor(pName)}33`,
-              }}>
-                {pName}
-              </span>
-            </div>
-            {/* 数据指标 — 正常文字 */}
-            <div style={{ display: 'flex', gap: 20, fontSize: 18, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-              <span>波动率 <b style={{ color: 'var(--text-primary)' }}>{st.vol != null ? st.vol.toFixed(2) : '—'}%</b></span>
-              <span>均值 <b style={{ color: st.avg != null && st.avg >= 0 ? '#E85050' : '#3DBB6E' }}>{st.avg != null ? (st.avg >= 0 ? '+' : '') + st.avg.toFixed(2) : '—'}%</b></span>
-            </div>
-            {/* 关联行业 */}
-            <div style={{ fontSize: 15, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>
-              {grp.names.join(' · ')}
-            </div>
-          </CardWrapper>
-        );
-      })}
+      {/* 周期信号灯悬浮卡片 */}
+      {cycleTooltip && (
+        <div style={{
+          position: 'absolute',
+          left: Math.min(cycleTooltip.x + 14, (chartRef.current?.clientWidth || 800) - 260),
+          top: Math.max(cycleTooltip.y - 80, 4),
+          zIndex: 100,
+          background: 'var(--bg-panel)',
+          border: `1px solid ${phaseColor(cycleTooltip.info.phaseName)}44`,
+          borderRadius: 8,
+          padding: '10px 14px',
+          boxShadow: `0 4px 20px rgba(0,0,0,0.4), 0 0 12px ${phaseColor(cycleTooltip.info.phaseName)}22`,
+          minWidth: 220,
+          pointerEvents: 'none',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 17 }}>{cycleTooltip.info.group.icon}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>{cycleTooltip.info.group.label}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cycleTooltip.info.group.sub}</span>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <span style={{
+              display: 'inline-block', padding: '2px 10px', borderRadius: 12,
+              fontSize: 14, fontWeight: 800,
+              background: `${phaseColor(cycleTooltip.info.phaseName)}18`,
+              color: phaseColor(cycleTooltip.info.phaseName),
+              border: `1px solid ${phaseColor(cycleTooltip.info.phaseName)}33`,
+            }}>
+              {cycleTooltip.info.phaseName || '—'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+            <span>波动率 <b style={{ color: 'var(--text-primary)' }}>{cycleTooltip.stats.vol != null ? cycleTooltip.stats.vol.toFixed(2) : '—'}%</b></span>
+            <span>均值 <b style={{ color: cycleTooltip.stats.avg != null && cycleTooltip.stats.avg >= 0 ? '#E85050' : '#3DBB6E' }}>{cycleTooltip.stats.avg != null ? (cycleTooltip.stats.avg >= 0 ? '+' : '') + cycleTooltip.stats.avg.toFixed(2) : '—'}%</b></span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            {cycleTooltip.info.group.names.join(' · ')}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1074,6 +1164,49 @@ export default function MesoLayout() {
   const [customLevel, setCustomLevel] = useState(1); // 1=一级 2=二级
   const [customSelected, setCustomSelected] = useState([]); // 选中的行业名
 
+  // ── 组合保存 ──
+  const [savedCombos, setSavedCombos] = useState(() => loadSavedCombos());
+  const [comboNameInput, setComboNameInput] = useState('');
+  const [showComboSave, setShowComboSave] = useState(false);
+  const saveCombo = useCallback((name) => {
+    if (!name.trim() || customSelected.length === 0) return;
+    const id = Date.now();
+    const accent = COMBO_COLORS[savedCombos.length % COMBO_COLORS.length];
+    const next = [...savedCombos, { id, label: name.trim(), names: [...customSelected], level: customLevel, accent }];
+    setSavedCombos(next);
+    persistCombos(next);
+    setShowComboSave(false);
+    setComboNameInput('');
+    // 保存后自动切换到新组合
+    setHeatmapCategory(`combo_${id}`);
+    setDrillTarget(null);
+  }, [savedCombos, customSelected, customLevel]);
+  const deleteCombo = useCallback((id) => {
+    const next = savedCombos.filter(c => c.id !== id);
+    setSavedCombos(next);
+    persistCombos(next);
+    if (heatmapCategory === `combo_${id}`) {
+      setHeatmapCategory('custom');
+    }
+  }, [savedCombos, heatmapCategory]);
+
+  // 动态分类配置 = 内置 + 保存的组合
+  const dynamicConfig = useMemo(() => {
+    const config = { ...CATEGORY_CONFIG };
+    savedCombos.forEach(combo => {
+      config[`combo_${combo.id}`] = {
+        label: `📌 ${combo.label}`,
+        names: new Set(combo.names),
+        accent: combo.accent,
+        desc: `自定义组合 · ${combo.names.length} 行业`,
+        _isCombo: true,
+        _comboId: combo.id,
+        _comboLevel: combo.level || 1,
+      };
+    });
+    return config;
+  }, [savedCombos]);
+
   // 二级行业数据
   const l2Result = useMCP('industry_sw_daily', customLevel === 2 ? { symbol: '二级行业', start_date: startStr, limit: 5000 } : null);
   const l2Parsed = useMemo(() => parseSWDaily(l2Result.data), [l2Result.data]);
@@ -1085,23 +1218,31 @@ export default function MesoLayout() {
 
   // 计算 filteredIndustries
   const allClassified = useMemo(() => new Set([...CYCLICAL_NAMES, ...DEFENSIVE_NAMES, ...GROWTH_NAMES]), []);
-  const heatmapConfig = CATEGORY_CONFIG[heatmapCategory];
+  const heatmapConfig = dynamicConfig[heatmapCategory];
   const filteredIndustries = useMemo(() => {
     // 自选模式：用自定义选中的行业
     if (heatmapCategory === 'custom') {
       return customIndustries.filter(i => customSelected.includes(i.name));
     }
-    const base = industries.filter(i => heatmapConfig.names.has(i.name));
+    // 组合模式：用组合保存的行业列表
+    if (heatmapConfig?._isCombo) {
+      const comboLevel = heatmapConfig._comboLevel || 1;
+      const source = comboLevel === 2 ? l2Parsed.industries : industries;
+      return source.filter(i => heatmapConfig.names.has(i.name));
+    }
+    const base = industries.filter(i => heatmapConfig?.names?.has(i.name));
     if (heatmapCategory === 'cyclical') {
       const uncategorized = industries.filter(i => !allClassified.has(i.name));
       return [...base, ...uncategorized];
     }
     return base;
-  }, [industries, heatmapCategory, heatmapConfig?.names, allClassified, customIndustries, customSelected]);
+  }, [industries, heatmapCategory, heatmapConfig, allClassified, customIndustries, customSelected, l2Parsed.industries]);
 
   // 自选模式的热力图数据（传给 HeatmapChart）
-  const activeMatrix = heatmapCategory === 'custom' ? customMatrix : matrix;
-  const activeDates = heatmapCategory === 'custom' ? customDates : dates;
+  const isComboMode = heatmapConfig?._isCombo;
+  const comboLevel = heatmapConfig?._comboLevel || 1;
+  const activeMatrix = (heatmapCategory === 'custom' || (isComboMode && comboLevel === 2)) ? (comboLevel === 2 ? customMatrix : matrix) : matrix;
+  const activeDates = (heatmapCategory === 'custom' || (isComboMode && comboLevel === 2)) ? (comboLevel === 2 ? customDates : dates) : dates;
 
   const avgChange = filteredIndustries.length
     ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
@@ -1154,6 +1295,38 @@ export default function MesoLayout() {
               {cfg.label}
             </button>
           ))}
+          {/* 已保存的组合标签 */}
+          {savedCombos.map(combo => {
+            const key = `combo_${combo.id}`;
+            const isActive = heatmapCategory === key;
+            return (
+              <span key={key} style={{ position: 'relative', display: 'inline-flex' }}>
+                <button
+                  onClick={() => { setHeatmapCategory(key); setDrillTarget(null); }}
+                  style={{
+                    padding: '6px 16px', borderRadius: 6, fontSize: 'var(--fs-sm)', fontWeight: 600,
+                    background: isActive ? `${combo.accent}22` : 'transparent',
+                    color: isActive ? combo.accent : 'var(--text-secondary)',
+                    border: `1.5px solid ${isActive ? combo.accent : 'var(--border-subtle)'}`,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    paddingRight: 28,
+                  }}>
+                  📌 {combo.label}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteCombo(combo.id); }}
+                  title="删除组合"
+                  style={{
+                    position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+                    width: 18, height: 18, borderRadius: 9, border: 'none',
+                    background: isActive ? `${combo.accent}33` : 'transparent',
+                    color: isActive ? combo.accent : 'var(--text-muted)',
+                    fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, padding: 0,
+                  }}>×</button>
+              </span>
+            );
+          })}
 
           {/* 天数选择 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
@@ -1197,41 +1370,78 @@ export default function MesoLayout() {
           </span>
         </div>
 
-        {/* 自选模式：行业选择器 */}
+        {/* 自选模式：行业选择器 + 组合保存 */}
         {heatmapCategory === 'custom' && (
-          <IndustryPicker
-            allIndustries={industries}
-            l2Industries={l2Parsed.industries}
-            selectedNames={customSelected}
-            onToggle={(namesOrList, isList) => {
-              if (isList) setCustomSelected(namesOrList);
-              else setCustomSelected([]);
-            }}
-            level={customLevel}
-            setLevel={lv => { setCustomLevel(lv); setCustomSelected([]); }}
-          />
-        )}
-
-        <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
-          <div style={{ display: heatmapCategory === 'cyclical' ? 'flex' : 'block', gap: 16, alignItems: 'flex-start' }}>
-            {heatmapCategory === 'cyclical' && (
-              <div style={{ flex: '0 0 auto', minWidth: 260, maxWidth: 340 }}>
-                <CyclePhasePanel industries={filteredIndustries} matrix={activeMatrix} dates={activeDates} />
+          <div style={{ marginBottom: 12 }}>
+            <IndustryPicker
+              allIndustries={industries}
+              l2Industries={l2Parsed.industries}
+              selectedNames={customSelected}
+              onToggle={(namesOrList, isList) => {
+                if (isList) setCustomSelected(namesOrList);
+                else setCustomSelected([]);
+              }}
+              level={customLevel}
+              setLevel={lv => { setCustomLevel(lv); setCustomSelected([]); }}
+            />
+            {/* 保存为组合 */}
+            {customSelected.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {!showComboSave ? (
+                  <button onClick={() => setShowComboSave(true)} style={{
+                    padding: '5px 14px', borderRadius: 6, fontSize: 'var(--fs-xs)', fontWeight: 600,
+                    background: 'rgba(155,126,200,0.12)', border: '1px solid #9B7EC844',
+                    color: '#9B7EC8', cursor: 'pointer',
+                  }}>
+                    💾 保存为组合
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={comboNameInput}
+                      onChange={e => setComboNameInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveCombo(comboNameInput); }}
+                      placeholder="输入组合名称..."
+                      autoFocus
+                      style={{
+                        padding: '4px 10px', borderRadius: 5, fontSize: 'var(--fs-sm)',
+                        background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                        border: '1px solid #9B7EC844', outline: 'none', width: 160,
+                      }}
+                    />
+                    <button onClick={() => saveCombo(comboNameInput)} disabled={!comboNameInput.trim()} style={{
+                      padding: '4px 12px', borderRadius: 5, fontSize: 'var(--fs-xs)', fontWeight: 600,
+                      background: comboNameInput.trim() ? '#9B7EC8' : 'rgba(155,126,200,0.2)',
+                      border: 'none', color: comboNameInput.trim() ? '#fff' : 'var(--text-muted)',
+                      cursor: comboNameInput.trim() ? 'pointer' : 'default',
+                    }}>确认</button>
+                    <button onClick={() => { setShowComboSave(false); setComboNameInput(''); }} style={{
+                      padding: '4px 8px', borderRadius: 5, fontSize: 'var(--fs-xs)',
+                      background: 'transparent', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-muted)', cursor: 'pointer',
+                    }}>取消</button>
+                  </>
+                )}
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+                  已选 {customSelected.length} 行业 · {customLevel === 1 ? '一级' : '二级'}行业
+                </span>
               </div>
             )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <HeatmapChart
-                filteredIndustries={filteredIndustries}
-                dates={activeDates} matrix={activeMatrix}
-                onIndustrySelect={handleIndustrySelect}
-                activeCategory={heatmapCategory}
-                displayDays={heatmapDays}
-                drillTarget={drillTarget}
-                setDrillTarget={setDrillTarget}
-                customLevel={customLevel}
-              />
-            </div>
           </div>
+        )}
+
+        <CardWrapper style={{ padding: '24px 30px' }}>
+          <HeatmapChart
+            filteredIndustries={filteredIndustries}
+            dates={activeDates} matrix={activeMatrix}
+            onIndustrySelect={handleIndustrySelect}
+            activeCategory={heatmapCategory}
+            displayDays={heatmapDays}
+            drillTarget={drillTarget}
+            setDrillTarget={setDrillTarget}
+            customLevel={isComboMode ? comboLevel : customLevel}
+          />
         </CardWrapper>
       </div>
 
