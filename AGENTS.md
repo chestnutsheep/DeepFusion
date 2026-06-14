@@ -63,6 +63,9 @@ This project uses Git. See .gitignore for excluded files.
 | `chart_helpers` | `deep_fusion/shared/chart_helpers.py` | 图表公共工具：阶段着色 `shade_phases`/`apply_phase_shading`、字体加载 `setup_chart_font`、日期轴 `setup_date_axes`、Agg 后端 `setup_matplotlib_agg` | `kondratiev.py` 四个 `_gen_*_chart` 函数 |
 | `phase_utils` | `deep_fusion/shared/phase_utils.py` | 相位命名映射 `KOND_RENAME = {1:"回升期",2:"繁荣期",3:"衰退期",4:"萧条期"}` | `kondratiev.py` 图表标签、前端对接 |
 | `nbs_client` | `deep_fusion/data/sources/nbs_client.py` | NBS 数据获取权威实现（`_NbsClient` 单例 + 8 个 `_fetch_nbs_*` 函数） | `tools/cycles.py`、`kondratiev.py`（间接） |
+| `correlation` | `deep_fusion/shared/correlation.py` | 行业相关性分析：静态/滚动相关矩阵、层次聚类、PCA载荷、主线识别 | `tools/industry.py` 的 `industry_themes` |
+| `dcc_garch` | `deep_fusion/shared/dcc_garch.py` | DCC-GARCH Engle两步法：单变量GARCH(arch包)+条件相关演化估计 | `tools/industry.py` 的 `industry_themes_dcc` |
+| `causality` | `deep_fusion/shared/causality.py` | Granger因果检验矩阵、领先-滞后网络、龙头行业识别 | `tools/industry.py` 的 `industry_themes_causality` |
 
 **关键去重**：
 - `kondratiev.py` 不再有独立的 `_NbsClient` 副本（~390 行已删除），统一使用 `data/sources/nbs_client.py`
@@ -85,6 +88,222 @@ from deep_fusion import load_portfolio
 
 同样，`load_portfolio` / `save_portfolio` 在 `deep_fusion/shared/utils.py`，不在顶层包。
 
+### 行业主线识别工具：实现与调用说明 (2026-06-14)
+
+三个 MCP 工具用于从行业日行情中识别市场主线、联动关系和因果传导链。**前提：必须先运行 `industry_daily_collect` 采集行业日行情数据到本地 SQLite。**
+
+#### 工具总览
+
+| 工具名 | 功能 | 耗时 | 核心依赖 |
+|--------|------|------|----------|
+| `industry_themes` | 相关性聚类+动量+资金流→当前市场主线 | ~1s | scipy(scipy.cluster.hierarchy), numpy |
+| `industry_themes_dcc` | DCC-GARCH时变条件相关，联动加强/减弱行业对 | ~30s | arch(单变量GARCH), scipy.optimize |
+| `industry_themes_causality` | Granger因果+领先/滞后行业识别 | ~60s | statsmodels(Granger检验) |
+
+#### 数据流
+
+```
+industry_db.get_daily_codes() → 90个同花顺行业代码
+    ↓
+industry_db.get_daily(industry_code, limit) → 各行业日收盘价
+    ↓
+pct_change() → 收益率矩阵 (DataFrame: 日期×行业名)
+    ↓
+industry_db.get_classify("ths") → code→name 映射
+industry_db.get_fund_flow(limit=100) → 当日资金流 + 龙头股
+```
+
+辅助函数 `_load_returns_matrix(window)` 完成上述加载和清洗：
+- 从 `get_daily_codes()` 获取行业列表
+- 用 `get_classify("ths")` 做 code→行业名映射
+- 取每个行业近 `window+30` 日收盘价，构建 `prices` DataFrame
+- 计算日收益率 `pct_change().dropna()`，剔除 NaN 比例 >10% 的行业
+- 返回 `(returns: DataFrame, code2name: dict)`
+
+#### `industry_themes` — 主线识别
+
+**参数**: `window=120`, `n_clusters=5`, `corr_method="pearson"`
+
+**计算流程**:
+
+1. **相关性矩阵** → `correlation.compute_correlation_matrix(returns, method)` — 支持 pearson/spearman/kendall
+2. **层次聚类** → `correlation.hierarchical_clustering(corr_matrix, n_clusters)` — 距离 = 1 - corr，average链接，fcluster 截断
+3. **PCA 载荷** → `correlation.pca_loadings(returns, n_components)` — SVD 分解，PC1 载荷最大行业为簇代表
+4. **主题命名** → `correlation._label_themes()` — ≤3 成员全列名，>3 用代表+数量
+5. **动量计算** → `_compute_momentum(returns)` — 各行业 5d/10d/20d 累计收益
+6. **资金流注入** → `industry_db.get_fund_flow()` — 匹配簇内行业的净流入+龙头股
+7. **滚动趋势** → `_compute_rolling_trends(returns, clustering, window=60)` — 用 `rolling_correlation` 计算近期相关性变化
+8. **综合评分** → `_enrich_themes()` — 归一化 min-max 后加权
+
+**评分公式**:
+```
+score = 0.4 × norm(簇内平均相关) + 0.35 × norm(簇内5d动量均值) + 0.25 × norm(簇内资金净流入合计)
+```
+归一化: `(x - min) / (max - min) * 100`，若 max=min 则得 50 分。
+
+**趋势判定** (`_compute_rolling_trends`):
+- 对每个簇，取成员行业在 `rolling_correlation(returns, window=60)` 的 `correlation_change` 矩阵
+- 计算簇内上三角元素均值 `avg_change`
+- `avg_change > 0.02` → "strengthening"，`< -0.02` → "weakening"，其余 → "stable"
+
+**返回结构** (JSON):
+```json
+{
+  "meta": {
+    "window": 120,
+    "n_clusters": 5,
+    "n_industries": 88,
+    "date_range": ["2025-12-01", "2026-06-13"],
+    "elapsed_seconds": 0.8
+  },
+  "themes": [
+    {
+      "rank": 1,
+      "theme_id": 2,
+      "label": "影视院线 等3行业",
+      "representative": "影视院线",
+      "members": ["影视院线", "出版", "数字媒体"],
+      "n_members": 3,
+      "avg_intra_corr": 0.7823,
+      "trend": "strengthening",
+      "score": 64.2,
+      "score_detail": {
+        "corr_score": 25.6,
+        "momentum_score": 23.1,
+        "fund_flow_score": 15.5
+      },
+      "momentum": {
+        "avg_5d": 0.0312,
+        "avg_10d": 0.0456,
+        "avg_20d": 0.0234,
+        "best_5d": {"industry": "影视院线", "return": 0.0421},
+        "best_10d": {"industry": "数字媒体", "return": 0.0612}
+      },
+      "fund_flow": {
+        "net_amount_total": 123456.78,
+        "leader_stocks": ["股票A", "股票B"],
+        "best_leader": "股票A",
+        "best_leader_pct": 5.23
+      }
+    }
+  ],
+  "momentum_ranking": [
+    {"industry": "电力", "return_5d": 0.0742, "return_10d": 0.0234, "return_20d": 0.0156}
+  ],
+  "pca_top_contributors": {
+    "PC1": ["银行", "白酒", "保险"],
+    "PC2": ["煤炭", "钢铁", "有色"]
+  }
+}
+```
+
+#### `industry_themes_dcc` — DCC-GARCH 时变相关
+
+**参数**: `window=120`
+
+**算法** (Engle 2002 两步法):
+
+1. **Step 1**: 对每个行业独立拟合 GARCH(1,1)（用 `arch` 包），得到条件方差 σ² 和标准化残差 ε = r/σ
+   - 若 arch 包拟合失败，降级为滚动标准差估计
+2. **Step 2**: 用标准化残差估计 DCC 参数 (a, b)
+   - Q̄ = E[εε'] (无条件相关矩阵)
+   - Q_t = (1-a-b)Q̄ + a(ε_{t-1}ε'_{t-1}) + bQ_{t-1}
+   - R_t = diag(Q_t)^{-1/2} Q_t diag(Q_t)^{-1/2} (条件相关矩阵)
+   - (a,b) 通过 `scipy.optimize.minimize` 最大化对数似然估计
+3. **输出**: `DCCResult` 数据类，含 `conditional_corr_series` (T×N×N)
+
+**返回结构** (JSON):
+```json
+{
+  "meta": {
+    "window": 120,
+    "n_industries": 88,
+    "n_observations": 118,
+    "elapsed_seconds": 28.5
+  },
+  "dcc_params": {
+    "a": 0.012345,
+    "b": 0.876543,
+    "a_plus_b": 0.888888
+  },
+  "garch_converged": [true, true, false, ...],
+  "latest_corr_top": [
+    {"pair": ["银行", "保险"], "corr": 0.8923},
+    {"pair": ["煤炭", "钢铁"], "corr": 0.8512}
+  ],
+  "corr_change_top": [
+    {"pair": ["贵金属", "保险"], "change": 0.1543, "direction": "up"},
+    {"pair": ["白酒", "银行"], "change": -0.0921, "direction": "down"}
+  ]
+}
+```
+
+**关键字段说明**:
+- `a_plus_b < 1`: DCC 过程平稳（必要条件）
+- `latest_corr_top`: 最新一期条件相关系数绝对值 TOP20 行业对
+- `corr_change_top`: 条件相关变化绝对值 TOP20 行业对（联动加强=up/减弱=down）
+- `garch_converged`: 每个行业 GARCH(1,1) 是否收敛的布尔列表
+
+#### `industry_themes_causality` — Granger 因果 + 龙头识别
+
+**参数**: `window=120`, `max_lag=5`
+
+**算法**:
+
+1. **Granger 因果矩阵** → `causality.granger_causality_matrix(returns, max_lag)`
+   - 对每对行业 (X→Y) 做 Granger 因果检验，原假设 H0: X 不 Granger 导致 Y
+   - 使用 `statsmodels.tsa.stattools.grangercausalitytests`，1~max_lag 各滞后期取最小 p 值
+   - 若 statsmodels 不可用，降级为互相关分析
+   - 输出 N×N p_matrix, causality_matrix (1=显著), best_lag_matrix
+2. **领先行业识别** → `causality.identify_leading_industries(granger, top_n=10)`
+   - 领先分 = 作为 cause 显著的次数 - 作为 effect 显著的次数
+   - 领先分高 → 该行业的涨跌对其他行业有预测力（龙头行业）
+   - 领先分低/负 → 该行业是滞后行业
+
+**返回结构** (JSON):
+```json
+{
+  "meta": {
+    "window": 120,
+    "max_lag": 5,
+    "n_industries": 88,
+    "n_significant": 156,
+    "n_total": 7744,
+    "elapsed_seconds": 55.3
+  },
+  "leading_industries": [
+    {"industry": "证券", "score": 12.0},
+    {"industry": "银行", "score": 9.0}
+  ],
+  "lagging_industries": [
+    {"industry": "电力", "score": -5.0},
+    {"industry": "环保", "score": -4.0}
+  ],
+  "top_causal_pairs": [
+    {"source": "证券", "target": "保险", "lag": 2},
+    {"source": "银行", "target": "房地产", "lag": 3}
+  ]
+}
+```
+
+**关键字段说明**:
+- `n_significant / n_total`: 显著因果对数 / 总检验对数 (N²-N)
+- `leading_industries`: 领先分 TOP10（得分越高，对其他行业预测力越强）
+- `lagging_industries`: 领先分最低 TOP5（最滞后的行业）
+- `top_causal_pairs`: 最强因果传导链 TOP15（source Granger导致 target，lag 为最优滞后期）
+
+#### 共享计算模块
+
+| 模块 | 位置 | 核心函数 | 被3个工具调用方式 |
+|------|------|----------|------------------|
+| `correlation` | `deep_fusion/shared/correlation.py` | `compute_correlation_matrix`, `hierarchical_clustering`, `pca_loadings`, `rolling_correlation`, `identify_themes` | `industry_themes` 直接调用 |
+| `dcc_garch` | `deep_fusion/shared/dcc_garch.py` | `fit_dcc_garch` → `DCCResult` | `industry_themes_dcc` 调用 |
+| `causality` | `deep_fusion/shared/causality.py` | `granger_causality_matrix`, `identify_leading_industries` | `industry_themes_causality` 调用 |
+
+**降级策略**:
+- `causality.py`: statsmodels 不可用时降级为互相关分析（`_granger_fallback`）
+- `dcc_garch.py`: arch 包 GARCH 拟合失败时降级为滚动标准差估计
+
 ---
 
 ## MCP 工具注册表（完整清单）
@@ -94,7 +313,7 @@ from deep_fusion import load_portfolio
 ```json
 {
   "meta": {
-    "total_tools": 126,
+    "total_tools": 129,
     "api_base": "/api/tools/call",
     "mcp_framework": "fastmcp",
     "return_format_note": "所有工具返回 str 类型。实际格式分为 CSV(表格数据)、JSON(结构化数据)、text(格式化报告) 三类。"
@@ -528,7 +747,7 @@ from deep_fusion import load_portfolio
     },
 
     "industry": {
-      "description": "行业分析：分类、行情、资金流、申万树、成分股、现货、因子、财新指数",
+      "description": "行业分析：分类、行情、资金流、申万树、成分股、现货、因子、财新指数、主线识别",
       "tools": {
         "industry_classify": {
           "params": { "分类标准": "str (默认'同花顺')" },
@@ -625,6 +844,24 @@ from deep_fusion import load_portfolio
           "return": "text — 19个财新指数列表",
           "data_source": "caixin_indices",
           "data_span": "N/A"
+        },
+        "industry_themes": {
+          "params": { "window": "int (默认120)", "n_clusters": "int (默认5)", "corr_method": "str (默认pearson, 可选spearman/kendall)" },
+          "return": "JSON — 行业主线识别(相关性聚类+动量+资金流+趋势→综合评分主线)",
+          "data_source": "本地SQLite行业日行情(industry_db.get_daily) + 同花顺资金流(industry_db.get_fund_flow) + 本地计算",
+          "data_span": "最近window交易日, 需先运行industry_daily_collect采集"
+        },
+        "industry_themes_dcc": {
+          "params": { "window": "int (默认120)" },
+          "return": "JSON — DCC-GARCH时变条件相关(DCC参数+最新期相关TOP20+相关变化TOP20)",
+          "data_source": "本地SQLite行业日行情 + arch包GARCH(1,1)+自写Engle两步法DCC",
+          "data_span": "最近window交易日, 计算约30s, 需先采集"
+        },
+        "industry_themes_causality": {
+          "params": { "window": "int (默认120)", "max_lag": "int (默认5)" },
+          "return": "JSON — Granger因果检验+龙头行业识别(领先/滞后行业+因果传导链TOP15)",
+          "data_source": "本地SQLite行业日行情 + statsmodels Granger检验",
+          "data_span": "最近window交易日, 计算约60s, 需先采集"
         }
       }
     },

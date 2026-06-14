@@ -22,5 +22,10 @@
 - `IndicatorDef(akshare_fn=...)` 也支持 DB-first（2026-06-13 新增）
 
 ## 代码架构
-- 共享模块：chart_helpers / phase_utils / nbs_client（修改需确认所有消费方不受影响）
+- 共享模块：chart_helpers / phase_utils / nbs_client / **correlation / dcc_garch / causality / network_analysis**（修改需确认所有消费方不受影响）
 - 测试导入：CacheKey 从 deep_fusion.cache 导入，不从顶层包导入
+- 行业主线识别：4个shared模块 + scripts/industry_themes.py，输出到 output/industry_themes/
+- **MCP工具**: industry_themes / industry_themes_dcc / industry_themes_causality（在 industry.py）
+- 主线评分: 0.4×簇内相关 + 0.35×动量 + 0.25×资金流，趋势由rolling_corr变化判定
+- DCC-GARCH 用 arch 包做单变量GARCH(Step1)，自写Engle两步法(Step2)
+- Granger因果依赖 statsmodels，不可用时降级互相关（causality.py 自动处理）

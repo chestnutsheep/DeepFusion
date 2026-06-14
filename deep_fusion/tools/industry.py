@@ -362,3 +362,434 @@ def caixin_list() -> str:
     for i in indices:
         lines.append(f"  {i['key']:15s}  {i['desc']}")
     return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  行业主线识别工具
+# ═══════════════════════════════════════════════════════════
+
+def _load_returns_matrix(window: int = 120) -> tuple:
+    """从 industry_db 加载行业日行情 → 收益率矩阵 + code→name 映射。"""
+    import pandas as pd
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return pd.DataFrame(), {}
+
+    # code→name 映射
+    cls = db.get_classify("ths")
+    code2name = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+
+    # 加载日行情 → 收益率
+    all_data = {}
+    for code in codes:
+        df = db.get_daily(industry_code=code, limit=window + 30)
+        if df.empty:
+            continue
+        name = code2name.get(code, code)
+        close = df.set_index("trade_date")["close"]
+        if len(close) > 30:
+            all_data[name] = close
+
+    if not all_data:
+        return pd.DataFrame(), code2name
+
+    prices = pd.DataFrame(all_data)
+    prices.index = pd.to_datetime(prices.index)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    return returns, code2name
+
+
+def _compute_momentum(returns) -> list:
+    """计算各行业近期动量：5d / 10d / 20d 累计收益。"""
+
+    n = len(returns)
+    momentum = []
+    for ind in returns.columns:
+        m = {"industry": ind}
+        for span, label in [(5, "return_5d"), (10, "return_10d"), (20, "return_20d")]:
+            if n >= span:
+                m[label] = round(float((1 + returns[ind].iloc[-span:]).prod() - 1), 4)
+            else:
+                m[label] = None
+        momentum.append(m)
+
+    momentum.sort(key=lambda x: x.get("return_5d") or -999, reverse=True)
+    return momentum
+
+
+def _enrich_themes(
+    themes_raw: list,
+    momentum: list,
+    fund_flow_df,
+    rolling_trend: dict,
+) -> list:
+    """为基础聚类结果添加动量/资金流/趋势信号 → 综合评分。"""
+    import numpy as np
+
+    # 构建 industry → momentum 映射
+    mom_map = {m["industry"]: m for m in momentum}
+
+    # 构建 industry → fund_flow 映射
+    ff_map = {}
+    if fund_flow_df is not None and not fund_flow_df.empty:
+        for _, r in fund_flow_df.iterrows():
+            name = r.get("industry_name", "")
+            ff_map[name] = {
+                "net_amount": float(r.get("net_amount", 0) or 0),
+                "leader_stock": r.get("leader_stock", ""),
+                "leader_pct_change": float(r.get("leader_pct_change", 0) or 0),
+            }
+
+    enriched = []
+    raw_scores = []  # 先收集原始分，后面做归一化
+
+    for t in themes_raw:
+        members = t["members"]
+        avg_corr = t.get("avg_intra_corr", 0) or 0
+
+        # 簇内动量均值
+        member_moms = [mom_map.get(m, {}) for m in members]
+        avg_5d = np.mean([m.get("return_5d", 0) or 0 for m in member_moms])
+        avg_10d = np.mean([m.get("return_10d", 0) or 0 for m in member_moms])
+        avg_20d = np.mean([m.get("return_20d", 0) or 0 for m in member_moms])
+
+        # 簇内资金流
+        member_ffs = [ff_map.get(m, {}) for m in members]
+        total_net = sum(f.get("net_amount", 0) for f in member_ffs)
+        leaders = [f.get("leader_stock", "") for f in member_ffs if f.get("leader_stock")]
+        leader_pcts = [f.get("leader_pct_change", 0) for f in member_ffs]
+
+        # 趋势
+        trend = rolling_trend.get(t["theme_id"], "stable")
+
+        # 原始评分分量 (归一化前)
+        raw_scores.append({
+            "theme_id": t["theme_id"],
+            "avg_corr": avg_corr,
+            "avg_5d": avg_5d,
+            "total_net": total_net,
+        })
+
+        # 找动量最强的行业
+        best_mom_5d = max(member_moms, key=lambda x: x.get("return_5d") or -999)
+        best_mom_10d = max(member_moms, key=lambda x: x.get("return_10d") or -999)
+
+        enriched.append({
+            "theme_id": t["theme_id"],
+            "label": t["label"],
+            "representative": t["representative"],
+            "members": members,
+            "n_members": len(members),
+            "avg_intra_corr": round(avg_corr, 4),
+            "trend": trend,
+            "momentum": {
+                "avg_5d": round(avg_5d, 4),
+                "avg_10d": round(avg_10d, 4),
+                "avg_20d": round(avg_20d, 4),
+                "best_5d": {"industry": best_mom_5d.get("industry", ""), "return": best_mom_5d.get("return_5d")},
+                "best_10d": {"industry": best_mom_10d.get("industry", ""), "return": best_mom_10d.get("return_10d")},
+            },
+            "fund_flow": {
+                "net_amount_total": round(total_net, 2),
+                "leader_stocks": leaders[:3],
+                "best_leader": leaders[0] if leaders else "",
+                "best_leader_pct": round(max(leader_pcts), 2) if leader_pcts else None,
+            },
+            # score 占位，后面归一化后填充
+            "_raw": raw_scores[-1],
+        })
+
+    # ── 归一化评分 ──
+    if enriched:
+        corrs = [r["avg_corr"] for r in raw_scores]
+        moms = [r["avg_5d"] for r in raw_scores]
+        nets = [r["total_net"] for r in raw_scores]
+
+        def _norm(vals, i):
+            mn, mx = min(vals), max(vals)
+            if mx == mn:
+                return 50.0
+            return (vals[i] - mn) / (mx - mn) * 100
+
+        for idx, t in enumerate(enriched):
+            corr_s = _norm(corrs, idx) * 0.4
+            mom_s = _norm(moms, idx) * 0.35
+            ff_s = _norm(nets, idx) * 0.25
+            t["score"] = round(corr_s + mom_s + ff_s, 1)
+            t["score_detail"] = {
+                "corr_score": round(corr_s, 1),
+                "momentum_score": round(mom_s, 1),
+                "fund_flow_score": round(ff_s, 1),
+            }
+            del t["_raw"]
+
+    # 按评分降序
+    enriched.sort(key=lambda x: x["score"], reverse=True)
+    # 重编号
+    for i, t in enumerate(enriched):
+        t["rank"] = i + 1
+
+    return enriched
+
+
+def _compute_rolling_trends(returns, cluster_result, window: int = 60) -> dict:
+    """计算各簇的滚动相关趋势: strengthening / weakening / stable。"""
+    from ..shared.correlation import rolling_correlation
+    import numpy as np
+
+    if len(returns) < window + 1:
+        return {}
+
+    rolling_result = rolling_correlation(returns, window=window)
+    change = rolling_result.get("correlation_change")
+    if change is None or change.empty:
+        return {}
+
+    trends = {}
+    for c_id, members in cluster_result.get("clusters", {}).items():
+        valid_members = [m for m in members if m in change.index and m in change.columns]
+        if len(valid_members) < 2:
+            trends[c_id] = "stable"
+            continue
+
+        sub = change.loc[valid_members, valid_members]
+        mask = np.triu(np.ones(sub.shape, dtype=bool), k=1)
+        avg_change = float(sub.values[mask].mean()) if mask.any() else 0.0
+
+        if avg_change > 0.02:
+            trends[c_id] = "strengthening"
+        elif avg_change < -0.02:
+            trends[c_id] = "weakening"
+        else:
+            trends[c_id] = "stable"
+
+    return trends
+
+
+@mcp.tool(
+    name="industry_themes",
+    description="行业相关性主线识别 — 从行业日行情计算相关性/聚类/动量/资金流，聚合出市场当前主线。"
+    "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+def industry_themes(
+    window: int = Field(120, description="收益率回看窗口(交易日)"),
+    n_clusters: int = Field(5, description="目标主线数"),
+    corr_method: str = Field("pearson", description="相关系数类型: pearson/spearman/kendall"),
+) -> str:
+    """行业主线识别：相关性聚类 + 近期动量 + 资金流 → 当前市场主线。"""
+    import json
+    import time
+    from ..shared.correlation import identify_themes
+
+    t0 = time.time()
+
+    # 1. 加载数据
+    returns, code2name = _load_returns_matrix(window=window)
+    if returns.empty:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    # 2. 基础分析 (相关性 + 聚类 + PCA)
+    themes_result = identify_themes(
+        returns, n_clusters=n_clusters, corr_method=corr_method,
+    )
+
+    if not themes_result.get("themes"):
+        return json.dumps({"error": "主题识别失败，数据可能不足"}, ensure_ascii=False)
+
+    # 3. 动量信号
+    momentum = _compute_momentum(returns)
+
+    # 4. 资金流信号
+    fund_flow_df = db.get_fund_flow(limit=100)
+
+    # 5. 滚动相关趋势
+    rolling_trend = _compute_rolling_trends(returns, themes_result["clustering"])
+
+    # 6. PCA 主成分贡献
+    pca = themes_result.get("pca", {})
+    pca_top = {}
+    for pc, contributors in pca.get("top_contributors", {}).items():
+        pca_top[pc] = [c["industry"] for c in contributors[:3]]
+
+    # 7. 综合主线
+    enriched = _enrich_themes(
+        themes_result["themes"], momentum, fund_flow_df, rolling_trend,
+    )
+
+    result = {
+        "meta": {
+            "window": window,
+            "n_clusters": n_clusters,
+            "n_industries": len(returns.columns),
+            "date_range": [str(returns.index[0])[:10], str(returns.index[-1])[:10]],
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "themes": enriched,
+        "momentum_ranking": momentum[:20],
+        "pca_top_contributors": pca_top,
+    }
+
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
+@mcp.tool(
+    name="industry_themes_dcc",
+    description="DCC-GARCH 时变条件相关 — 估计行业间动态相关性矩阵，识别联动加强/减弱的行业对。"
+    "计算较慢(约30s)，返回JSON。",
+)
+def industry_themes_dcc(
+    window: int = Field(120, description="收益率回看窗口(交易日)"),
+) -> str:
+    """DCC-GARCH 动态条件相关分析。"""
+    import json
+    import time
+    import numpy as np
+    from ..shared.dcc_garch import fit_dcc_garch
+
+    t0 = time.time()
+
+    returns, _ = _load_returns_matrix(window=window)
+    if returns.empty:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    result = fit_dcc_garch(returns)
+
+    out = {
+        "meta": {
+            "window": window,
+            "n_industries": result.n_industries,
+            "n_observations": result.n_observations,
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "dcc_params": {
+            "a": round(result.dcc_a, 6),
+            "b": round(result.dcc_b, 6),
+            "a_plus_b": round(result.dcc_a + result.dcc_b, 6),
+        },
+        "garch_converged": result.garch_converged,
+    }
+
+    if result.conditional_corr_series.size > 0:
+        # 最新期条件相关
+        latest = result.corr_at_latest()
+        # 变化最大的行业对
+        change = result.correlation_change()
+
+        # 提取变化 TOP 20
+        top_changes = []
+        if not change.empty:
+            industries = change.columns.tolist()
+            for i in range(len(industries)):
+                for j in range(i + 1, len(industries)):
+                    d = float(change.iloc[i, j])
+                    if not np.isnan(d):
+                        top_changes.append({
+                            "pair": [industries[i], industries[j]],
+                            "change": round(d, 4),
+                            "direction": "up" if d > 0 else "down",
+                        })
+            top_changes.sort(key=lambda x: abs(x["change"]), reverse=True)
+            top_changes = top_changes[:20]
+
+        # 找联动最强的行业对 (最新期 |corr| 最高)
+        top_corr = []
+        if not latest.empty:
+            industries = latest.columns.tolist()
+            for i in range(len(industries)):
+                for j in range(i + 1, len(industries)):
+                    v = float(latest.iloc[i, j])
+                    if not np.isnan(v):
+                        top_corr.append({
+                            "pair": [industries[i], industries[j]],
+                            "corr": round(v, 4),
+                        })
+            top_corr.sort(key=lambda x: abs(x["corr"]), reverse=True)
+            top_corr = top_corr[:20]
+
+        out["latest_corr_top"] = top_corr
+        out["corr_change_top"] = top_changes
+    else:
+        out["note"] = "条件相关序列为空，数据量可能不足"
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+@mcp.tool(
+    name="industry_themes_causality",
+    description="Granger因果检验 + 龙头行业识别 — 找出领先/滞后行业及因果传导链。"
+    "计算较慢(约60s)，需要statsmodels。返回JSON。",
+)
+def industry_themes_causality(
+    window: int = Field(120, description="收益率回看窗口(交易日)"),
+    max_lag: int = Field(5, description="最大检验滞后期"),
+) -> str:
+    """Granger 因果检验 + 领先行业识别。"""
+    import json
+    import time
+    from ..shared.causality import granger_causality_matrix, identify_leading_industries
+
+    t0 = time.time()
+
+    returns, _ = _load_returns_matrix(window=window)
+    if returns.empty:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    granger = granger_causality_matrix(returns, max_lag=max_lag)
+    leading = identify_leading_industries(granger, top_n=10)
+
+    out = {
+        "meta": {
+            "window": window,
+            "max_lag": max_lag,
+            "n_industries": len(returns.columns),
+            "n_significant": granger.get("n_significant", 0),
+            "n_total": granger.get("n_total", 0),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+    }
+
+    if "note" in granger:
+        out["note"] = granger["note"]
+
+    # 领先行业
+    if not leading["leading_score"].empty:
+        out["leading_industries"] = [
+            {"industry": ind, "score": round(float(score), 1)}
+            for ind, score in leading["leading_score"].head(10).items()
+        ]
+
+    # 滞后行业
+    if not leading["leading_score"].empty:
+        lagging = leading["leading_score"].sort_values(ascending=True)
+        out["lagging_industries"] = [
+            {"industry": ind, "score": round(float(score), 1)}
+            for ind, score in lagging.head(5).items()
+        ]
+
+    # 最强因果对
+    if leading.get("top_pairs"):
+        out["top_causal_pairs"] = [
+            {"source": src, "target": tgt, "lag": lag}
+            for src, tgt, lag in leading["top_pairs"][:15]
+        ]
+
+    return json.dumps(out, ensure_ascii=False, default=str)

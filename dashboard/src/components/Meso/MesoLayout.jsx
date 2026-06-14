@@ -234,7 +234,6 @@ function persistCombos(combos) {
 // 基钦(库存)周期：上游原材料(钢铁/采掘，价格随库存波动) + 产成品库存(汽车/非银/综合)
 // 朱格拉(设备投资)周期：机械设备(Capex周期核心载体)
 // 库兹涅茨(建筑)周期：房地产 + 建筑材料(水泥/玻璃) + 建筑装饰(施工链)
-const CYCLE_GROUP_ORDER = ['kitchin', 'juglar', 'kuznets'];
 const CYCLE_GROUPS = {
   kitchin: {
     label: '基钦周期', icon: '📦', sub: '库存周期 3~5年',
@@ -737,10 +736,21 @@ function HeatmapChart({ filteredIndustries, dates, matrix, onIndustrySelect, act
       juglar:  parseLatest(juglarRaw),
       kuznets: parseLatest(kuznetsRaw),
     };
+    const KITCHIN_NAMES = { 1: '主动去库存', 2: '被动去库存', 3: '主动补库存', 4: '被动补库存' };
+    const MACRO_NAMES = { 1: '复苏', 2: '繁荣', 3: '衰退', 4: '萧条' };
     const map = {};
     for (const [key, grp] of Object.entries(CYCLE_GROUPS)) {
       const ph = phases[key];
-      const pName = ph ? (key === 'kitchin' ? (ph.cycle_phase_name || ph.stage) : (ph.cycle_phase_name || ph.phase)) : null;
+      let pName = null;
+      if (ph) {
+        if (ph.cycle_phase_name) {
+          pName = ph.cycle_phase_name;
+        } else if (key === 'kitchin') {
+          pName = ph.stage_name || KITCHIN_NAMES[ph.stage] || null;
+        } else {
+          pName = ph.phase_name || MACRO_NAMES[ph.phase] || null;
+        }
+      }
       for (const name of grp.names) {
         map[name] = { cycleKey: key, phaseName: pName, phase: ph, group: grp };
       }
@@ -1207,8 +1217,9 @@ export default function MesoLayout() {
     return config;
   }, [savedCombos]);
 
-  // 二级行业数据
-  const l2Result = useMCP('industry_sw_daily', customLevel === 2 ? { symbol: '二级行业', start_date: startStr, limit: 5000 } : null);
+  // 二级行业数据（自选二级 或 组合二级 都需要）
+  const needL2 = customLevel === 2 || savedCombos.some(c => c.level === 2);
+  const l2Result = useMCP('industry_sw_daily', needL2 ? { symbol: '二级行业', start_date: startStr, limit: 5000 } : null);
   const l2Parsed = useMemo(() => parseSWDaily(l2Result.data), [l2Result.data]);
 
   // 自选模式用的行业列表和矩阵
@@ -1241,8 +1252,9 @@ export default function MesoLayout() {
   // 自选模式的热力图数据（传给 HeatmapChart）
   const isComboMode = heatmapConfig?._isCombo;
   const comboLevel = heatmapConfig?._comboLevel || 1;
-  const activeMatrix = (heatmapCategory === 'custom' || (isComboMode && comboLevel === 2)) ? (comboLevel === 2 ? customMatrix : matrix) : matrix;
-  const activeDates = (heatmapCategory === 'custom' || (isComboMode && comboLevel === 2)) ? (comboLevel === 2 ? customDates : dates) : dates;
+  const effectiveLevel = heatmapCategory === 'custom' ? customLevel : comboLevel;
+  const activeMatrix = (heatmapCategory === 'custom' || isComboMode) && effectiveLevel === 2 ? customMatrix : matrix;
+  const activeDates = (heatmapCategory === 'custom' || isComboMode) && effectiveLevel === 2 ? customDates : dates;
 
   const avgChange = filteredIndustries.length
     ? filteredIndustries.reduce((s, i) => s + (i.change || 0), 0) / filteredIndustries.length : 0;
@@ -1440,7 +1452,7 @@ export default function MesoLayout() {
             displayDays={heatmapDays}
             drillTarget={drillTarget}
             setDrillTarget={setDrillTarget}
-            customLevel={isComboMode ? comboLevel : customLevel}
+            customLevel={effectiveLevel}
           />
         </CardWrapper>
       </div>
