@@ -618,11 +618,19 @@ def industry_themes(
     # 5. 滚动相关趋势
     rolling_trend = _compute_rolling_trends(returns, themes_result["clustering"])
 
-    # 6. PCA 主成分贡献
+    # 6. PCA 主成分贡献（适配新格式: positive/negative/by_abs）
     pca = themes_result.get("pca", {})
     pca_top = {}
-    for pc, contributors in pca.get("top_contributors", {}).items():
-        pca_top[pc] = [c["industry"] for c in contributors[:3]]
+    for pc, contrib in pca.get("top_contributors", {}).items():
+        if isinstance(contrib, dict):
+            # 新格式：分正/负方向
+            pca_top[pc] = {
+                "positive": [c["industry"] for c in contrib.get("positive", [])[:3]],
+                "negative": [c["industry"] for c in contrib.get("negative", [])[:3]],
+            }
+        else:
+            # 旧格式兼容（list）
+            pca_top[pc] = [c["industry"] for c in contrib[:3]]
 
     # 7. 综合主线
     enriched = _enrich_themes(

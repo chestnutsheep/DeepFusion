@@ -203,15 +203,32 @@ def pca_loadings(
     explained_series = pd.Series(explained_ratio[:K], index=pc_names)
     cumulative_series = pd.Series(cumulative[:K], index=pc_names)
 
-    # 每个主成分贡献最大的行业
-    top_contributors: dict[str, list[dict[str, float]]] = {}
+    # 每个主成分贡献最大的行业（分正/负方向）
+    top_contributors: dict[str, dict[str, list[dict[str, float]]]] = {}
     for pc in pc_names:
-        col = loadings_df[pc].abs().sort_values(ascending=False)
-        top_n = min(5, len(col))
-        top_contributors[pc] = [
-            {"industry": idx, "loading": float(loadings_df.loc[idx, pc])}
-            for idx in col.head(top_n).index
-        ]
+        sorted_abs = loadings_df[pc].abs().sort_values(ascending=False)
+        top_n = min(5, len(sorted_abs))
+
+        # 正方向（载荷 > 0 的行业中绝对值最大的）
+        positive = loadings_df[pc][loadings_df[pc] > 0].sort_values(ascending=False)
+        # 负方向（载荷 < 0 的行业中绝对值最大的）
+        negative = loadings_df[pc][loadings_df[pc] < 0].sort_values(ascending=True)
+
+        top_contributors[pc] = {
+            "positive": [
+                {"industry": idx, "loading": float(loadings_df.loc[idx, pc])}
+                for idx in positive.head(top_n).index
+            ],
+            "negative": [
+                {"industry": idx, "loading": float(loadings_df.loc[idx, pc])}
+                for idx in negative.head(top_n).index
+            ],
+            # 保留绝对值排序（向后兼容）
+            "by_abs": [
+                {"industry": idx, "loading": float(loadings_df.loc[idx, pc])}
+                for idx in sorted_abs.head(top_n).index
+            ],
+        }
 
     return {
         "loadings": loadings_df,
@@ -310,8 +327,12 @@ def identify_themes(
     n_components: int = 5,
     corr_method: str = "pearson",
     cluster_method: str = "average",
+    remove_market_beta: bool = True,
 ) -> dict[str, Any]:
     """一站式主线识别：相关性 + 聚类 + PCA + 命名。
+
+    当 remove_market_beta=True 时，先从收益率中去掉 PC1（市场 beta），
+    再用残差做聚类。这解决了 A 股行业高相关导致 80% 行业挤同一簇的问题。
 
     Args:
         returns: DataFrame, index=日期, columns=行业名, values=日收益率
@@ -319,11 +340,12 @@ def identify_themes(
         n_components: PCA 主成分数
         corr_method: 相关系数类型
         cluster_method: 聚类链接方法
+        remove_market_beta: 是否在聚类前去除 PC1 市场beta（默认True）
 
     Returns:
         综合结果字典，包含:
-          - correlation: 相关性矩阵结果
-          - clustering: 聚类结果
+          - correlation: 原始相关性矩阵结果
+          - clustering: 聚类结果（基于残差或原始）
           - pca: PCA 载荷结果
           - themes: 识别出的主线标签（语义化命名）
     """
@@ -331,12 +353,44 @@ def identify_themes(
     if corr_result["n_industries"] == 0:
         return {"correlation": corr_result, "clustering": {}, "pca": {}, "themes": []}
 
-    cluster_result = hierarchical_clustering(
-        corr_result["corr_matrix"],
-        n_clusters=n_clusters,
-        method=cluster_method,
-    )
     pca_result = pca_loadings(returns, n_components=n_components)
+
+    # ── 聚类：用残差（去 PC1）或原始 ──
+    if remove_market_beta and pca_result["n_components"] >= 1:
+        # 从收益率中去掉 PC1 分量
+        loadings = pca_result["loadings"]
+        X_centered = (returns - returns.mean()).values
+        pc1_loading = loadings["PC1"].values  # (N,)
+        # PC1 的得分 = X @ pc1_loading / ||pc1_loading||
+        norm = np.linalg.norm(pc1_loading)
+        if norm > 0:
+            scores = X_centered @ pc1_loading / (norm ** 2)
+            # 残差 = 原始 - PC1贡献
+            residual = X_centered - np.outer(scores, pc1_loading)
+        else:
+            residual = X_centered
+
+        residual_df = pd.DataFrame(
+            residual, index=returns.index, columns=returns.columns,
+        )
+        # 残差相关性矩阵
+        residual_corr = residual_df.corr(method=corr_method)
+        residual_corr = residual_corr.dropna(axis=0, how="all").dropna(axis=1, how="all")
+
+        cluster_result = hierarchical_clustering(
+            residual_corr,
+            n_clusters=n_clusters,
+            method=cluster_method,
+        )
+        # 记录用的是残差
+        cluster_result["based_on"] = "residual_corr (PC1 removed)"
+    else:
+        cluster_result = hierarchical_clustering(
+            corr_result["corr_matrix"],
+            n_clusters=n_clusters,
+            method=cluster_method,
+        )
+        cluster_result["based_on"] = "raw_corr"
 
     # 语义化主线标签
     themes = _label_themes(cluster_result, pca_result)
@@ -356,7 +410,8 @@ def _label_themes(
     """为聚类结果生成语义化主线标签。
 
     命名规则：
-    1. 取簇内 PCA 载荷绝对值最大的行业作为代表
+    1. 取簇内在 PC2 上载荷绝对值最大的行业作为代表
+       （PC1 是市场 beta，PC2+ 才区分行业特质）
     2. 用代表行业 + 簇大小组合命名
     3. 附加簇内平均相关性
     """
@@ -369,12 +424,14 @@ def _label_themes(
         if not members:
             continue
 
-        # 找簇内在 PC1 上载荷绝对值最大的行业作为代表
+        # 找簇内代表行业：优先用 PC2（区分因子），fallback PC1
         rep_industry = members[0]
-        if not loadings.empty and "PC1" in loadings.columns:
-            member_loadings = loadings.loc[loadings.index.isin(members), "PC1"].abs()
-            if not member_loadings.empty:
-                rep_industry = member_loadings.idxmax()
+        for pc_key in ["PC2", "PC1"]:
+            if not loadings.empty and pc_key in loadings.columns:
+                member_loadings = loadings.loc[loadings.index.isin(members), pc_key].abs()
+                if not member_loadings.empty:
+                    rep_industry = member_loadings.idxmax()
+                    break
 
         # 组合命名
         if len(members) <= 3:

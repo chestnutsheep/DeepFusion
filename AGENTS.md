@@ -127,13 +127,15 @@ industry_db.get_fund_flow(limit=100) → 当日资金流 + 龙头股
 **计算流程**:
 
 1. **相关性矩阵** → `correlation.compute_correlation_matrix(returns, method)` — 支持 pearson/spearman/kendall
-2. **层次聚类** → `correlation.hierarchical_clustering(corr_matrix, n_clusters)` — 距离 = 1 - corr，average链接，fcluster 截断
-3. **PCA 载荷** → `correlation.pca_loadings(returns, n_components)` — SVD 分解，PC1 载荷最大行业为簇代表
-4. **主题命名** → `correlation._label_themes()` — ≤3 成员全列名，>3 用代表+数量
-5. **动量计算** → `_compute_momentum(returns)` — 各行业 5d/10d/20d 累计收益
-6. **资金流注入** → `industry_db.get_fund_flow()` — 匹配簇内行业的净流入+龙头股
-7. **滚动趋势** → `_compute_rolling_trends(returns, clustering, window=60)` — 用 `rolling_correlation` 计算近期相关性变化
-8. **综合评分** → `_enrich_themes()` — 归一化 min-max 后加权
+2. **PCA 载荷** → `correlation.pca_loadings(returns, n_components)` — SVD 分解
+3. **去市场beta** → 从收益率中去除 PC1 分量（A 股 PC1 解释 ~54% 方差 = 市场 beta），得到残差矩阵
+4. **残差聚类** → `correlation.hierarchical_clustering(residual_corr, n_clusters)` — 距离 = 1 - residual_corr，average链接
+   - 关键：必须在残差（去 PC1）上聚类，否则 A 股行业因高系统性相关会 80%+ 挤同一簇
+5. **主题命名** → `correlation._label_themes()` — 代表行业取 PC2 载荷最大（PC1 是 beta，PC2+ 才区分特质），≤3 成员全列名，>3 用代表+数量
+6. **动量计算** → `_compute_momentum(returns)` — 各行业 5d/10d/20d 累计收益
+7. **资金流注入** → `industry_db.get_fund_flow()` — 匹配簇内行业的净流入+龙头股
+8. **滚动趋势** → `_compute_rolling_trends(returns, clustering, window=60)` — 用 `rolling_correlation` 计算近期相关性变化
+9. **综合评分** → `_enrich_themes()` — 归一化 min-max 后加权
 
 **评分公式**:
 ```
@@ -191,11 +193,29 @@ score = 0.4 × norm(簇内平均相关) + 0.35 × norm(簇内5d动量均值) + 0
     {"industry": "电力", "return_5d": 0.0742, "return_10d": 0.0234, "return_20d": 0.0156}
   ],
   "pca_top_contributors": {
-    "PC1": ["银行", "白酒", "保险"],
-    "PC2": ["煤炭", "钢铁", "有色"]
+    "PC1": {"positive": ["小金属", "其他电子", "金属新材料"], "negative": ["油气开采及服务"]},
+    "PC2": {"positive": ["油气开采及服务", "贵金属", "煤炭开采加工"], "negative": ["影视院线", "半导体", "军工电子"]},
+    "PC3": {"positive": ["影视院线", "白酒", "旅游及酒店"], "negative": ["半导体", "电子化学品", "小金属"]}
   }
 }
 ```
+
+#### PCA 方向说明
+
+`pca_top_contributors` 输出分 **positive** 和 **negative** 两个方向：
+- **positive**: 该 PC 上载荷为正且绝对值最大的行业（同涨同跌组）
+- **negative**: 该 PC 上载荷为负且绝对值最大的行业（与 positive 组反向运动）
+
+例如 PC3 `positive=["影视院线","白酒","旅游及酒店"]` / `negative=["半导体","电子化学品","小金属"]`，
+表示 PC3 捕捉的是"消费 vs 科技"的对冲关系——消费涨时科技跌，反之亦然。
+
+**不要把同一 PC 的 positive 和 negative 组视为"同一组"**，它们在该因子维度上是反向的。
+
+#### 为什么必须去 PC1 beta 再聚类
+
+A 股行业收益率的 PC1 解释 ~54% 方差，本质是市场系统性 beta（大盘涨跌主导）。
+若直接用原始相关矩阵聚类，行业间相关性中位数 0.576，导致层次聚类将 80/90 行业归入同一大簇。
+去除 PC1 后的残差相关中位数降至 ~0.2，行业特质因子才显现，聚类才能有效分离出不同主线。
 
 #### `industry_themes_dcc` — DCC-GARCH 时变相关
 
