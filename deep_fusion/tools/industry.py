@@ -637,6 +637,9 @@ def industry_themes(
         themes_result["themes"], momentum, fund_flow_df, rolling_trend,
     )
 
+    # 8. 生成可读性摘要
+    summary_lines = _build_themes_summary(enriched, momentum, pca_top, returns)
+
     result = {
         "meta": {
             "window": window,
@@ -648,9 +651,104 @@ def industry_themes(
         "themes": enriched,
         "momentum_ranking": momentum[:20],
         "pca_top_contributors": pca_top,
+        "readable_summary": summary_lines,
     }
 
     return json.dumps(result, ensure_ascii=False, default=str)
+
+
+def _build_themes_summary(
+    themes: list, momentum: list, pca_top: dict, returns,
+) -> str:
+    """生成行业主线识别的可读性摘要。"""
+    lines = []
+
+    # ── 一、核心主线 ──
+    lines.append("【当前市场主线】")
+    for t in themes[:5]:
+        trend_emoji = {"strengthening": "↑联动增强", "weakening": "↓联动减弱", "stable": "→稳定"}
+        trend_text = trend_emoji.get(t.get("trend", ""), "")
+        lines.append(
+            f"  主线{t['rank']}: {t['label']}  |  综合评分 {t['score']}  |  {trend_text}"
+        )
+        # 动量
+        mom = t.get("momentum", {})
+        avg5 = mom.get("avg_5d", 0)
+        avg10 = mom.get("avg_10d", 0)
+        avg20 = mom.get("avg_20d", 0)
+        lines.append(
+            f"    近期动量: 5日{avg5:+.2%} / 10日{avg10:+.2%} / 20日{avg20:+.2%}"
+        )
+        # 资金流
+        ff = t.get("fund_flow", {})
+        net = ff.get("net_amount_total", 0)
+        leader = ff.get("best_leader", "")
+        leader_pct = ff.get("best_leader_pct")
+        net_desc = f"净流入{net/1e8:+.2f}亿" if abs(net) >= 1e8 else f"净流入{net/1e4:+.1f}万"
+        leader_desc = f"，龙头{leader}涨{leader_pct:+.2f}%" if leader and leader_pct else ""
+        lines.append(f"    资金面: {net_desc}{leader_desc}")
+        # 簇内相关
+        corr = t.get("avg_intra_corr", 0)
+        corr_desc = "高联动" if corr > 0.6 else "中等联动" if corr > 0.3 else "低联动"
+        lines.append(f"    簇内相关: {corr:.2f}({corr_desc})，共{t['n_members']}个行业")
+        lines.append("")
+
+    # ── 二、动量极值 ──
+    if momentum:
+        lines.append("【动量排行】")
+        top3 = momentum[:3]
+        bot3 = momentum[-3:] if len(momentum) > 3 else []
+        parts_up = [f"{m['industry']}({m['return_5d']:+.2%})" for m in top3]
+        lines.append(f"  最强5日: {' / '.join(parts_up)}")
+        if bot3:
+            parts_dn = [f"{m['industry']}({m['return_5d']:+.2%})" for m in bot3]
+            lines.append(f"  最弱5日: {' / '.join(parts_dn)}")
+        lines.append("")
+
+    # ── 三、主因子解读 ──
+    if pca_top:
+        lines.append("【PCA 主因子解读】")
+        for pc, contrib in list(pca_top.items())[:3]:
+            if isinstance(contrib, dict):
+                pos = contrib.get("positive", [])
+                neg = contrib.get("negative", [])
+                pos_str = "、".join(pos[:3]) if pos else ""
+                neg_str = "、".join(neg[:3]) if neg else ""
+                if pos_str and neg_str:
+                    lines.append(f"  {pc}: {pos_str} vs {neg_str}（对冲关系）")
+                elif pos_str:
+                    lines.append(f"  {pc}: {pos_str}（同涨同跌）")
+            else:
+                # 旧格式
+                items = "、".join(contrib[:3]) if isinstance(contrib, list) else str(contrib)
+                lines.append(f"  {pc}: {items}")
+        lines.append("")
+
+    # ── 四、综合研判 ──
+    if themes:
+        top = themes[0]
+        lines.append("【综合研判】")
+        lines.append(
+            f"  当前最强主线为「{top['label']}」，"
+            f"综合评分{top['score']}，簇内{top['n_members']}个行业联动紧密。"
+        )
+        # 动量方向
+        top_mom = top.get("momentum", {})
+        avg5 = top_mom.get("avg_5d", 0)
+        if avg5 > 0.02:
+            lines.append("  近5日动量强势，短线资金持续流入。")
+        elif avg5 < -0.02:
+            lines.append("  近5日动量转弱，需关注回调风险。")
+        else:
+            lines.append("  近5日动量中性，方向待确认。")
+        # 趋势
+        trend = top.get("trend", "")
+        if trend == "strengthening":
+            lines.append("  行业间联动仍在增强，主线效应可能持续扩大。")
+        elif trend == "weakening":
+            lines.append("  行业间联动开始减弱，主线可能正在扩散或切换。")
+
+    return "\n".join(lines)
 
 
 @mcp.tool(
@@ -732,10 +830,94 @@ def industry_themes_dcc(
 
         out["latest_corr_top"] = top_corr
         out["corr_change_top"] = top_changes
+
+        # 生成可读性摘要
+        out["readable_summary"] = _build_dcc_summary(out, returns)
     else:
         out["note"] = "条件相关序列为空，数据量可能不足"
 
     return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_dcc_summary(out: dict, returns) -> str:
+    """生成 DCC-GARCH 分析的可读性摘要。"""
+    lines = []
+
+    # ── DCC 参数解读 ──
+    a, b = out["dcc_params"]["a"], out["dcc_params"]["b"]
+    apb = out["dcc_params"]["a_plus_b"]
+    lines.append("【DCC-GARCH 参数解读】")
+    lines.append(f"  a={a:.4f}(短期冲击响应), b={b:.4f}(长期持续性), a+b={apb:.4f}")
+    if apb < 1:
+        lines.append("  a+b < 1，条件相关过程平稳，结果可信。")
+    else:
+        lines.append("  ⚠️ a+b ≥ 1，条件相关非平稳，结果需谨慎参考。")
+    if b > 0.8:
+        lines.append("  b 值较高，行业间相关性具有很强的惯性（变化缓慢）。")
+    lines.append("")
+
+    # ── 联动最强行业对 ──
+    top_corr = out.get("latest_corr_top", [])
+    if top_corr:
+        lines.append("【当前联动最强行业对】")
+        for item in top_corr[:5]:
+            pair = item["pair"]
+            c = item["corr"]
+            strength = "极强" if abs(c) > 0.8 else "强" if abs(c) > 0.6 else "中等"
+            direction = "同涨同跌" if c > 0 else "反向运动"
+            lines.append(f"  {pair[0]} ↔ {pair[1]}: {c:+.4f}({strength}{direction})")
+        lines.append("")
+
+    # ── 联动变化最大行业对 ──
+    top_change = out.get("corr_change_top", [])
+    if top_change:
+        lines.append("【联动变化最显著行业对】")
+        up_pairs = [x for x in top_change if x["direction"] == "up"]
+        dn_pairs = [x for x in top_change if x["direction"] == "down"]
+        if up_pairs:
+            lines.append("  联动增强(同涨同跌倾向上升):")
+            for item in up_pairs[:4]:
+                pair = item["pair"]
+                d = item["change"]
+                lines.append(f"    {pair[0]} ↔ {pair[1]}: +{d:.4f}")
+        if dn_pairs:
+            lines.append("  联动减弱(走势开始分化):")
+            for item in dn_pairs[:4]:
+                pair = item["pair"]
+                d = item["change"]
+                lines.append(f"    {pair[0]} ↔ {pair[1]}: {d:.4f}")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if top_corr:
+        strongest = top_corr[0]
+        lines.append(
+            f"  当前联动最强的是「{strongest['pair'][0]}↔{strongest['pair'][1]}」，"
+            f"条件相关{strongest['corr']:+.4f}。"
+        )
+    if up_pairs:
+        p = up_pairs[0]
+        lines.append(
+            f"  「{p['pair'][0]}↔{p['pair'][1]}」联动增强最显著(+{p['change']:.4f})，"
+            f"二者近期走势趋于同步，可作为配对交易或板块轮动参考。"
+        )
+    if dn_pairs:
+        p = dn_pairs[0]
+        lines.append(
+            f"  「{p['pair'][0]}↔{p['pair'][1]}」联动减弱最显著({p['change']:.4f})，"
+            f"二者走势正在分化，对冲效果可能增强。"
+        )
+
+    # GARCH 收敛率
+    conv = out.get("garch_converged", [])
+    if conv:
+        n_conv = sum(1 for x in conv if x)
+        rate = n_conv / len(conv) * 100
+        if rate < 80:
+            lines.append(f"  ⚠️ GARCH收敛率仅{rate:.0f}%，部分行业波动率估计可能不准。")
+
+    return "\n".join(lines)
 
 
 @mcp.tool(
@@ -800,4 +982,87 @@ def industry_themes_causality(
             for src, tgt, lag in leading["top_pairs"][:15]
         ]
 
+    # 生成可读性摘要
+    out["readable_summary"] = _build_causality_summary(out)
+
     return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_causality_summary(out: dict) -> str:
+    """生成 Granger 因果分析的可读性摘要。"""
+    lines = []
+
+    meta = out.get("meta", {})
+    n_sig = meta.get("n_significant", 0)
+    n_total = meta.get("n_total", 0)
+    n_ind = meta.get("n_industries", 0)
+    max_lag = meta.get("max_lag", 5)
+
+    # ── 总体概况 ──
+    lines.append("【Granger 因果检验概况】")
+    if n_total > 0:
+        pct = n_sig / n_total * 100
+        lines.append(
+            f"  {n_ind}个行业间共检验{n_total}对因果关系，"
+            f"显著{n_sig}对({pct:.1f}%)，max_lag={max_lag}。"
+        )
+        if pct < 5:
+            lines.append("  显著比例较低，行业间领先-滞后关系不太明显，市场可能处于普涨普跌状态。")
+        elif pct > 20:
+            lines.append("  显著比例较高，行业间传导关系活跃，龙头效应明显。")
+    if out.get("note"):
+        lines.append(f"  备注: {out['note']}")
+    lines.append("")
+
+    # ── 领先行业 ──
+    leading = out.get("leading_industries", [])
+    if leading:
+        lines.append("【领先行业(涨跌对其他行业有预测力)】")
+        for item in leading[:5]:
+            score = item["score"]
+            desc = "强领先" if score >= 6 else "中等领先" if score >= 3 else "弱领先"
+            lines.append(f"  {item['industry']}: 领先分{score:+.1f}({desc})")
+        lines.append("")
+
+    # ── 滞后行业 ──
+    lagging = out.get("lagging_industries", [])
+    if lagging:
+        lines.append("【滞后行业(涨跌受其他行业驱动)】")
+        for item in lagging[:3]:
+            score = item["score"]
+            desc = "强滞后" if score <= -4 else "中等滞后" if score <= -2 else "弱滞后"
+            lines.append(f"  {item['industry']}: 领先分{score:+.1f}({desc})")
+        lines.append("")
+
+    # ── 传导链 ──
+    pairs = out.get("top_causal_pairs", [])
+    if pairs:
+        lines.append("【最强因果传导链】")
+        for item in pairs[:6]:
+            lag_desc = f"滞后{item['lag']}日" if item['lag'] > 1 else "滞后1日(隔日传导)"
+            lines.append(f"  {item['source']} → {item['target']}({lag_desc})")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if leading:
+        top_lead = leading[0]
+        lines.append(
+            f"  当前市场龙头行业为「{top_lead['industry']}」(领先分{top_lead['score']:+.1f})，"
+            f"其涨跌对其他行业具有统计显著的预测力。"
+        )
+    if lagging:
+        top_lag = lagging[0]
+        lines.append(
+            f"  最滞后的行业是「{top_lag['industry']}」(领先分{top_lag['score']:+.1f})，"
+            f"其走势更多是被动跟随。"
+        )
+    if pairs:
+        p = pairs[0]
+        lines.append(
+            f"  最强传导链「{p['source']}→{p['target']}」滞后{p['lag']}日，"
+            f"意味着{p['source']}的异动领先{p['target']}约{p['lag']}个交易日。"
+        )
+        lines.append("  实战建议: 关注领先行业信号，提前布局滞后行业的同向波动。")
+
+    return "\n".join(lines)
