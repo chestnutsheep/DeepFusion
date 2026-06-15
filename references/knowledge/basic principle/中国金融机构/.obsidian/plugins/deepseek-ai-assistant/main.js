@@ -693,7 +693,7 @@ function endBatch() {
       e.flags &= -9;
       if (e.flags & 1) {
         try {
-          ;
+
           e.trigger();
         } catch (err) {
           if (!error)
@@ -933,7 +933,7 @@ var Dep = class {
       }
       for (let link3 = this.subs; link3; link3 = link3.prevSub) {
         if (link3.sub.notify()) {
-          ;
+
           link3.sub.dep.notify();
         }
       }
@@ -5625,7 +5625,7 @@ function baseCreateRenderer(options, createHydrationFns) {
         if (true) {
           popWarningContext();
         }
-        return;
+
       } else {
         instance.next = n2;
         instance.update();
@@ -12155,7 +12155,7 @@ var AbstractChatCompletionRunner = class extends EventStream {
         }
       }
     }
-    return;
+
   }
 };
 _AbstractChatCompletionRunner_instances = /* @__PURE__ */ new WeakSet(), _AbstractChatCompletionRunner_getFinalContent = function _AbstractChatCompletionRunner_getFinalContent2() {
@@ -12188,7 +12188,7 @@ _AbstractChatCompletionRunner_instances = /* @__PURE__ */ new WeakSet(), _Abstra
       return message.tool_calls.at(-1)?.function;
     }
   }
-  return;
+
 }, _AbstractChatCompletionRunner_getFinalFunctionCallResult = function _AbstractChatCompletionRunner_getFinalFunctionCallResult2() {
   for (let i = this.messages.length - 1; i >= 0; i--) {
     const message = this.messages[i];
@@ -12199,7 +12199,7 @@ _AbstractChatCompletionRunner_instances = /* @__PURE__ */ new WeakSet(), _Abstra
       return message.content;
     }
   }
-  return;
+
 }, _AbstractChatCompletionRunner_calculateTotalUsage = function _AbstractChatCompletionRunner_calculateTotalUsage2() {
   const total = {
     completion_tokens: 0,
@@ -12954,7 +12954,7 @@ function str(x4) {
   return JSON.stringify(x4);
 }
 function assertIsEmpty(obj) {
-  return;
+
 }
 function assertNever2(_x) {
 }

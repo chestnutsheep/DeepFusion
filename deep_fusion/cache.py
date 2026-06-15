@@ -144,14 +144,16 @@ def _em_fallback_retry(fun, *args, **kwargs) -> pd.DataFrame | None:
 
 
 def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
+    # 先 pop ttl/ttl2/force 再拼 key，避免缓存键被非业务参数污染
     key = kwargs.pop("key", None)
-    if not key:
-        key = f"{fun.__name__}-{args}-{kwargs}"
+    force = kwargs.pop("force", False)
     ttl1 = kwargs.pop("ttl", 86400)
     ttl2 = kwargs.pop("ttl2", None)
+    if not key:
+        key = f"{fun.__name__}-{args}-{kwargs}"
     cache = CacheKey.init(key, ttl1, ttl2)
     all_df = cache.get()
-    if all_df is None:
+    if all_df is None or force:
         try:
             _LOGGER.info("Request akshare: %s", [key, args, kwargs])
             all_df = fun(*args, **kwargs)
@@ -166,14 +168,16 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
 
 async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
     """Async version of ak_cache that runs blocking calls in thread pool."""
+    # 先 pop ttl/ttl2/force 再拼 key
     key = kwargs.pop("key", None)
-    if not key:
-        key = f"{fun.__name__}-{args}-{kwargs}"
+    force = kwargs.pop("force", False)
     ttl1 = kwargs.pop("ttl", 86400)
     ttl2 = kwargs.pop("ttl2", None)
+    if not key:
+        key = f"{fun.__name__}-{args}-{kwargs}"
     cache = CacheKey.init(key, ttl1, ttl2)
     all_df = cache.get()
-    if all_df is None:
+    if all_df is None or force:
         try:
             _LOGGER.info("Request akshare async: %s",[key, args, kwargs])
             loop = asyncio.get_event_loop()

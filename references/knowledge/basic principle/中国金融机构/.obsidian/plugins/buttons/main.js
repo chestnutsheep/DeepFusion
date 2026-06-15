@@ -1443,7 +1443,7 @@ async function templater(app, template2, _target) {
   } catch (error) {
     console.error("Error setting up templater functions:", error);
     new import_obsidian2.Notice("Error setting up templater functions. Check console for details.");
-    return;
+
   }
 }
 async function processTemplate(app, file) {
@@ -1621,7 +1621,7 @@ var addContentAtCursor = async (app, insert, isTemplater) => {
           }
         } else {
           new import_obsidian6.Notice("Failed to initialize Templater processor", 2e3);
-          return;
+
         }
       } else {
         await app.internalPlugins?.plugins["templates"].instance.insertTemplate(insert);
@@ -1709,7 +1709,7 @@ var createNote = async (app, type, folder, prompt, filePath, isTemplater) => {
       }
       const openOption = path[2];
       if (openOption === "false") {
-        return;
+
       } else if (openOption === "vsplit") {
         const leaf = app.workspace.getLeaf("split", "vertical");
         await leaf.openFile(file);
@@ -2331,7 +2331,7 @@ var clickHandler = async (app, args, inline, id) => {
   }
   if (processedArgs.type === "chain") {
     await chain(app, processedArgs, position, inline, id, activeFile);
-    return;
+
   }
 };
 
@@ -4207,7 +4207,7 @@ var ButtonModal = class extends import_obsidian18.Modal {
         this.outputObject.type = value;
         actionContainer.empty();
         if (value === "pre") {
-          return;
+
         } else if (value === "chain") {
           this.renderChainActions(actionContainer);
         } else if (value === "link") {
@@ -5055,7 +5055,7 @@ var ButtonWidget = class extends import_view.WidgetType {
     }
     if (processedArgs.type === "chain") {
       await chain(this.app, processedArgs, position, true, this.id, activeFile);
-      return;
+
     }
   }
 };

@@ -272,6 +272,34 @@ def get_daily_codes() -> list[str]:
     return [r[0] for r in rows]
 
 
+def get_daily_latest_date(industry_code: str) -> str | None:
+    """获取某行业 DB 中最新的 trade_date，无数据返回 None。"""
+    conn = _connect()
+    row = conn.execute(
+        "SELECT MAX(trade_date) FROM meso_industry_daily WHERE industry_code=?",
+        (industry_code,),
+    ).fetchone()
+    conn.close()
+    return row[0] if row and row[0] else None
+
+
+def latest_trading_date() -> str:
+    """返回最近一个可能的交易日期（简化版：今天或昨天）。
+
+    不依赖交易日历——用于判断 DB 数据是否可能是最新的。
+    返回 YYYY-MM-DD 格式。
+    """
+    now = datetime.now()
+    # 周六 → 周五，周日 → 周五
+    if now.weekday() == 5:  # Sat
+        now -= timedelta(days=1)
+    elif now.weekday() == 6:  # Sun
+        now -= timedelta(days=2)
+    # 收盘前（15:00）用昨天，收盘后用今天
+    # 简化版：直接用当前日期
+    return now.strftime("%Y-%m-%d")
+
+
 # ── 行业估值 ──────────────────────────────────────────
 
 

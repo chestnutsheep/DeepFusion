@@ -66,6 +66,7 @@ This project uses Git. See .gitignore for excluded files.
 | `correlation` | `deep_fusion/shared/correlation.py` | 行业相关性分析：静态/滚动相关矩阵、层次聚类、PCA载荷、主线识别 | `tools/industry.py` 的 `industry_themes` |
 | `dcc_garch` | `deep_fusion/shared/dcc_garch.py` | DCC-GARCH Engle两步法：单变量GARCH(arch包)+条件相关演化估计 | `tools/industry.py` 的 `industry_themes_dcc` |
 | `causality` | `deep_fusion/shared/causality.py` | Granger因果检验矩阵、领先-滞后网络、龙头行业识别 | `tools/industry.py` 的 `industry_themes_causality` |
+| `network_analysis` | `deep_fusion/shared/network_analysis.py` | 相关网络构建(`build_correlation_network`)、社区检测(`detect_communities`)、中心性(`compute_centrality`) | `tools/industry.py` 预留，依赖 networkx |
 
 **关键去重**：
 - `kondratiev.py` 不再有独立的 `_NbsClient` 副本（~390 行已删除），统一使用 `data/sources/nbs_client.py`
@@ -87,6 +88,36 @@ from deep_fusion import load_portfolio
 ```
 
 同样，`load_portfolio` / `save_portfolio` 在 `deep_fusion/shared/utils.py`，不在顶层包。
+
+### MCP 工具参数的 `_val()` 解包 (2026-06-15)
+
+MCP 框架通过 FastMCP 调用工具时，`Field("pearson")` 默认值传入的是 `FieldInfo` 对象而非字符串。直接 Python 调用（如 `_run_themes.py` 脚本）会因类型不匹配而报错。
+
+`industry.py` 顶部定义的 `_val()` 辅助函数统一处理此问题：
+
+```python
+def _val(v, default=""):
+    """解包 Field 默认值 — 兼容 MCP 框架传入的 FieldInfo 和直接 Python 调用。"""
+    if hasattr(v, "default"):
+        return v.default if v.default is not None else default
+    return v if v is not None else default
+```
+
+所有 `industry.py` 工具函数内使用 `_val(param)` 而非直接引用参数。**新增工具时务必遵循此模式**。
+
+### 统计库 FutureWarning 抑制 (2026-06-15)
+
+`statsmodels` 0.14 对每次 `grangercausalitytests` 调用都刷 `FutureWarning: verbose is deprecated`。90×89=8010 次 Granger 检验意味着 8010 行警告。
+
+`causality.py` 中已用 `warnings.catch_warnings()` 包裹 Granger 调用块来抑制。**若升级 statsmodels 后此警告消除，可移除该抑制**。
+
+### A股交易日 vs 日历日注意
+
+行业日行情数据（`industry_daily_collect`）来源于同花顺，仅交易日有数据。周末（周六日）和法定节假日无数据。
+
+采集后出现部分行业截止到周五、部分截止到下周一的情况，属于**数据源更新时差**而非代码 bug。同花顺/akshare 的数据通常在收盘后一段时间才更新，不同行业更新时间可能不同。
+
+**判断数据新鲜度时**：应以最后一个交易日为基准，而非日历日。
 
 ### 行业主线识别工具：实现与调用说明 (2026-06-14)
 

@@ -73,11 +73,14 @@ def granger_causality_matrix(
                     continue
 
                 with np.errstate(invalid="ignore"):
-                    result = grangercausalitytests(
-                        test_data.values,
-                        maxlag=max_lag,
-                        verbose=False,
-                    )
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", "verbose is deprecated")
+                        result = grangercausalitytests(
+                            test_data.values,
+                            maxlag=max_lag,
+                            verbose=False,
+                        )
 
                 # 取各滞后期中最小 p 值
                 min_p = 1.0

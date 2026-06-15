@@ -2,7 +2,7 @@
 
 DeepFusion — 作为 **MCP 服务器** 为 AI Agent 提供中国金融市场全品类数据获取与分析能力。
 
-覆盖 **A股 / 港股 / 美股 / 加密货币 / 外汇 / 期货 / 基金 / 贵金属 / 经济周期** 九大资产，集成 **81 个数据工具、7 个 SOP 分析工作流、14 个预置资源**。
+覆盖 **A股 / 港股 / 美股 / 加密货币 / 外汇 / 期货 / 基金 / 贵金属 / 经济周期** 九大资产，集成 **129 个数据工具、7 个 SOP 分析工作流、14 个预置资源**。
 
 ## 快速开始
 
@@ -54,7 +54,7 @@ uv run python -m deep_fusion --inspect
 
 ## 功能总览
 
-### 工具清单（81 个）
+### 工具清单（129 个）
 
 Agent 接入后可调用以下工具获取实时数据：
 
@@ -84,7 +84,7 @@ Agent 接入后可调用以下工具获取实时数据：
 | `market_anomaly_scan` | 异动扫描（火箭发射/快速反弹/加速下跌/高台跳水/大单等） | _"今天有哪些股票出现异动？"_ |
 | `margin_balance` | 融资融券余额（近 30 期） | _"最近两融余额变化如何？"_ |
 
-#### 宏观经济（12 个工具）
+#### 宏观经济（13 个工具）
 
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
@@ -99,8 +99,9 @@ Agent 接入后可调用以下工具获取实时数据：
 | `macro_industrial_value_add` | 工业增加值同比增速 | _"工业增加值增速"_ |
 | `macro_inventory_growth` | 库存增长（工业企业产成品库存同比） | _"库存周期处于什么位置？"_ |
 | `macro_fixed_investment` | 固定资产投资累计同比 | _"固定资产投资增速"_ |
+| `global_pmi` | 全球合成 PMI（美国 ISM + 欧元区 + 中国） | _"全球 PMI 走势如何？"_ |
 
-#### 经济周期（8 个工具）
+#### 经济周期（16 个工具）
 
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
@@ -108,18 +109,43 @@ Agent 接入后可调用以下工具获取实时数据：
 | `juglar_cycle` | 朱格拉周期（固定资本投资周期）定位 — 固投+PPI+PMI | _"设备投资周期处于什么位置？"_ |
 | `kuznets_cycle` | 库兹涅茨周期（房地产周期）定位 — 房地产板块价格同比+PMI | _"房地产周期是复苏还是衰退？"_ |
 | `kondratiev_cycle` | 康波周期（长波）定位 — 人均GDP 频谱分析（FFT/ACF/小波/EMD） | _"我们现在处于康波的哪个阶段？"_ |
-| `chart_kitchin_cycle` | 基钦周期分析图表（2×2 子图：需求vs库存/PMI/实际库存vsPPI/M2vs固投） | _"画一张库存周期分析图"_ |
-| `chart_juglar_cycle` | 朱格拉周期分析图表（投资指标/PPIvsPMI/固投细项） | _"画一张朱格拉周期图"_ |
-| `chart_kuznets_cycle` | 库兹涅茨周期分析图表（房地产板块+PMI 双图） | _"画一张房地产周期图"_ |
-| `chart_kondratiev_cycle` | 康波周期分析图表（人均GDP历史序列+主周期标注） | _"画一张康波周期图"_ |
+| `chart_kitchin_cycle` | 基钦周期分析图表 | _"画一张库存周期分析图"_ |
+| `chart_juglar_cycle` | 朱格拉周期分析图表 | _"画一张朱格拉周期图"_ |
+| `chart_kuznets_cycle` | 库兹涅茨周期分析图表 | _"画一张房地产周期图"_ |
+| `chart_kondratiev_cycle` | 康波周期分析图表 | _"画一张康波周期图"_ |
+| `data_kitchin` / `data_juglar` / `data_kuznets` / `data_kondratiev` | 四周期结构化数据（JSON，供前端渲染） | _"获取基钦周期数据数组"_ |
+| `data_*_extended` | FRED 扩展版（美国长序列 1919~ 至今） | _"美国基钦周期长序列"_ |
+| `cycle_nesting` | 四周期嵌套合成 Z 值 | _"当前四周期叠加状态"_ |
+| `cycle_collect` | 采集 NBS 数据 + 预热各周期计算 | _"预热周期数据"_ |
+| `cycle_cache_status` | 周期缓存状态 | _"查看周期缓存"_ |
+| `fred_data` / `fred_list` | FRED 指标数据/列表 | _"美国 PPI 数据"_ |
+| `wb_data` / `wb_list` | 世界银行指标数据/列表 | _"全球 GDP 增速"_ |
 
-#### 行业数据（3 个工具）
+#### 行业数据（19 个工具）
 
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
-| `industry_classify` | 行业分类（申万/证监会/东财） | _"茅台属于什么行业？"_ |
+| `industry_classify` | 行业分类（申万/证监会/东财/同花顺） | _"茅台属于什么行业？"_ |
 | `industry_quotes` | 行业行情 + 历史K线 + 估值 + 财务 | _"白酒行业的估值和 ROE 怎么样？"_ |
 | `industry_capital_flow` | 行业资金流 + 涨跌排名 | _"哪些行业资金在流出？"_ |
+| `industry_daily_collect` | 批量采集同花顺行业日行情→SQLite | _"采集行业日行情数据"_ |
+| `industry_daily_query` | 查询本地 SQLite 行业日行情 | _"查看白酒行业最近30天行情"_ |
+| `industry_collect` | 行业分类/估值/资金流/行情/申万分级快照采集 | _"刷新行业基础数据"_ |
+| `industry_sw_tree` | 申万三级行业树（31一级→131二级→336三级） | _"申万行业分类树"_ |
+| `industry_sw_constituents` | 申万指数成分股 | _"申万白酒成分股"_ |
+| `industry_sw_constituents_detail` | 申万成分股+实时行情（涨跌幅/PE/PB） | _"白酒行业成分股详细数据"_ |
+| `industry_sw_daily` | 申万日报表（市场表征/一级/二级/风格） | _"申万一级行业今日表现"_ |
+| `industry_db_status` | 行业数据库各表行数+新鲜度 | _"行业数据是否过期？"_ |
+| `spot_prices` | 81个大宗商品现货走势（99qh） | _"螺纹钢现货价格"_ |
+| `spot_symbols` | 可查现货品种列表 | _"有哪些现货品种？"_ |
+| `ff_factors` | Fama-French 多因子数据 | _"最新FF因子"_ |
+| `caixin_indices` | 19个财新指数数据 | _"中国新经济指数"_ |
+| `caixin_list` | 财新指数列表 | _"有哪些财新指数？"_ |
+| `industry_themes` | ★ 行业主线识别（相关性聚类+动量+资金流→综合评分） | _"当前市场主线是什么？"_ |
+| `industry_themes_dcc` | ★ DCC-GARCH 时变条件相关（联动加强/减弱行业对） | _"哪些行业联动在加强？"_ |
+| `industry_themes_causality` | ★ Granger因果+领先/滞后行业识别 | _"哪些行业是龙头？"_ |
+
+> ★ 三个主线识别工具需先运行 `industry_daily_collect` 采集行业日行情数据。详细算法说明见 `AGENTS.md`。
 
 #### 财务/消息/资金（7 个工具）
 
@@ -133,19 +159,19 @@ Agent 接入后可调用以下工具获取实时数据：
 | `stock_indicators_hk` | 港股财务摘要 | _"腾讯的财务指标"_ |
 | `stock_indicators_us` | 美股单季报财务摘要 | _"特斯拉最新一季报"_ |
 
-#### 加密货币（10 个工具）
+#### 加密货币（9 个工具）
 
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
 | `crypto_prices` | 多币种统一行情（OHLCV + 技术指标） | _"BTC 和 ETH 的行情和技术指标"_ |
-| `crypto_sentiment_metrics` | 合约多空比 + 吃单量 + 资金费率 + 持仓量 + 恐惧贪婪指数 | _"BTC 合约多空比和资金费率"_ |
+| `crypto_sentiment_metrics` | 合约多空比 + 吃单量 | _"BTC 合约多空比"_ |
 | `fear_greed_index` | 恐惧&贪婪指数 | _"现在的恐惧贪婪指数是多少？"_ |
 | `crypto_composite_diagnostic` | 综合诊断（价格+合约+情绪） | _"现在适合做多还是做空 BTC？"_ |
-| `crypto_综合诊断（OKX）` | OKX 综合诊断 | _"OKX 上的 BTC 怎么看？"_ |
 | `binance_ai_report` | Binance AI 报告 | _"Binance 对 BTC 的分析"_ |
-| `backtest_crypto_strategy` | 加密货币策略回测 | _"BTC SMA 金叉死叉策略回测"_ |
-| `okx_funding_rate` | OKX 资金费率 | _"OKX BTC 资金费率"_ |
-| `okx_open_interest` | OKX 持仓量 | _"OKX BTC 持仓量变化"_ |
+| `crypto_funding_rate` | OKX 资金费率 | _"OKX BTC 资金费率"_ |
+| `crypto_open_interest` | OKX 持仓量 | _"OKX BTC 持仓量变化"_ |
+| `draw_crypto_chart` | ASCII 走势图 | _"画 BTC 走势图"_ |
+| `backtest_crypto_strategy` | 策略回测（SMA/RSI/MACD） | _"BTC SMA 策略回测"_ |
 
 #### 外汇（2 个工具）
 
@@ -163,14 +189,19 @@ Agent 接入后可调用以下工具获取实时数据：
 | `futures_basis` | 期现基差 | _"铁矿石基差是多少？"_ |
 | `futures_positions` | 机构持仓排名 | _"螺纹钢期货谁在持有多头？"_ |
 
-#### 基金（4 个工具）
+#### 基金（9 个工具）
 
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
-| `fund_info` | 基金信息 + 净值（单位/累计/日增长） | _"易方达蓝筹精选的净值信息"_ |
-| `fund_nav` | 基金日数据（开放式基金全量） | _"今天所有基金的涨跌幅排名"_ |
-| `fund_holdings` | 基金持仓股票 | _"张坤的基金持有哪些股票？"_ |
-| `fund_ranking` | 同类排名 | _"股票型基金近一年排名"_ |
+| `fund_info` | 基本信息雪球→东方财富三级回退 | _"易方达蓝筹精选的信息"_ |
+| `fund_nav` | 基金净值历史（单位/累计/日增长） | _"基金净值走势"_ |
+| `fund_holdings` | 股票持仓明细 | _"张坤的基金持有哪些股票？"_ |
+| `fund_ranking` | 同类排名 Top100 | _"股票型基金近一年排名"_ |
+| `fund_bond_holdings` | 债券持仓明细 | _"基金债券配置"_ |
+| `fund_industry_allocation` | 行业配置比例 | _"基金行业分布"_ |
+| `fund_analysis` | 风险收益分析（年化波动率/夏普/最大回撤） | _"基金风险指标"_ |
+| `fund_profit_probability` | 盈利概率（任意时点买入持有X时间） | _"持有3年盈利概率"_ |
+| `fund_asset_allocation` | 资产配置（股票/债券/现金占比） | _"基金资产配置"_ |
 
 #### 贵金属（7 个工具）
 
@@ -183,6 +214,29 @@ Agent 接入后可调用以下工具获取实时数据：
 | `pm_basis` | 基差 | _"沪金基差"_ |
 | `pm_benchmark_price` | 基准价 | _"今天的黄金基准价"_ |
 | `pm_composite_diagnostic` | 综合诊断 | _"现在适合买黄金吗？"_ |
+
+#### 政策文件（5 个工具）
+
+| 工具 | 功能 | 典型查询 |
+|------|------|----------|
+| `policy_collect` | 采集6大官网政策文件→SQLite（国务院/央行/财政部/发改委/统计局/外管局） | _"采集最新政策文件"_ |
+| `policy_search` | 按关键词/机构/年份搜索政策 | _"搜索房地产相关政策"_ |
+| `policy_detail` | 政策全文详情 | _"查看这条政策全文"_ |
+| `policy_stats` | 政策文件统计（总篇数+各机构分布） | _"政策文件数量统计"_ |
+| `policy_timeline` | 政策时间线（按月聚合+五年规划阶段） | _"2024年政策时间线"_ |
+
+#### 频谱分析（2 个工具）
+
+| 工具 | 功能 | 典型查询 |
+|------|------|----------|
+| `cycle_detect` | 多方法周期检测（FFT/ACF/小波/EMD/Lomb/MUSIC/ESPRIT/MEM） | _"这段数据的周期是多少？"_ |
+| `cycle_phase` | CF 带通滤波+相位推断 | _"当前处于什么相位？"_ |
+
+#### 技术指标（1 个工具）
+
+| 工具 | 功能 | 典型查询 |
+|------|------|----------|
+| `stock_tech_indicators` | 15 项技术指标（MACD/KDJ/RSI/BOLL/MA/EMA/ADX/CCI/OBV/SAR/WR/ROC/PSY/BIAS/MTM） | _"茅台最新技术指标"_ |
 
 #### 模拟持仓（3 个工具）
 
@@ -197,10 +251,10 @@ Agent 接入后可调用以下工具获取实时数据：
 | 工具 | 功能 | 典型查询 |
 |------|------|----------|
 | `composite_stock_diagnostic` | 复合诊断（技术+基本面+消息） | _"综合分析一下茅台"_ |
-| `backtest_strategy` | 策略回测（SMA/RSI/MACD/BOLL/MA_CROSS/KDJ） | _"MACD 金叉死叉策略在茅台上的回测结果"_ |
-| `draw_ascii_chart` | ASCII 价格走势图 | _"画个茅台近一年的走势图"_ |
+| `backtest_strategy` | 策略回测（SMA/RSI/MACD/BOLL/MA_CROSS/KDJ） | _"MACD 策略在茅台上的回测"_ |
+| `draw_ascii_chart` | ASCII 价格走势图 | _"画个茅台近一年走势图"_ |
 | `draw_crypto_chart` | 加密货币 ASCII 图 | _"画 BTC 走势图"_ |
-| `trading_suggest` | 交易建议 | _"根据当前数据给出交易建议"_ |
+| `trading_suggest` | 交易建议格式化 | _"根据当前数据给出交易建议"_ |
 | `cache_status` / `cache_clear` | 缓存统计/清理 | _"查看/清理缓存状态"_ |
 
 ---
@@ -234,9 +288,17 @@ Agent 调用以下提示词可触发完整的结构化分析工作流：
 | **东方财富** (akshare `_em`) | A股行情/财务/资金流/涨停/龙虎榜/基金/期货/外汇 | 需要代理（`push2.eastmoney.com`） |
 | **datacenter.eastmoney.com** | 行业比较/财务指标/机构调研 | 无需代理，注意大小写（`SH`/`SZ`） |
 | **新浪** (akshare `_sina`) | 实时快照、财报、龙虎榜 | 无需代理 |
+| **同花顺** | 行业分类/日行情/资金流（90 个行业 × 5 年历史） | 无需代理 |
+| **巨潮资讯** | 行业 PE/PB 估值 | 无需代理 |
+| **申万** | 三级行业分级（31/131/336）/成分股/日报表 | 无需代理 |
+| **99qh** | 81 个大宗商品现货（2012 年至今） | 无需代理 |
+| **财新** | 19 个财新指数（新经济/PMI/产业等） | 无需代理 |
 | **OKX / Binance** | 加密货币行情/合约/情绪 | 无需代理 |
 | **SGE** (上金所) | 贵金属现货/基差/基准价 | 无需代理 |
-| **国家统计局** (akshare) | GDP/CPI/PMI/工业/固投/库存等宏观数据 | 无需代理 |
+| **国家统计局** (akshare + NBS 客户端) | GDP/CPI/PMI/工业/固投/库存等宏观数据 | 无需代理 |
+| **FRED** | 8 个美国经济指标（年频/月频） | 无需代理 |
+| **世界银行** | 7 个全球指标（年频，1960~至今） | 无需代理 |
+| **政策爬虫** | 国务院/央行/财政部/发改委/统计局/外管局 6 大官网 | 无需代理 |
 
 ---
 
@@ -267,39 +329,63 @@ DeepFusion/
 │   ├── cache.py              # 双层缓存（L1 内存 / L2 磁盘）
 │   ├── prompts.py            # 7 个 SOP 分析提示词
 │   ├── resources.py          # 14 个投研资源
-│   ├── analysis/             # 周期分析引擎（engine/kondratiev/juglar/kuznets/kitchin）
-│   ├── data/                 # 数据源层（nbs_client/fred/world_bank/data_lake）
-│   ├── shared/               # 共享模块
+│   ├── analysis/             # 周期分析引擎
+│   │   ├── engine.py         # CycleEngine 核心计算
+│   │   ├── kondratiev.py     # 康波周期（三线PCA + level-momentum 相位）
+│   │   ├── juglar.py         # 朱格拉周期
+│   │   ├── kuznets.py        # 库兹涅茨周期
+│   │   ├── kitchin.py        # 基钦周期
+│   │   ├── industry/         # 行业分析
+│   │   │   └── rotation.py   # 行业轮动分析
+│   │   ├── stock/            # 个股分析
+│   │   │   └── screener.py   # 股票筛选
+│   │   └── macro/            # 宏观分析
+│   ├── data/                 # 数据源层
+│   │   ├── sources/
+│   │   │   ├── nbs_client.py      # NBS 国家统计局（单例 + 8 个 fetch 函数）
+│   │   │   ├── industry_collector.py  # 同花顺行业日行情批量采集
+│   │   │   ├── fred.py             # FRED 美联储经济数据
+│   │   │   ├── world_bank.py       # 世界银行数据
+│   │   │   └── data_lake.py        # 本地数据湖（SQLite 缓存）
+│   ├── shared/               # 共享模块（跨工具复用）
 │   │   ├── chart_helpers.py  # 图表公共工具（阶段着色/字体/日期轴/Agg后端）
 │   │   ├── phase_utils.py    # 相位命名映射（KOND_RENAME 等）
+│   │   ├── correlation.py    # 行业相关性分析（相关矩阵/层次聚类/PCA/主线识别）
+│   │   ├── dcc_garch.py      # DCC-GARCH Engle 两步法
+│   │   ├── causality.py      # Granger 因果检验 + 领先行业识别
+│   │   ├── network_analysis.py  # 相关网络 + 社区检测 + 中心性（networkx）
+│   │   ├── industry_db.py    # SQLite 行业数据库辅助
+│   │   ├── cycle_db.py       # SQLite 周期数据库辅助（FRED/世界银行）
+│   │   ├── policy_db.py      # SQLite 政策数据库辅助
 │   │   ├── constants.py      # 环境变量/URL/UA/DB_CONFIG 常量
 │   │   ├── fields.py         # Pydantic Field 定义
 │   │   ├── indicators.py     # 19 个技术指标计算
 │   │   ├── spectral.py       # 频谱分析（FFT/ACF/小波/EMD）— 康波周期使用
 │   │   ├── normalize.py      # DataFrame → CSV 标准化
 │   │   ├── schema.py         # 输出列名映射
-│   │   ├── industry_db.py    # SQLite 行业数据库辅助
-│   │   ├── cycle_db.py       # SQLite 周期数据库辅助（FRED/世界银行）
-│   │   ├── policy_db.py      # SQLite 政策数据库辅助
 │   │   ├── request.py        # HTTP session + UA 轮换 + 代理
 │   │   └── utils.py          # ak_cache / ak_cache_async + EM 回退
-│   └── tools/                # 14 个工具模块
+│   └── tools/                # 17 个工具模块
 │       ├── analysis.py       # 诊断/回测/图表/缓存（6 个工具）
-│       ├── crypto.py         # 加密货币（10 个工具）
-│       ├── cycles.py         # ★ 经济周期定位（8 个工具：基钦/朱格拉/库兹涅茨/康波）
+│       ├── bonds.py          # 债券与期权（4 个工具）
+│       ├── crypto.py         # 加密货币（9 个工具）
+│       ├── cycles.py         # ★ 经济周期定位（16 个工具：四周期+图表+数据+FRED/WB）
 │       ├── forex.py          # 外汇（2 个工具）
-│       ├── funds.py          # 基金（4 个工具）
+│       ├── funds.py          # 基金（9 个工具）
 │       ├── futures.py        # 期货（4 个工具）
-│       ├── industry.py       # 行业数据（3 个工具）
-│       ├── macro.py          # 宏观经济（12 个工具）
+│       ├── industry.py       # ★ 行业数据（19 个工具：分类/行情/资金/申万/现货/主线识别）
+│       ├── macro.py          # 宏观经济（13 个工具）
 │       ├── market.py         # 市场总貌（11 个工具）
+│       ├── policy.py         # 政策文件（5 个工具）
 │       ├── portfolio.py      # 模拟持仓（3 个工具）
 │       ├── precious_metals.py # 贵金属（7 个工具）
+│       ├── spectral.py       # 频谱分析（2 个工具）
 │       ├── stock_reports.py  # 财务/消息/资金（7 个工具）
-│       └── stocks.py         # 股票基础（5 个工具）
+│       ├── stocks.py         # 股票基础（5 个工具）
+│       └── tech_indicators.py # 技术指标（1 个工具）
 ├── agents/skills/            # 10 个投研 SOP 技能
 ├── references/               # 投研参考文档
-├── tests/                    # 测试套件（12 个测试文件，52 个测试用例）
+├── tests/                    # 测试套件（14 个测试文件，128 个测试用例）
 ├── .env.example              # 环境变量模板
 ├── proxy_setup.md            # 代理设置指南
 ├── registry_add.bat          # Windows 代理注册脚本
@@ -413,7 +499,7 @@ A: 修改 `.env` 中的 `HTTP_PROXY` 地址为你的实际代理地址即可。
 
 | 文件 | 用途 |
 |:-----|:-----|
-| `AGENTS.md` | 合并实施记录、缓存配置、已知问题、变更日志 |
+| `AGENTS.md` | AI 助手工作指南：红线禁令、缓存版本锁、共享模块架构、工具注册表（129 工具完整清单）、行业主线算法说明 |
 | `server.json` | MCP 客户端配置模板（Claude/Cursor/OpenCode） |
 | `agents/skills/` | 10 个投研 SOP 技能（行业对比/周期定位/假设检验等） |
 | `references/` | 投研参考词典（宏观/中观/微观） |

@@ -3,6 +3,14 @@
 import akshare as ak
 from pydantic import Field
 
+
+def _val(v):
+    """解包 Field 默认值——直接 Python 调用时参数可能是 Field 对象而非原生类型。"""
+    from pydantic.fields import FieldInfo
+    if isinstance(v, FieldInfo):
+        return v.default
+    return v
+
 from ..cache import ak_cache
 from ..data.sources import caixin_indices as caixin
 from ..data.sources import industry_cninfo as cninfo
@@ -96,17 +104,22 @@ def industry_capital_flow(
 
 @mcp.tool(
     name="industry_daily_collect",
-    description="批量采集同花顺行业日行情（OHLCV）写入本地 SQLite，约90行业×5年数据",
+    description="批量采集同花顺行业日行情（OHLCV）写入本地 SQLite，约90行业×5年数据。"
+    "自动增量：DB已是最新则跳过，否则从最后日期补增量。force=True强制全量重采。",
 )
 def industry_daily_collect(
     start_date: str = "20200101",
+    force: bool = Field(False, description="强制全量重采，绕过DB新鲜度检查和缓存"),
 ) -> str:
     import time
+    force = _val(force)
     t0 = time.time()
-    results = collector.collect_all_industry_daily(start_date)
+    results = collector.collect_all_industry_daily(start_date, force=force)
     elapsed = time.time() - t0
     total = sum(results.values())
-    lines = [f"采集完成: {len(results)} 个行业, {total} 行, {elapsed:.0f}s"]
+    lines = [f"采集完成: {len(results)} 个行业更新, {total} 行, {elapsed:.0f}s"]
+    if not force and total == 0:
+        lines.append("  DB已是最新，无需更新。使用 force=True 强制重采。")
     for name, rows in list(results.items())[:5]:
         lines.append(f"  {name}: {rows} 行")
     if len(results) > 5:
@@ -591,6 +604,9 @@ def industry_themes(
     import time
     from ..shared.correlation import identify_themes
 
+    window = _val(window)
+    n_clusters = _val(n_clusters)
+    corr_method = _val(corr_method)
     t0 = time.time()
 
     # 1. 加载数据
@@ -765,6 +781,7 @@ def industry_themes_dcc(
     import numpy as np
     from ..shared.dcc_garch import fit_dcc_garch
 
+    window = _val(window)
     t0 = time.time()
 
     returns, _ = _load_returns_matrix(window=window)
@@ -934,6 +951,8 @@ def industry_themes_causality(
     import time
     from ..shared.causality import granger_causality_matrix, identify_leading_industries
 
+    window = _val(window)
+    max_lag = _val(max_lag)
     t0 = time.time()
 
     returns, _ = _load_returns_matrix(window=window)

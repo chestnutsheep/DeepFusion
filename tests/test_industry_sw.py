@@ -197,29 +197,34 @@ class TestGetConstituentsWithQuotes:
         assert pd.isna(row_688999["change_pct"])
 
     def test_cache_key_includes_industry_code(self, monkeypatch):
-        """The spot_all call should use a cache key that doesn't vary per industry_code."""
+        """get_constituents 应使用包含行业代码的缓存 key。"""
         from deep_fusion.data.sources import industry_sw
 
         captured_keys = []
 
         def _capturing_cache(fun, *args, **kwargs):
-            key = kwargs.get("key", f"{fun.__name__}-{args}-{kwargs}")
-            captured_keys.append(key)
-            name = getattr(fun, "__name__", "")
+            # 模拟修复后的 ak_cache 行为：先 pop ttl/ttl2/force/key 再拼 key
+            key = kwargs.pop("key", None)
             kwargs.pop("ttl", None)
             kwargs.pop("ttl2", None)
-            kwargs.pop("key", None)
+            kwargs.pop("force", None)
+            if not key:
+                key = f"{fun.__name__}-{args}-{kwargs}"
+            captured_keys.append(key)
+            name = getattr(fun, "__name__", "")
             if name == "index_component_sw":
                 return _mock_constituents_df()
             if name == "stock_zh_a_spot_em":
                 return _mock_spot_em_df()
             return pd.DataFrame()
 
+        # 直接测试 get_constituents（不经过 get_constituents_with_quotes）
         monkeypatch.setattr(industry_sw, "ak_cache", _capturing_cache)
-        industry_sw.get_constituents_with_quotes("801011")
+        industry_sw.get_constituents("801011")
 
-        # At least 2 cache calls: constituents + spot
-        assert len(captured_keys) >= 2
+        # 应该有 1 个 key，且包含行业代码
+        assert len(captured_keys) >= 1
+        assert "801011" in captured_keys[0]
 
 
 # ---------------------------------------------------------------------------
