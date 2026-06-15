@@ -1270,3 +1270,16 @@ A 股行业收益率的 PC1 解释 ~54% 方差，本质是市场系统性 beta�
   }
 }
 ```
+
+### 相关性分析完整输出版使用方式
+```
+# 完整版（约 90s）
+uv run python scripts/industry_full_report.py
+
+# 快速版（跳过 DCC + 因果，约 6s）
+uv run python scripts/industry_full_report.py --skip-dcc --skip-causality
+
+# 自定义参数
+uv run python scripts/industry_full_report.py --window 60 --n-clusters 7 --corr-method spearman
+
+```
