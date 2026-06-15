@@ -381,8 +381,13 @@ def caixin_list() -> str:
 #  行业主线识别工具
 # ═══════════════════════════════════════════════════════════
 
-def _load_returns_matrix(window: int = 120) -> tuple:
-    """从 industry_db 加载行业日行情 → 收益率矩阵 + code→name 映射。"""
+def _load_returns_matrix(window: int = 120, limit: int = 0) -> tuple:
+    """从 industry_db 加载行业日行情 → 收益率矩阵 + code→name 映射。
+
+    Args:
+        window: 收益率回看窗口(交易日)，用于默认 limit 计算。
+        limit: 从数据库加载的日线条数。0 表示自动取 window+30。
+    """
     import pandas as pd
 
     codes = db.get_daily_codes()
@@ -397,9 +402,10 @@ def _load_returns_matrix(window: int = 120) -> tuple:
             code2name[r["industry_code"]] = r["industry_name"]
 
     # 加载日行情 → 收益率
+    fetch_limit = limit if limit > 0 else window + 30
     all_data = {}
     for code in codes:
-        df = db.get_daily(industry_code=code, limit=window + 30)
+        df = db.get_daily(industry_code=code, limit=fetch_limit)
         if df.empty:
             continue
         name = code2name.get(code, code)

@@ -57,7 +57,7 @@ def pm_spot_prices(
     df[close_col] = pd.to_numeric(df[close_col], errors="coerce")
     if volume_col in df.columns:
         df[volume_col] = pd.to_numeric(df[volume_col], errors="coerce")
-    add_technical_indicators(df, df[close_col], df[low_col], df[high_col])
+    add_technical_indicators(df, close_col, low_col, high_col, volume_col)
     column_map = {"date": date_col, "open": open_col, "high": high_col, "low": low_col, "close": close_col}
     if volume_col in df.columns:
         column_map["volume"] = volume_col

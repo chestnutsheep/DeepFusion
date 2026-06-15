@@ -1279,7 +1279,11 @@ uv run python scripts/industry_full_report.py
 # 快速版（跳过 DCC + 因果，约 6s）
 uv run python scripts/industry_full_report.py --skip-dcc --skip-causality
 
-# 自定义参数
-uv run python scripts/industry_full_report.py --window 60 --n-clusters 7 --corr-method spearman
+# 默认：加载 window+30=150 条日线 → ~149 个收益率
+uv run python scripts/industry_full_report.py --window 120
+
+# 手动指定加载 500 条日线 → ~498 个收益率观测
+uv run python scripts/industry_full_report.py --window 120 --limit 500
+
 
 ```

@@ -18,6 +18,7 @@
 用法:
   uv run python scripts/industry_full_report.py
   uv run python scripts/industry_full_report.py --window 120 --n-clusters 5
+  uv run python scripts/industry_full_report.py --limit 500  # 手动指定加载500条日线(约498个收益率)
   uv run python scripts/industry_full_report.py --skip-dcc --skip-causality  # 跳过耗时步骤
 """
 from __future__ import annotations
@@ -36,6 +37,19 @@ os.environ.setdefault("HTTPS_PROXY", "http://127.0.0.1:7897")
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output", "industry_themes")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def _clean_output_dir():
+    """删除输出目录中的旧文件，确保每次只保留最新结果。"""
+    import glob
+    old_files = glob.glob(os.path.join(OUTPUT_DIR, "*"))
+    for f in old_files:
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    if old_files:
+        print(f"  🧹 已清理 {len(old_files)} 个旧文件")
 
 
 def _save_json(name: str, data: dict):
@@ -71,13 +85,17 @@ def _fmt_matrix(df, max_rows=None, max_cols=None, float_fmt=".4f"):
 def main():
     parser = argparse.ArgumentParser(description="行业全景分析")
     parser.add_argument("--window", type=int, default=120, help="收益率回看窗口(交易日)")
+    parser.add_argument("--limit", type=int, default=0, help="从数据库加载的日线条数(0=自动取window+30)")
     parser.add_argument("--n-clusters", type=int, default=5, help="目标主线数")
     parser.add_argument("--corr-method", type=str, default="pearson", help="相关系数类型")
     parser.add_argument("--max-lag", type=int, default=5, help="Granger 检验最大滞后期")
-    parser.add_argument("--skip-dcc", action="store_true", help="跳过 DCC-GARCH(约30s)")
-    parser.add_argument("--skip-causality", action="store_true", help="跳过 Granger 因果(约60s)")
-    parser.add_argument("--skip-network", action="store_true", help="跳过网络分析(需 networkx)")
+    parser.add_argument("--skip-dcc", action="store_true", default=False, help="跳过 DCC-GARCH(约30s)")
+    parser.add_argument("--skip-causality", action="store_true", default=False, help="跳过 Granger 因果(约60s)")
+    parser.add_argument("--skip-network", action="store_true", default=False, help="跳过网络分析(需 networkx)")
     args = parser.parse_args()
+
+    # 清理旧输出
+    _clean_output_dir()
 
     total_t0 = time.time()
 
@@ -101,7 +119,7 @@ def main():
     print("=" * 60)
     t0 = time.time()
 
-    returns, code2name = _load_returns_matrix(window=args.window)
+    returns, code2name = _load_returns_matrix(window=args.window, limit=args.limit)
     if returns.empty:
         print("❌ 本地无行业数据，请先运行 industry_daily_collect 采集")
         sys.exit(1)
