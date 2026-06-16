@@ -6,7 +6,7 @@ export const useAppStore = create((set) => ({
   activeMesoSub: 'signals',
   activeMicroSub: 'stock',
   activePolicySub: 'stats',
-  activeGlobalSub: 'fred',
+  activeGlobalSub: 'stress',
   historyMode: null,
   theme: 'matin',
   setActiveTab: (tab) => set({ activeTab: tab }),

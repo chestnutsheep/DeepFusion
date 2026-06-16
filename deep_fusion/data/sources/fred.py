@@ -33,6 +33,24 @@ SERIES: dict[str, tuple[str, str]] = {
     "fred_ussthpi":   ("USSTHPI",          "美国房价指数, 1975~"),
     "fred_prfi":      ("PRFI",             "住宅固定投资, 1947~"),
     "fred_m2sl":      ("M2SL",             "M2货币存量, 1959~"),
+    # ── 金融压力指标（国际监测核心新增） ──
+    "fred_t10y2y":    ("T10Y2Y",           "10Y-2Y国债利差(日频), 倒挂=衰退信号, 1976~"),
+    "fred_tedrate":   ("TEDRATE",          "TED利差(银行间信用压力), 1986~"),
+    "fred_baa10ym":   ("BAA10YM",          "Baa企业债-10Y国债利差(信用风险), 1986~"),
+    "fred_baa_aaa":   ("BAA_AAA",          "Baa-Aaa级企业债利差(违约风险分层), 1986~"),
+    # ── 美国核心经济指标 ──
+    "fred_payems":    ("PAYEMS",           "非农就业人数(千人), 1939~"),
+    "fred_umcsent":   ("UMCSENT",          "密歇根消费者信心指数, 1978~"),
+    "fred_rsafs":     ("RSAFS",            "零售销售(百万美元), 1992~"),
+    "fred_cpilfesl":  ("CPILFESL",         "核心CPI(不含食品能源), 1957~"),
+    "fred_gfdebtn":   ("GFDEBTN",          "美国联邦债务/GDP(%), 1939~"),
+    # ── 亚太汇率压力 ──
+    "fred_dexjpus":   ("DEXJPUS",          "日元/美元汇率(日频), 1978~"),
+    "fred_dexkous":   ("DEXKOUS",          "韩元/美元汇率(月频), 1981~"),
+    "fred_dexchus":   ("DEXCHUS",          "人民币/美元汇率(日频), 1981~"),
+    # ── 亚太/欧洲经济指标 ──
+    "fred_jpn_indpro":("JPNPROINDM1M",     "日本工业生产指数(月频), 1953~"),
+    "fred_eu_unrate": ("LRHUTTTTEZM156S",  "欧元区失业率(月频), 2000~"),
 }
 
 

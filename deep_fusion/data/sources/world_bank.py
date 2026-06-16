@@ -13,9 +13,28 @@ INDICATORS: dict[str, tuple[str, str, str]] = {
     "wb_inflation":      ("FP.CPI.TOTL.ZG",    "1W", "CPI通胀率"),
     "wb_patent":         ("IP.PAT.RESD",       "1W", "居民专利申请量"),
     "wb_electricity":    ("EG.USE.ELEC.KH.PC", "1W", "人均用电量"),
+    # ── 国际金融压力监测新增（按国家分查） ──
+    "wb_debt_gdp_cn":    ("GC.DOD.TOTL.GD.ZS", "CN", "中国政府债务/GDP(%)"),
+    "wb_debt_gdp_us":    ("GC.DOD.TOTL.GD.ZS", "US", "美国政府债务/GDP(%)"),
+    "wb_debt_gdp_jp":    ("GC.DOD.TOTL.GD.ZS", "JP", "日本政府债务/GDP(%)"),
+    "wb_debt_gdp_kr":    ("GC.DOD.TOTL.GD.ZS", "KR", "韩国政府债务/GDP(%)"),
+    "wb_reserves_cn":    ("FI.RES.TOTL.MO",    "CN", "中国外汇储备(月进口覆盖)"),
+    "wb_reserves_kr":    ("FI.RES.TOTL.MO",    "KR", "韩国外汇储备(月进口覆盖)"),
+    "wb_reserves_jp":    ("FI.RES.TOTL.MO",    "JP", "日本外汇储备(月进口覆盖)"),
+    "wb_gdp_growth_cn":  ("NY.GDP.MKTP.KD.ZG", "CN", "中国GDP增长率(%)"),
+    "wb_gdp_growth_us":  ("NY.GDP.MKTP.KD.ZG", "US", "美国GDP增长率(%)"),
+    "wb_gdp_growth_jp":  ("NY.GDP.MKTP.KD.ZG", "JP", "日本GDP增长率(%)"),
+    "wb_gdp_growth_kr":  ("NY.GDP.MKTP.KD.ZG", "KR", "韩国GDP增长率(%)"),
+    "wb_inflation_cn":   ("FP.CPI.TOTL.ZG",    "CN", "中国CPI通胀率(%)"),
+    "wb_inflation_us":   ("FP.CPI.TOTL.ZG",    "US", "美国CPI通胀率(%)"),
+    "wb_inflation_jp":   ("FP.CPI.TOTL.ZG",    "JP", "日本CPI通胀率(%)"),
+    "wb_inflation_kr":   ("FP.CPI.TOTL.ZG",    "KR", "韩国CPI通胀率(%)"),
+    "wb_trade_cn":       ("NE.TRD.GNFS.ZS",    "CN", "中国贸易占GDP比重(%)"),
+    "wb_trade_jp":       ("NE.TRD.GNFS.ZS",    "JP", "日本贸易占GDP比重(%)"),
+    "wb_trade_kr":       ("NE.TRD.GNFS.ZS",    "KR", "韩国贸易占GDP比重(%)"),
 }
 
-COUNTRY_MAP = {"CN": "中国", "1W": "全球", "US": "美国", "JP": "日本", "DE": "德国"}
+COUNTRY_MAP = {"CN": "中国", "1W": "全球", "US": "美国", "JP": "日本", "KR": "韩国", "DE": "德国", "EUU": "欧元区"}
 
 
 def list_indicators() -> list[dict]:

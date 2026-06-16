@@ -157,7 +157,7 @@ def get_daily_analysis(
         symbol=symbol,
         start_date=start_date,
         end_date=end_date,
-        ttl=86400,
+        ttl=300,  # 5min — 日行情收盘后更新，与前端 staleTime 对齐
     )
     if df is None or df.empty:
         return pd.DataFrame()
@@ -222,7 +222,7 @@ def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
 
     # Step 2b: SQLite 无数据时，fallback 到 akshare 实时 API
     if spot_renamed.empty:
-        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
+        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, key="stock_zh_a_spot_em")
         if spot is None or spot.empty:
             # 无行情时仅返回成分股基础信息
             cons = cons.copy()

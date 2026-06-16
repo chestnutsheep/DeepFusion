@@ -192,7 +192,7 @@ def industry_collect() -> str:
 
     # 6. 全A实时行情快照（供成分股 PE/PB 查询）
     try:
-        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=86400, key="stock_zh_a_spot_em")
+        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, key="stock_zh_a_spot_em")
         if spot is not None and not spot.empty:
             rows = db.save_spot_quotes(spot)
             results.append(f"全A行情快照: {rows} 条")
