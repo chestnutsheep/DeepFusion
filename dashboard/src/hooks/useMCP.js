@@ -13,6 +13,8 @@ function getStaleTime(toolName) {
   if (toolName.startsWith('macro_')) return 24 * 60 * 60 * 1000;
   if (toolName.startsWith('policy_')) return 30 * 60 * 1000;
   if (toolName === 'search') return 2 * 60 * 1000;
+  // 行业数据：5分钟刷新，确保盘中/收盘后数据及时更新
+  if (toolName.startsWith('industry_')) return 5 * 60 * 1000;
   return 8 * 60 * 60 * 1000;
 }
 

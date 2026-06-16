@@ -6,14 +6,14 @@ import {mcp} from '../services/mcp.js';
 const SUB_NAV = {
   policy: ['stats','list','collect'],
   macro: ['kitchin','juglar','kuznets','kondratiev','coverage','nesting','gantt'],
-  meso: ['heatmap','tree','capital'],
+  meso: ['signals','heatmap','ranking','chain'],
   micro: ['stock','fund','futures','bond','option'],
   global: ['fred','wb','trade'],
 };
 const SUB_LABELS = {
   policy: { stats:'📊 政策统计', list:'📋 文件列表', collect:'🔄 采集管理' },
   macro: { kitchin:'📉 基钦', juglar:'📈 朱格拉', kuznets:'🏠 库兹涅茨', kondratiev:'🌊 康波', coverage:'📊 宏观覆盖', nesting:'🔗 周期嵌套', gantt:'📅 相位分布' },
-  meso: { heatmap:'🔥 热力图', tree:'🌳 行业树', capital:'💰 资金流' },
+  meso: { signals:'📡 趋势与信号', heatmap:'🔥 行业热力图', ranking:'📊 排名详情', chain:'⛓️ 产业链' },
   micro: { stock:'📈 个股', fund:'📦 基金', futures:'⛽ 期货', bond:'📜 债券', option:'🎯 期权' },
   global: { fred:'🇺🇸 FRED', wb:'🌍 World Bank', trade:'📊 贸易' },
 };
@@ -182,8 +182,8 @@ function SidebarContent() {
             icon={<span>{labels[key]?.split(' ')[0]}</span>}
             onClick={() => {
               setActiveSub(key);
-              // 宏观页面使用单页滚动
-              if (activeTab === 'macro') {
+              // 宏观/中观页面使用单页滚动
+              if (activeTab === 'macro' || activeTab === 'meso') {
                 const el = document.getElementById(key);
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }

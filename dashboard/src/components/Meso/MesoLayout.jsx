@@ -5,6 +5,7 @@ import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
 import * as echarts from 'echarts';
+import TrendsAndSignals, {WarningBar} from './TrendsAndSignals';
 
 // ── CSV 解析工具 ──
 
@@ -467,7 +468,7 @@ function IndustryDrilldown({ target, onBack }) {
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000);
   const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
-  const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, limit: 5000 });
+  const { data: l2Raw } = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, end_date: new Date().toISOString().slice(0, 10).replace(/-/g, ''), limit: 5000 });
 
   // 历史指数走势数据（一级行业级别）
   const { data: histRaw } = useMCP('industry_daily_query', target.industry ? { industry: target.industry, limit: 120 } : null);
@@ -1109,6 +1110,8 @@ function ChainView({ industries }) {
   );
 }
 
+
+
 /** 能源监测 */
 function EnergySection() {
   const { data: oilRaw } = useMCP('futures_prices', { symbol: '原油', limit: 60 });
@@ -1161,7 +1164,8 @@ export default function MesoLayout() {
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000); // 30自然日≈20交易日
   const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
-  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', start_date: startStr, limit: 800 });
+  const endStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', start_date: startStr, end_date: endStr, limit: 800 });
   const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
   const [activeInd, setActiveInd] = useState('');
 
@@ -1217,9 +1221,8 @@ export default function MesoLayout() {
     return config;
   }, [savedCombos]);
 
-  // 二级行业数据（自选二级 或 组合二级 都需要）
-  const needL2 = customLevel === 2 || savedCombos.some(c => c.level === 2);
-  const l2Result = useMCP('industry_sw_daily', needL2 ? { symbol: '二级行业', start_date: startStr, limit: 5000 } : null);
+  // 二级行业数据（自选二级 + 组合二级 + 趋势信号晴雨表都需要）
+  const l2Result = useMCP('industry_sw_daily', { symbol: '二级行业', start_date: startStr, end_date: endStr, limit: 5000 });
   const l2Parsed = useMemo(() => parseSWDaily(l2Result.data), [l2Result.data]);
 
   // 自选模式用的行业列表和矩阵
@@ -1289,8 +1292,32 @@ export default function MesoLayout() {
       {/* 英雄区 */}
       <ErrorBoundary><Hero industries={industries} /></ErrorBoundary>
 
-      {/* 区块一：行业热力图与轮动（可交互Tab+下钻） */}
-      <div style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+      {/* 动态警告条 */}
+      <ErrorBoundary>
+        <WarningBar
+          l1Industries={industries} l1Matrix={matrix} l1Dates={dates}
+        />
+      </ErrorBoundary>
+
+      {/* ═══ 区块一：趋势与信号 ═══ */}
+      <section id="signals" style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
+        <SectionHeader badge="📡 趋势与信号" title="市场结构" highlight="晴雨表" desc="先行/滞后行业信号 + 因果传导 + 阵营对比" />
+        <ErrorBoundary>
+          <TrendsAndSignals
+            l1Industries={industries}
+            l2Industries={l2Parsed.industries}
+            l1Dates={dates}
+            l2Dates={l2Parsed.dates}
+            l1Matrix={matrix}
+            l2Matrix={l2Parsed.matrix}
+          />
+        </ErrorBoundary>
+      </section>
+
+      <hr className="section-divider" />
+
+      {/* ═══ 区块二：行业热力图 ═══ */}
+      <section id="heatmap" style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
 
         {/* 控制栏 — 在卡片外部，水平排列 */}
@@ -1455,12 +1482,14 @@ export default function MesoLayout() {
             customLevel={effectiveLevel}
           />
         </CardWrapper>
-      </div>
+
+
+      </section>
 
       <hr className="section-divider" />
 
-      {/* 区块二：行业排名 + 行业详情 */}
-      <div style={{ paddingBottom: 24 }}>
+      {/* ═══ 区块三：排名详情 ═══ */}
+      <section id="ranking" style={{ paddingBottom: 24 }}>
         <SectionHeader badge="📊 行业排名" title="当期" highlight="TOP / BOTTOM" desc="各维度排名前 5 / 后 5 行业" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, marginBottom: 16 }}>
           <RankingTable title="🔥 涨幅 TOP 5" subtitle="· 今日" items={top5} colorKey="up" />
@@ -1471,18 +1500,18 @@ export default function MesoLayout() {
         <ErrorBoundary>
           <IndustryDetail sel={sel} chartData={chartData} latest={latest} prev={prev} />
         </ErrorBoundary>
-      </div>
+      </section>
 
       <hr className="section-divider" />
 
-      {/* 区块三：产业链穿透 */}
-      <div style={{ paddingBottom: 24 }}>
+      {/* ═══ 区块四：产业链穿透 ═══ */}
+      <section id="chain" style={{ paddingBottom: 24 }}>
         <ErrorBoundary><ChainView industries={industries} /></ErrorBoundary>
-      </div>
+      </section>
 
       <hr className="section-divider" />
 
-      {/* 区块四：能源专项 */}
+      {/* 区块四附：能源专项 */}
       <div style={{ paddingBottom: 24 }}>
         <ErrorBoundary><EnergySection /></ErrorBoundary>
       </div>
