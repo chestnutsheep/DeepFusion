@@ -3,6 +3,7 @@ import {useMCP} from '../../hooks/useMCP.js';
 import DataGrid from '../common/DataGrid.jsx';
 import DataChart from '../common/DataChart.jsx';
 import {STOCK_FINANCE_CONFIG} from '../../configs/stockFinance.js';
+import AntiFraudPanel from './AntiFraudPanel.jsx';
 
 function parseKline(csv) {
   if (!csv) return [];
@@ -86,6 +87,7 @@ export default function StockPanel() {
   const [symbol, setSymbol] = useState('');
   const [stockName, setStockName] = useState('');
   const [market, setMarket] = useState('sh');
+  const [showAntiFraud, setShowAntiFraud] = useState(false);
   const debounceRef = useRef(null);
 
   // 搜索：仅 keyword 非空且不是纯代码时触发
@@ -140,6 +142,17 @@ export default function StockPanel() {
   const finData = parseFinancial(finRaw);
   const chartSeries = [{ key: 'close', name: '收盘价', color: '#d2991d', type: 'line' }];
 
+  // 显示反诈面板时
+  if (showAntiFraud && symbol) {
+    return (
+      <AntiFraudPanel
+        symbol={symbol}
+        name={stockName}
+        onBack={() => setShowAntiFraud(false)}
+      />
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -151,6 +164,9 @@ export default function StockPanel() {
           style={{ flex: 1, padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border-subtle)', background: 'var(--bg-panel)', color: 'var(--text-primary)' }}
         />
         <button onClick={doSearch} style={{ padding: '8px 22px', borderRadius: 20, background: 'var(--accent-gold)', color: '#000', border: 'none', cursor: 'pointer' }}>🔍 查询</button>
+        {symbol && (
+          <button onClick={() => setShowAntiFraud(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'rgba(212,168,83,0.1)', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', cursor: 'pointer' }}>🛡️ 反诈分析</button>
+        )}
       </div>
       <div style={{ marginBottom: 20, padding: '12px 20px', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>{stockName || '—'}</span>

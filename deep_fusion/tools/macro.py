@@ -8,11 +8,11 @@ from ..shared.utils import ak_cache
 
 
 def _fetch_with_priority(
-    indicator: str,
-    akshare_fn,
-    limit=0,
-    akshare_ttl=604800,
-    akshare_ttl2=1209600,
+        indicator: str,
+        akshare_fn,
+        limit=0,
+        akshare_ttl=604800,
+        akshare_ttl2=1209600,
 ):
     """优先从 data_lake SQLite 取数据（永不过期），无数据时才从 akshare 拉取并入库。"""
     df = None
@@ -47,7 +47,7 @@ def _fetch_with_priority(
     description="获取中国GDP（季度/年度）、工业增加值同比等经济增长数据",
 )
 def macro_growth(
-    limit: int = Field(20, description="返回期数"),
+        limit: int = Field(20, description="返回期数"),
 ) -> str:
     results = {}
 
@@ -78,7 +78,7 @@ def macro_growth(
     description="获取中国CPI（月度/年度）、PPI（月度/年度）通胀数据",
 )
 def macro_inflation(
-    limit: int = Field(24, description="返回期数"),
+        limit: int = Field(24, description="返回期数"),
 ) -> str:
     results = {}
 
@@ -111,7 +111,7 @@ def macro_inflation(
     description="获取中国PMI（制造业/财新/非制造业）等景气指数数据",
 )
 def macro_business(
-    limit: int = Field(24, description="返回期数"),
+        limit: int = Field(24, description="返回期数"),
 ) -> str:
     results = {}
 
@@ -144,7 +144,7 @@ def macro_business(
     description="获取M2、社会融资规模、LPR、失业率、外汇储备、进出口等综合货币与外贸数据",
 )
 def macro_monetary(
-    limit: int = Field(24, description="返回期数"),
+        limit: int = Field(24, description="返回期数"),
 ) -> str:
     results = {}
 
@@ -195,7 +195,7 @@ def macro_monetary(
     description="获取中国GDP季度数据（单接口细粒度）",
 )
 def macro_gdp(
-    limit: int = Field(20, description="返回数量", strict=False),
+        limit: int = Field(20, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("GDP", ak.macro_china_gdp, limit=limit)
     if df is None or df.empty:
@@ -208,7 +208,7 @@ def macro_gdp(
     description="获取中国居民消费价格指数(CPI)月度数据",
 )
 def macro_cpi(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("CPI", ak.macro_china_cpi, limit=limit)
     if df is None or df.empty:
@@ -221,7 +221,7 @@ def macro_cpi(
     description="获取中国制造业采购经理指数(PMI)月度数据",
 )
 def macro_pmi(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=limit)
     if df is None or df.empty:
@@ -234,7 +234,7 @@ def macro_pmi(
     description="获取中国贷款市场报价利率(LPR)数据，包括1年期和5年期以上LPR",
 )
 def macro_interest_rate(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df = ak_cache(ak.macro_china_lpr, ttl=86400 * 7)
     if df is None or df.empty:
@@ -253,7 +253,7 @@ def macro_interest_rate(
     description="获取中国货币供应量(M0/M1/M2)月度数据",
 )
 def macro_money_supply(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df = ak_cache(ak.macro_china_m2_yearly, ttl=86400 * 7)
     if df is None or df.empty:
@@ -272,7 +272,7 @@ def macro_money_supply(
     description="获取中国规模以上工业增加值同比增速数据",
 )
 def macro_industrial_value_add(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("INDUSTRIAL_VALUE_ADD", ak.macro_china_industrial_production_yoy,
                                  limit=limit)
@@ -286,7 +286,7 @@ def macro_industrial_value_add(
     description="获取中国规模以上工业企业库存同比增速数据",
 )
 def macro_inventory_growth(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("INVENTORY", None, limit=limit)
     if df is None or df.empty:
@@ -299,7 +299,7 @@ def macro_inventory_growth(
     description="获取中国固定资产投资完成额累计同比增速数据",
 )
 def macro_fixed_investment(
-    limit: int = Field(24, description="返回数量", strict=False),
+        limit: int = Field(24, description="返回数量", strict=False),
 ):
     df, _ = _fetch_with_priority("FIXED_INVESTMENT", None,
                                  limit=limit)
@@ -313,7 +313,7 @@ def macro_fixed_investment(
     description="合成全球制造业PMI指数（美国ISM×0.6 + 欧元区×0.4），附各经济体明细。前端国际Tab用。",
 )
 def global_pmi(
-    limit: int = Field(24, description="返回月数"),
+        limit: int = Field(24, description="返回月数"),
 ) -> str:
     """合成全球制造业PMI ≈ US ISM×0.6 + Euro×0.4"""
     results = {}
@@ -355,7 +355,3 @@ def global_pmi(
         output.append(data)
         output.append("")
     return "\n".join(output)
-
-
-
-

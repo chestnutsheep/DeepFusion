@@ -5,10 +5,10 @@ import pandas as pd
 from fastmcp import Context
 from pydantic import Field
 
+from .stock_reports import sentiment_side
+from .stocks import market_prices, individual_info
 from ..server import mcp
 from ..shared.fields import field_market, field_symbol
-from .stocks import market_prices, individual_info
-from .stock_reports import sentiment_side
 
 
 @mcp.tool(
@@ -16,9 +16,9 @@ from .stock_reports import sentiment_side
     description="复合技能：一键获取技术面、基本面和消息面的综合诊断数据",
 )
 async def composite_stock_diagnostic(
-    symbol: str = field_symbol,
-    market: str = field_market,
-    ctx: Context | None = None,
+        symbol: str = field_symbol,
+        market: str = field_market,
+        ctx: Context | None = None,
 ):
     if ctx:
         await ctx.report_progress(0, 100, "开始综合诊断...")
@@ -72,10 +72,10 @@ def draw_ascii_chart(symbol: str = field_symbol, market: str = field_market):
     description="基于历史价格与技术指标进行简单策略回测（SMA/RSI/MACD/BOLL/MA_CROSS/KDJ）",
 )
 def backtest_strategy(
-    symbol: str = field_symbol,
-    market: str = field_market,
-    strategy: str = Field("SMA", description="策略类型: SMA/RSI/MACD/BOLL/MA_CROSS/KDJ"),
-    days: int = Field(252, description="回测天数"),
+        symbol: str = field_symbol,
+        market: str = field_market,
+        strategy: str = Field("SMA", description="策略类型: SMA/RSI/MACD/BOLL/MA_CROSS/KDJ"),
+        days: int = Field(252, description="回测天数"),
 ):
     data = market_prices.fn(symbol=symbol, market=market, limit=days)
     if not data or data.startswith("error,"):
@@ -198,10 +198,10 @@ def backtest_strategy(
     description="基于AI对其他工具提供的数据分析结果给出具体投资建议",
 )
 def trading_suggest(
-    symbol: str = Field(description="股票代码或加密币种"),
-    action: str = Field(description="推荐操作: buy/sell/hold"),
-    score: int = Field(description="置信度，范围: 0-100"),
-    reason: str = Field(description="推荐理由"),
+        symbol: str = Field(description="股票代码或加密币种"),
+        action: str = Field(description="推荐操作: buy/sell/hold"),
+        score: int = Field(description="置信度，范围: 0-100"),
+        reason: str = Field(description="推荐理由"),
 ):
     return {
         "symbol": symbol,
@@ -234,7 +234,7 @@ def cache_status():
     description="清理指定的缓存键，或清理所有缓存",
 )
 def cache_clear(
-    key: str = Field("", description="要清理的缓存键，留空则清理所有缓存"),
+        key: str = Field("", description="要清理的缓存键，留空则清理所有缓存"),
 ):
     from ..cache import CacheKey
 

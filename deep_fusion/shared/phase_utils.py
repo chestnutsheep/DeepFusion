@@ -91,8 +91,8 @@ def get_phase_signal(phase: int) -> float:
 
 
 def resolve_cycle_phase(
-    row: dict[str, Any],
-    phase_type: str = "macro",
+        row: dict[str, Any],
+        phase_type: str = "macro",
 ) -> dict[str, Any]:
     """解析单条周期数据行的相位并添加统一字段
 
@@ -133,8 +133,8 @@ def resolve_cycle_phase(
 
 
 def resolve_cycle_series(
-    rows: list[dict[str, Any]],
-    phase_type: str = "macro",
+        rows: list[dict[str, Any]],
+        phase_type: str = "macro",
 ) -> list[dict[str, Any]]:
     """批量解析周期数据行的相位
 
@@ -149,9 +149,9 @@ def resolve_cycle_series(
 
 
 def build_cycle_signal_value(
-    phase: int,
-    confidence: float | None = None,
-    include_meta: bool = False,
+        phase: int,
+        confidence: float | None = None,
+        include_meta: bool = False,
 ) -> float | dict[str, Any]:
     """构建综合信号值（confidence 加权）
 
@@ -176,7 +176,7 @@ def build_cycle_signal_value(
 
 
 def normalize_cycle_output(
-    cycles_data: dict[str, list[dict[str, Any]] | None],
+        cycles_data: dict[str, list[dict[str, Any]] | None],
 ) -> dict[str, list[dict[str, Any]] | None]:
     """统览四周期数据并归一化相位字段
 

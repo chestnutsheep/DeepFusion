@@ -33,8 +33,8 @@ def get_current_time():
     description="获取中国A股市场(上证、深证)的所有涨停股票",
 )
 def stock_zt_pool_em(
-    date: str = Field("", description="交易日日期(可选)，默认为最近的交易日，格式: 20251231"),
-    limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
+        date: str = Field("", description="交易日日期(可选)，默认为最近的交易日，格式: 20251231"),
+        limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
 ):
     if not date:
         date = recent_trade_date().strftime("%Y%m%d")
@@ -59,8 +59,8 @@ def stock_zt_pool_em(
     description="获取中国A股市场(上证、深证)的强势股池数据",
 )
 def stock_zt_pool_strong_em(
-    date: str = Field("", description="交易日日期(可选)，默认为最近的交易日，格式: 20251231"),
-    limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
+        date: str = Field("", description="交易日日期(可选)，默认为最近的交易日，格式: 20251231"),
+        limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
 ):
     if not date:
         date = recent_trade_date().strftime("%Y%m%d")
@@ -83,8 +83,8 @@ def stock_zt_pool_strong_em(
     description="获取中国A股市场(上证、深证)的龙虎榜个股上榜统计数据",
 )
 def stock_lhb_ggtj_sina(
-    days: str = Field("5", description="统计最近天数，仅支持: [5/10/30/60]"),
-    limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
+        days: str = Field("5", description="统计最近天数，仅支持: [5/10/30/60]"),
+        limit: int = Field(50, description="返回数量(int,30-100)", strict=False),
 ):
     dfs = ak_cache(ak.stock_lhb_ggtj_sina, symbol=days, ttl=3600)
     if dfs is None:
@@ -100,8 +100,8 @@ def stock_lhb_ggtj_sina(
     description="获取中国A股市场(上证、深证)的行业资金流向数据",
 )
 def stock_sector_fund_flow_rank(
-    days: str = Field("今日", description="天数，仅支持: {'今日','5日','10日'}"),
-    cate: str = Field("行业资金流", description="仅支持: {'行业资金流','概念资金流','地域资金流'}"),
+        days: str = Field("今日", description="天数，仅支持: {'今日','5日','10日'}"),
+        cate: str = Field("行业资金流", description="仅支持: {'行业资金流','概念资金流','地域资金流'}"),
 ):
     dfs = ak_cache(ak.stock_sector_fund_flow_rank, indicator=days, sector_type=cate, ttl=1200)
     if dfs is None:
@@ -232,17 +232,18 @@ def newsnow_news(channels=None):
     description="扫描 A 股市场实时的异动信号，如火箭发射、大笔买入、快速反弹等",
 )
 def market_anomaly_scan(
-    symbol: str = Field(
-        "火箭发射",
-        description="异动类型，可选: 火箭发射, 快速反弹, 加速下跌, 高台跳水, 大笔买入, 大笔卖出, 封涨停板, 打开涨停板",
-    ),
+        symbol: str = Field(
+            "火箭发射",
+            description="异动类型，可选: 火箭发射, 快速反弹, 加速下跌, 高台跳水, 大笔买入, 大笔卖出, 封涨停板, 打开涨停板",
+        ),
 ):
     try:
         dfs = ak_cache(ak.stock_changes_em, symbol=symbol, ttl=30, key=f"stock_changes_em-{symbol}")
         if dfs is None or dfs.empty:
             return f"当前没有检测到 [{symbol}] 类型的异动信号"
         dfs = dfs.head(20)
-        dfs.rename(columns={"时间": "异动时间", "代码": "股票代码", "名称": "股票名称", "板块": "所属板块", "相关信息": "异动详情"}, inplace=True)
+        dfs.rename(columns={"时间": "异动时间", "代码": "股票代码", "名称": "股票名称", "板块": "所属板块",
+                            "相关信息": "异动详情"}, inplace=True)
         return f"--- 实时异动扫描报告 [{symbol}] ---\n" + dfs.to_csv(index=False)
     except Exception as e:
         return f"异动扫描失败: {str(e)}"
@@ -257,6 +258,3 @@ def margin_balance():
     if df is None or df.empty:
         return "未获取到融资融券数据"
     return df.tail(30).to_csv(index=False, float_format="%.2f")
-
-
-

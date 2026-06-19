@@ -13,10 +13,12 @@ class TestAkCacheKeyGeneration:
 
         def _make_fn():
             """创建一个闭包函数，带唯一 __name__ 避免跨测试冲突。"""
+
             def fn(x, y=1):
                 nonlocal call_count
                 call_count += 1
                 return pd.DataFrame({"a": [x, y]})
+
             fn.__name__ = f"mock_fn_ttl_{unique_id}"
             return fn
 
@@ -41,6 +43,7 @@ class TestAkCacheKeyGeneration:
                 nonlocal call_count
                 call_count += 1
                 return pd.DataFrame({"b": [a]})
+
             fn.__name__ = f"mock_fn_ttl2_{unique_id}"
             return fn
 
@@ -63,6 +66,7 @@ class TestAkCacheKeyGeneration:
                 nonlocal call_count
                 call_count += 1
                 return pd.DataFrame({"c": [x + call_count]})
+
             fn.__name__ = f"mock_fn_force_{unique_id}"
             return fn
 

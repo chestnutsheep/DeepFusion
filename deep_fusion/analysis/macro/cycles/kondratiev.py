@@ -3,16 +3,18 @@ import logging
 
 import numpy as np
 
+from .engine import _zscore as _simple_zscore  # 复用 engine 的 Z-score，消除重复
 from ....shared.chart_helpers import (
     setup_chart_font, apply_phase_shading, setup_date_axes, setup_matplotlib_agg,
 )
 from ....shared.phase_utils import KOND_RENAME
-from .engine import _zscore as _simple_zscore  # 复用 engine 的 Z-score，消除重复
 
 setup_matplotlib_agg()
 import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
+
+
 def _compute_kondratiev(method: str = "pca"):
     method = method.lower()
     if method == "wavelet":
@@ -26,12 +28,12 @@ def _compute_kondratiev(method: str = "pca"):
         return result, []
     return result, result["pca1"]
 
+
 # dead code removed: 2026-06-12, unreachable block after return (原28-129行)
 
 # ── 图表函数 ──────────────────────────────────
 
 def _gen_kitchin_chart(results: list[dict], data: dict, output_path: str):
-    import matplotlib.dates as mdates
     setup_chart_font()
 
     STAGE_NAMES = {1: "主动去库存", 2: "被动去库存", 3: "主动补库存", 4: "被动补库存"}
@@ -54,13 +56,16 @@ def _gen_kitchin_chart(results: list[dict], data: dict, output_path: str):
     apply_phase_shading(ax1, dates, stages, stage_colors)
     vd = [(d, v) for d, v in zip(dates, demand_vals) if v is not None]
     if vd:
-        ax1.plot([x[0] for x in vd], [x[1] for x in vd], color="#2c3e50", lw=1.8, marker=".", ms=2, label="工业增加值同比%")
+        ax1.plot([x[0] for x in vd], [x[1] for x in vd], color="#2c3e50", lw=1.8, marker=".", ms=2,
+                 label="工业增加值同比%")
     vi = [(d, v) for d, v in zip(dates, inventory_vals) if v is not None]
     if vi:
-        ax1t.plot([x[0] for x in vi], [x[1] for x in vi], color="#e67e22", lw=1.8, marker=".", ms=2, label="产成品存货同比%")
+        ax1t.plot([x[0] for x in vi], [x[1] for x in vi], color="#e67e22", lw=1.8, marker=".", ms=2,
+                  label="产成品存货同比%")
     vri = [(d, v) for d, v in zip(dates, real_inv_vals) if v is not None]
     if vri:
-        ax1t.plot([x[0] for x in vri], [x[1] for x in vri], color="#e67e22", lw=0.8, alpha=0.5, ls="--", label="实际库存")
+        ax1t.plot([x[0] for x in vri], [x[1] for x in vri], color="#e67e22", lw=0.8, alpha=0.5, ls="--",
+                  label="实际库存")
     ax1.axhline(0, color="#888", lw=0.5, ls="--")
     ax1t.axhline(0, color="#888", lw=0.5, ls="--")
     ax1.set_ylabel("工业增加值同比%", color="#2c3e50")
@@ -80,7 +85,8 @@ def _gen_kitchin_chart(results: list[dict], data: dict, output_path: str):
     ax3t = ax3.twinx()
     vri2 = [(d, v) for d, v in zip(dates, real_inv_vals) if v is not None]
     if vri2:
-        ax3.plot([x[0] for x in vri2], [x[1] for x in vri2], color="#e67e22", lw=1.5, marker=".", ms=2, label="实际库存同比%")
+        ax3.plot([x[0] for x in vri2], [x[1] for x in vri2], color="#e67e22", lw=1.5, marker=".", ms=2,
+                 label="实际库存同比%")
     vpp = [(d, v) for d, v in zip(dates, ppi_vals) if v is not None]
     if vpp:
         ax3t.plot([x[0] for x in vpp], [x[1] for x in vpp], color="#8e44ad", lw=1.5, marker=".", ms=2, label="PPI指数")
@@ -99,8 +105,8 @@ def _gen_kitchin_chart(results: list[dict], data: dict, output_path: str):
     plt.savefig(output_path, dpi=150, bbox_inches="tight", facecolor="white")
     plt.close()
 
+
 def _gen_juglar_chart(results: list[dict], data: dict, output_path: str):
-    import matplotlib.dates as mdates
     from matplotlib.patches import Patch
     setup_chart_font()
 
@@ -137,7 +143,8 @@ def _gen_juglar_chart(results: list[dict], data: dict, output_path: str):
         ax2.plot([x[0] for x in vpp], [x[1] for x in vpp], color="#c0392b", lw=1.5, marker=".", ms=2, label="PPI指数")
     vpmi = [(d, v) for d, v in zip(dates, pmi) if v is not None]
     if vpmi:
-        ax2t.plot([x[0] for x in vpmi], [x[1] for x in vpmi], color="#27ae60", lw=1.5, marker=".", ms=2, label="制造业PMI")
+        ax2t.plot([x[0] for x in vpmi], [x[1] for x in vpmi], color="#27ae60", lw=1.5, marker=".", ms=2,
+                  label="制造业PMI")
     ax2.axhline(100, color="#888", lw=0.5, ls="--")
     ax2t.axhline(50, color="#e74c3c", lw=1, ls="--", alpha=0.7)
     ax2.set_ylabel("PPI指数", color="#c0392b")
@@ -147,15 +154,16 @@ def _gen_juglar_chart(results: list[dict], data: dict, output_path: str):
 
     ax3 = axes[1, 0]
     ax4 = axes[1, 1]
-    ax4.text(0.5, 0.5, "数据源限制：详细固投分项\n（设备/制造业/新建/扩建/改建）\n需 NBS API，当前仅显示总量", ha="center", va="center", transform=ax4.transAxes, fontsize=10, color="#888")
+    ax4.text(0.5, 0.5, "数据源限制：详细固投分项\n（设备/制造业/新建/扩建/改建）\n需 NBS API，当前仅显示总量", ha="center",
+             va="center", transform=ax4.transAxes, fontsize=10, color="#888")
     ax4.set_title("固投细项占位")
 
     setup_date_axes(axes.flat)
     plt.savefig(output_path, dpi=150, bbox_inches="tight", facecolor="white")
     plt.close()
 
+
 def _gen_kuznets_chart(results: list[dict], data: dict, output_path: str):
-    import matplotlib.dates as mdates
     setup_chart_font()
 
     PHASE_NAMES = {1: "复苏期", 2: "繁荣期", 3: "衰退期", 4: "萧条期"}
@@ -173,7 +181,8 @@ def _gen_kuznets_chart(results: list[dict], data: dict, output_path: str):
     apply_phase_shading(ax1, dates, phases, phase_colors)
     vs = [(d, v) for d, v in zip(dates, re_sale) if v is not None]
     if vs:
-        ax1.plot([x[0] for x in vs], [x[1] for x in vs], color="#2c3e50", lw=2, marker=".", ms=3, label="房地产开发投资累计增长%")
+        ax1.plot([x[0] for x in vs], [x[1] for x in vs], color="#2c3e50", lw=2, marker=".", ms=3,
+                 label="房地产开发投资累计增长%")
     ax1.axhline(0, color="#888", lw=0.5, ls="--")
     ax1.set_ylabel("累计增长%", color="#2c3e50")
     ax1.grid(True, alpha=0.3, ls="--", lw=0.5)
@@ -192,6 +201,7 @@ def _gen_kuznets_chart(results: list[dict], data: dict, output_path: str):
     setup_date_axes(axes.flat)
     plt.savefig(output_path, dpi=150, bbox_inches="tight", facecolor="white")
     plt.close()
+
 
 def _gen_kondratiev_chart(result: dict, vals: list, output_path: str):
     from matplotlib.patches import Patch
@@ -272,8 +282,8 @@ def _gen_kondratiev_chart(result: dict, vals: list, output_path: str):
     ax.grid(True, alpha=0.3)
 
     info = (
-        f"数据: 世界银行({result.get('year_range','?')})  PCA方差占比: {result.get('pca_variance_ratio',0)*100:.0f}%\n"
-        f"当前: {phase_labels.get(ph, '未知')}  相位置信度: {result.get('phase_confidence',0):.2f}"
+        f"数据: 世界银行({result.get('year_range', '?')})  PCA方差占比: {result.get('pca_variance_ratio', 0) * 100:.0f}%\n"
+        f"当前: {phase_labels.get(ph, '未知')}  相位置信度: {result.get('phase_confidence', 0):.2f}"
     )
     ax.text(0.02, 0.02, info, transform=ax.transAxes, fontsize=8, verticalalignment="bottom",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.6))
@@ -281,6 +291,7 @@ def _gen_kondratiev_chart(result: dict, vals: list, output_path: str):
     plt.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
+
 
 # ═══════════════════════════════════════════════════════════════
 # NBS API 客户端 — 已抽取到 data/sources/nbs_client.py（权威版本）
@@ -314,10 +325,10 @@ def _calc_kondratiev_wavelet() -> tuple[dict, list]:
         sigma = scale / 3.0
         half = int(scale * 2)
         t = np.arange(-half, half + 1)
-        kernel = np.exp(2j * np.pi * f0 * t) * np.exp(-t**2 / (2 * sigma**2))
-        kernel = kernel / max(np.sqrt(np.sum(np.abs(kernel)**2)), 1e-30)
+        kernel = np.exp(2j * np.pi * f0 * t) * np.exp(-t ** 2 / (2 * sigma ** 2))
+        kernel = kernel / max(np.sqrt(np.sum(np.abs(kernel) ** 2)), 1e-30)
         conv = np.convolve(arr, kernel.conj()[::-1], mode="same")
-        power[i] = np.sum(np.abs(conv)**2)
+        power[i] = np.sum(np.abs(conv) ** 2)
         phase_at_end[i] = np.angle(conv[-1])
         all_coefs.append(conv)
 
@@ -375,6 +386,7 @@ def _calc_kondratiev_wavelet() -> tuple[dict, list]:
         "zscore": result.get("zscore", []),
         "cf_cycle": result.get("cf_cycle", []),
     }, cycle_comp
+
 
 def _calc_kondratiev_bandpass() -> tuple[dict, list]:
     """Butterworth 40-60 年带通滤波提取康波相位"""
@@ -487,10 +499,10 @@ def _pct_change_yearly(years: list[str], vals: list[float]) -> tuple[list[str], 
 
 
 def _compute_extended_cycle(
-    indicators: list[tuple[str, float]],
-    bandpass_lo: float,
-    bandpass_hi: float,
-    phase_type: str = "macro",
+        indicators: list[tuple[str, float]],
+        bandpass_lo: float,
+        bandpass_hi: float,
+        phase_type: str = "macro",
 ) -> tuple[dict, list[dict]]:
     """通用 FRED 扩展周期计算框架
 
@@ -618,9 +630,9 @@ def compute_kitchin_extended() -> tuple[dict, list[dict]]:
     """基钦周期 FRED 扩展版 (1919~) — 工业生产+库存交叉法"""
     return _compute_extended_cycle(
         indicators=[
-            ("fred_indpro", 0.5),       # 工业生产（需求代理）
-            ("fred_mnfrir", 0.3),       # 制造商库存
-            ("fred_m2sl", 0.2),         # M2 货币供应
+            ("fred_indpro", 0.5),  # 工业生产（需求代理）
+            ("fred_mnfrir", 0.3),  # 制造商库存
+            ("fred_m2sl", 0.2),  # M2 货币供应
         ],
         bandpass_lo=3,
         bandpass_hi=5,
@@ -632,10 +644,10 @@ def compute_juglar_extended() -> tuple[dict, list[dict]]:
     """朱格拉周期 FRED 扩展版 (1929~) — 固定投资+设备投资"""
     return _compute_extended_cycle(
         indicators=[
-            ("fred_pnfi", 0.4),         # 非住宅固定投资（设备代理）
-            ("fred_fpi", 0.3),          # 私人固定投资
-            ("fred_gnpca", 0.2),        # 实际 GNP
-            ("fred_mcumfn", 0.1),       # 产能利用率
+            ("fred_pnfi", 0.4),  # 非住宅固定投资（设备代理）
+            ("fred_fpi", 0.3),  # 私人固定投资
+            ("fred_gnpca", 0.2),  # 实际 GNP
+            ("fred_mcumfn", 0.1),  # 产能利用率
         ],
         bandpass_lo=7,
         bandpass_hi=12,
@@ -647,10 +659,10 @@ def compute_kuznets_extended() -> tuple[dict, list[dict]]:
     """库兹涅茨周期 FRED 扩展版 (1947~) — 房价+住宅投资+开工"""
     return _compute_extended_cycle(
         indicators=[
-            ("fred_ussthpi", 0.4),      # 美国房价指数
-            ("fred_houst", 0.25),        # 新屋开工
-            ("fred_prfi", 0.2),          # 住宅固定投资
-            ("fred_indpro", 0.15),       # 工业生产（辅助）
+            ("fred_ussthpi", 0.4),  # 美国房价指数
+            ("fred_houst", 0.25),  # 新屋开工
+            ("fred_prfi", 0.2),  # 住宅固定投资
+            ("fred_indpro", 0.15),  # 工业生产（辅助）
         ],
         bandpass_lo=14,
         bandpass_hi=25,

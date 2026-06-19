@@ -57,10 +57,10 @@ def policy_collect(max_pages: int = 2) -> str:
     description="搜索已入库的政策文件",
 )
 def policy_search(
-    keyword: str = "",
-    org: str = "",
-    limit: int = 20,
-    year: int | None = None,
+        keyword: str = "",
+        org: str = "",
+        limit: int = 20,
+        year: int | None = None,
 ) -> str:
     from ..shared.policy_db import PolicyDB
     db = PolicyDB()
@@ -82,7 +82,7 @@ def policy_search(
     description="查看某篇政策文件详情",
 )
 def policy_detail(
-    url: str = Field(..., description="政策文件URL"),
+        url: str = Field(..., description="政策文件URL"),
 ) -> str:
     from ..shared.policy_db import PolicyDB
     db = PolicyDB()
@@ -169,9 +169,9 @@ def policy_timeline(year: int | None = None) -> str:
     elapsed_years = max(0, now_year - five_year_start)
     total_years = five_year_end - five_year_start + 1
     stage = "开局起步期 · 夯实基础" if elapsed_years < 2 else \
-            "攻坚深化期 · 重点突破" if elapsed_years < 3 else \
+        "攻坚深化期 · 重点突破" if elapsed_years < 3 else \
             "全面加速期 · 成果转化" if elapsed_years < 4 else \
-            "收官决胜期 · 冲刺达标"
+                "收官决胜期 · 冲刺达标"
 
     result = {
         "year": now_year,

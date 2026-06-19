@@ -4,7 +4,7 @@ All akshare calls should go through this adapter, NOT accessed directly as `ak.x
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable
 
 import akshare as ak
 import pandas as pd
@@ -29,7 +29,8 @@ def stock_spot_all(ttl: int = 300) -> pd.DataFrame | None:
     return ak_cache(ak.stock_zh_a_spot_em, ttl=ttl)
 
 
-def stock_hist(symbol: str, period: str = "daily", start: str = "19700101", end: str = "22220101", ttl: int = 3600) -> pd.DataFrame | None:
+def stock_hist(symbol: str, period: str = "daily", start: str = "19700101", end: str = "22220101",
+               ttl: int = 3600) -> pd.DataFrame | None:
     return ak_cache(ak.stock_zh_a_hist, symbol=symbol, period=period, start_date=start, end_date=end, ttl=ttl)
 
 
@@ -70,7 +71,8 @@ def stock_board_hist(symbol: str, period: str = "daily", ttl: int = 3600) -> pd.
 
 
 def stock_board_classify(source: str = "ths", ttl: int = 86400) -> pd.DataFrame | None:
-    fn = {"ths": ak.stock_board_industry_name_ths, "cninfo": ak.stock_industry_category_cninfo}.get(source, ak.stock_board_industry_name_ths)
+    fn = {"ths": ak.stock_board_industry_name_ths, "cninfo": ak.stock_industry_category_cninfo}.get(source,
+                                                                                                    ak.stock_board_industry_name_ths)
     return ak_cache(fn, ttl=ttl)
 
 

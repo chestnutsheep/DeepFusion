@@ -11,15 +11,13 @@ Four-Cycle Nested Asset Allocation Engine
 
 """
 
-
 import json
 
 import sys
 
 from datetime import datetime
 
-from typing import Dict, List, Optional, Tuple
-
+from typing import Dict, List, Optional
 
 # ============================================================
 
@@ -48,19 +46,20 @@ PHASE_WEIGHTS = {
 
 }
 
-
 CYCLE_CONFIG = {
 
-    "kitchin":   {"name": "基钦周期", "name_en": "Kitchin",  "span": "6-12个月", "weight": 0.4, "role": "决定短期战术仓位"},
+    "kitchin": {"name": "基钦周期", "name_en": "Kitchin", "span": "6-12个月", "weight": 0.4,
+                "role": "决定短期战术仓位"},
 
-    "juglar":    {"name": "朱格拉周期", "name_en": "Juglar",  "span": "3-5年",    "weight": 0.3, "role": "决定中期战略方向"},
+    "juglar": {"name": "朱格拉周期", "name_en": "Juglar", "span": "3-5年", "weight": 0.3, "role": "决定中期战略方向"},
 
-    "kuznets":   {"name": "库兹涅茨周期", "name_en": "Kuznets", "span": "7-10年",  "weight": 0.2, "role": "决定大类资产长期偏好"},
+    "kuznets": {"name": "库兹涅茨周期", "name_en": "Kuznets", "span": "7-10年", "weight": 0.2,
+                "role": "决定大类资产长期偏好"},
 
-    "kontratieff":{"name": "康波周期", "name_en": "Kontratieff","span": "50-60年", "weight": 0.1, "role": "决定超长期资产底色"}
+    "kontratieff": {"name": "康波周期", "name_en": "Kontratieff", "span": "50-60年", "weight": 0.1,
+                    "role": "决定超长期资产底色"}
 
 }
-
 
 RISK_PREFERENCE_ADJUSTMENT = {
 
@@ -71,7 +70,6 @@ RISK_PREFERENCE_ADJUSTMENT = {
     "激进": {"stock": 10, "bond": -5, "commodity": 5, "cash": -10}
 
 }
-
 
 ASSET_NAMES = {
 
@@ -85,9 +83,7 @@ ASSET_NAMES = {
 
 }
 
-
 PHASE_VALUES = {"复苏": 25, "繁荣": 75, "衰退": 125, "萧条": 175}
-
 
 
 # ============================================================
@@ -100,7 +96,6 @@ PHASE_VALUES = {"复苏": 25, "繁荣": 75, "衰退": 125, "萧条": 175}
 def calculate_portfolio(kitchin_phase: str, juglar_phase: str,
 
                         kuznets_phase: str, kontratieff_phase: str) -> Dict[str, int]:
-
     """
 
     四周期加权共振法：计算最终资产配置比例。
@@ -114,15 +109,12 @@ def calculate_portfolio(kitchin_phase: str, juglar_phase: str,
 
     phases = [kitchin_phase, juglar_phase, kuznets_phase, kontratieff_phase]
 
-
     # 校验相位值
 
     for phase in phases:
 
         if phase not in PHASE_WEIGHTS:
-
             raise ValueError(f"无效相位 '{phase}'，有效值：{list(PHASE_WEIGHTS.keys())}")
-
 
     cycle_weights_map = {
 
@@ -136,21 +128,16 @@ def calculate_portfolio(kitchin_phase: str, juglar_phase: str,
 
     }
 
-
     final_portfolio = {"stock": 0.0, "bond": 0.0, "commodity": 0.0, "cash": 0.0}
-
 
     for phase, weight in cycle_weights_map.items():
 
         for asset in final_portfolio:
-
             final_portfolio[asset] += PHASE_WEIGHTS[phase][asset] * weight
-
 
     # 四舍五入到整数百分比
 
     return {k: round(v * 100) for k, v in final_portfolio.items()}
-
 
 
 def adjust_portfolio(portfolio: Dict[str, int],
@@ -160,7 +147,6 @@ def adjust_portfolio(portfolio: Dict[str, int],
                      pe_quantile: Optional[float] = None,
 
                      risk_preference: str = "稳健") -> Dict[str, int]:
-
     """
 
     风险调整：波动率因子 + 估值因子 + 风险偏好。
@@ -176,24 +162,19 @@ def adjust_portfolio(portfolio: Dict[str, int],
 
     portfolio = portfolio.copy()
 
-
     # 1. 波动率因子：中国波指>30时，现金比例+10%，股票-10%
 
     if ivix_value is not None and ivix_value > 30:
-
         portfolio["cash"] += 10
 
         portfolio["stock"] -= 10
 
-
     # 2. 估值因子：全A市盈率分位>80%时，股票-15%，债券+15%
 
     if pe_quantile is not None and pe_quantile > 80:
-
         portfolio["stock"] -= 15
 
         portfolio["bond"] += 15
-
 
     # 3. 风险偏好调整
 
@@ -202,29 +183,22 @@ def adjust_portfolio(portfolio: Dict[str, int],
         adj = RISK_PREFERENCE_ADJUSTMENT[risk_preference]
 
         for asset in portfolio:
-
             portfolio[asset] += adj[asset]
-
 
     # 确保比例非负且总和为100%
 
     for k in portfolio:
-
         portfolio[k] = max(0, portfolio[k])
 
     total = sum(portfolio.values())
 
     if total > 0:
-
         portfolio = {k: round(v / total * 100) for k, v in portfolio.items()}
-
 
     return portfolio
 
 
-
 def calculate_phase_deviation(phases: Dict[str, str]) -> float:
-
     """
 
     计算四周期相位偏离度（标准差）。
@@ -240,9 +214,7 @@ def calculate_phase_deviation(phases: Dict[str, str]) -> float:
     return float(np.std(values))
 
 
-
 def determine_resonance_strength(phases: Dict[str, str]) -> Dict:
-
     """
 
     判断共振强度。
@@ -252,7 +224,6 @@ def determine_resonance_strength(phases: Dict[str, str]) -> Dict:
     phase_list = list(phases.values())
 
     unique_phases = set(phase_list)
-
 
     if len(unique_phases) == 1:
 
@@ -294,7 +265,6 @@ def determine_resonance_strength(phases: Dict[str, str]) -> Dict:
 
         description = "多周期分裂，高度均衡配置，降低风险"
 
-
     return {
 
         "strength": strength,
@@ -308,13 +278,11 @@ def determine_resonance_strength(phases: Dict[str, str]) -> Dict:
     }
 
 
-
 def check_rebalance(current_portfolio: Dict[str, int],
 
                     last_portfolio: Dict[str, int],
 
                     threshold: int = 10) -> Dict:
-
     """
 
     检查是否需要调仓。
@@ -328,7 +296,6 @@ def check_rebalance(current_portfolio: Dict[str, int],
 
     instructions = []
 
-
     for asset in current_portfolio:
 
         diff = current_portfolio[asset] - last_portfolio.get(asset, 0)
@@ -340,7 +307,6 @@ def check_rebalance(current_portfolio: Dict[str, int],
             action = "买入" if diff > 0 else "卖出"
 
             instructions.append(f"{action} {abs(diff)}% {ASSET_NAMES[asset]}")
-
 
     return {
 
@@ -357,11 +323,9 @@ def check_rebalance(current_portfolio: Dict[str, int],
     }
 
 
-
 def allocate_industries(stock_weight: int,
 
                         industry_rank: List[Dict]) -> Dict:
-
     """
 
     基于行业景气度排名分配股票仓位到具体行业。
@@ -374,9 +338,7 @@ def allocate_industries(stock_weight: int,
     """
 
     if not industry_rank:
-
         return {"超配": {}, "标配": {}, "低配": {}}
-
 
     n = len(industry_rank)
 
@@ -386,20 +348,17 @@ def allocate_industries(stock_weight: int,
 
     under_n = min(5, max(0, n - super_n - standard_n))
 
-
     super_industries = industry_rank[:super_n]
 
     standard_industries = industry_rank[super_n:super_n + standard_n]
 
     under_industries = industry_rank[-under_n:] if under_n > 0 else []
 
-
     super_weight = round(stock_weight * 0.60 / max(super_n, 1), 1)
 
     standard_weight = round(stock_weight * 0.30 / max(standard_n, 1), 1)
 
     under_weight = round(stock_weight * 0.10 / max(under_n, 1), 1)
-
 
     return {
 
@@ -412,21 +371,19 @@ def allocate_industries(stock_weight: int,
     }
 
 
-
 def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
-                             kuznets_phase: str, kontratieff_phase: str,
+                            kuznets_phase: str, kontratieff_phase: str,
 
-                             ivix_value: Optional[float] = None,
+                            ivix_value: Optional[float] = None,
 
-                             pe_quantile: Optional[float] = None,
+                            pe_quantile: Optional[float] = None,
 
-                             risk_preference: str = "稳健",
+                            risk_preference: str = "稳健",
 
-                             last_portfolio: Optional[Dict[str, int]] = None,
+                            last_portfolio: Optional[Dict[str, int]] = None,
 
-                             industry_rank: Optional[List[Dict]] = None) -> str:
-
+                            industry_rank: Optional[List[Dict]] = None) -> str:
     """
 
     生成完整的月度配置报告（Markdown 格式）。
@@ -445,7 +402,6 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
     }
 
-
     # 计算配置
 
     portfolio = calculate_portfolio(kitchin_phase, juglar_phase, kuznets_phase, kontratieff_phase)
@@ -456,27 +412,21 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
     deviation = calculate_phase_deviation(phases)
 
-
     # 调仓提醒
 
     rebalance_info = None
 
     if last_portfolio:
-
         rebalance_info = check_rebalance(adjusted, last_portfolio)
-
 
     # 行业配置
 
     industry_alloc = None
 
     if industry_rank:
-
         industry_alloc = allocate_industries(adjusted["stock"], industry_rank)
 
-
     now = datetime.now().strftime("%Y-%m-%d")
-
 
     report = f"""# Deep Fusion 月度资产配置报告
 
@@ -535,18 +485,13 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
 """
 
-
     if ivix_value is not None:
-
         report += f"**风险因子**：iVIX={ivix_value}{'（⚠ 超过30阈值，现金比例已上调）' if ivix_value > 30 else ''}\n"
 
     if pe_quantile is not None:
-
         report += f"**估值因子**：全A市盈率分位={pe_quantile}%{'（⚠ 超过80%阈值，股票比例已下调）' if pe_quantile > 80 else ''}\n"
 
-
     report += "\n---\n\n"
-
 
     if industry_alloc:
 
@@ -555,23 +500,19 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
         report += "### 🔥 超配行业\n\n"
 
         for ind, w in industry_alloc["超配"].items():
-
             report += f"- **{ind}**：{w}%\n"
 
         report += "\n### 📊 标配行业\n\n"
 
         for ind, w in industry_alloc["标配"].items():
-
             report += f"- {ind}：{w}%\n"
 
         report += "\n### ❄ 低配行业\n\n"
 
         for ind, w in industry_alloc["低配"].items():
-
             report += f"- {ind}：{w}%\n"
 
         report += "\n---\n\n"
-
 
     if rebalance_info:
 
@@ -586,7 +527,6 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
             report += "\n**具体指令**：\n\n"
 
             for inst in rebalance_info['instructions']:
-
                 report += f"- {inst}\n"
 
         else:
@@ -594,7 +534,6 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
             report += "\n✅ 当前配置与建议偏离度较小，无需调仓。\n"
 
         report += "\n---\n\n"
-
 
     report += """## 五、下月关键跟踪指标
 
@@ -615,9 +554,7 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
 """
 
-
     return report
-
 
 
 # ============================================================
@@ -628,11 +565,9 @@ def generate_monthly_report(kitchin_phase: str, juglar_phase: str,
 
 
 def main():
-
     """命令行入口，支持多种计算模式。"""
 
     if len(sys.argv) < 2:
-
         print("用法: python cycle_allocator.py <command> [args...]")
 
         print()
@@ -663,14 +598,11 @@ def main():
 
         sys.exit(1)
 
-
     command = sys.argv[1]
-
 
     if command == "portfolio":
 
         if len(sys.argv) < 6:
-
             print("用法: portfolio <基钦相位> <朱格拉相位> <库兹涅茨相位> <康波相位>")
 
             sys.exit(1)
@@ -683,7 +615,6 @@ def main():
     elif command == "adjust":
 
         if len(sys.argv) < 6:
-
             print("用法: adjust <基钦相位> <朱格拉相位> <库兹涅茨相位> <康波相位> [ivix] [pe分位] [风险偏好]")
 
             sys.exit(1)
@@ -704,7 +635,6 @@ def main():
     elif command == "resonance":
 
         if len(sys.argv) < 6:
-
             print("用法: resonance <基钦相位> <朱格拉相位> <库兹涅茨相位> <康波相位>")
 
             sys.exit(1)
@@ -725,7 +655,6 @@ def main():
     elif command == "report":
 
         if len(sys.argv) < 6:
-
             print("用法: report <基钦相位> <朱格拉相位> <库兹涅茨相位> <康波相位>")
 
             sys.exit(1)
@@ -742,7 +671,5 @@ def main():
         sys.exit(1)
 
 
-
 if __name__ == "__main__":
-
     main()

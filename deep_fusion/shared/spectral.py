@@ -31,9 +31,10 @@ from typing import Any
 
 import numpy as np
 from numpy.fft import rfft, rfftfreq
-from scipy.signal import correlate, find_peaks, lombscargle, periodogram
+from scipy.signal import correlate, find_peaks, lombscargle
 
 logger = logging.getLogger(__name__)
+
 
 # ── 工具函数 ──────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ def _is_stationary(series: np.ndarray, threshold: float = 0.05) -> bool:
 
 
 def _periodogram_period(
-    series: np.ndarray, freq: str = "M"
+        series: np.ndarray, freq: str = "M"
 ) -> dict[str, Any]:
     """Scipy periodogram (Welch 法) 周期检测"""
     result: dict[str, Any] = {"success": False, "period": None, "confidence": 0.0}
@@ -111,7 +112,7 @@ def _periodogram_period(
 
 
 def _dominant_period_from_freqs(
-    freqs: np.ndarray, psd: np.ndarray, min_period: float = 2.0
+        freqs: np.ndarray, psd: np.ndarray, min_period: float = 2.0
 ) -> float | None:
     """从频率/功率谱中提取主导周期（抛物线插值提高精度）"""
     mask = freqs > 0
@@ -156,7 +157,7 @@ def _convert_period(period: float, from_freq: str, to_freq: str) -> float:
 
 
 def _fft_psd_period(
-    series: np.ndarray, freq: str = "M"
+        series: np.ndarray, freq: str = "M"
 ) -> dict[str, Any]:
     """FFT + 功率谱密度周期检测 (零填充过采样 + 抛物线插值)"""
     result: dict[str, Any] = {"success": False, "period": None, "confidence": 0.0}
@@ -265,7 +266,7 @@ def _acf_period(series: np.ndarray, max_lag: int | None = None) -> dict[str, Any
 
 
 def _wavelet_period(
-    series: np.ndarray, freq: str = "M"
+        series: np.ndarray, freq: str = "M"
 ) -> dict[str, Any]:
     """连续小波变换(CWT)周期检测"""
     result: dict[str, Any] = {"success": False, "period": None, "confidence": 0.0}
@@ -404,7 +405,7 @@ def _lomb_scargle_period(series: np.ndarray, freq: str = "M") -> dict[str, Any]:
 
 
 def _music_period(
-    series: np.ndarray, n_sig: int = 2, n_grid: int = 2000
+        series: np.ndarray, n_sig: int = 2, n_grid: int = 2000
 ) -> dict[str, Any]:
     """MUSIC (MUltiple SIgnal Classification) 子空间方法"""
     result: dict[str, Any] = {"success": False, "period": None, "confidence": 0.0}
@@ -647,13 +648,14 @@ class ThreeLevelVoter:
             long_clusters = [
                 c for c in clustered
                 if sum(p * w for p, w, _ in c) / max(1e-12, sum(w for _, w, _ in c)) > series_length / 2
-                and len(c) >= 2
+                   and len(c) >= 2
             ]
             if long_clusters:
                 best_cluster = max(long_clusters, key=cluster_score)
 
         cluster_weight = sum(w for _, w, _ in best_cluster)
-        final_period = sum(p * w for p, w, _ in best_cluster) / cluster_weight if cluster_weight > 0 else sorted_entries[0][0]
+        final_period = sum(p * w for p, w, _ in best_cluster) / cluster_weight if cluster_weight > 0 else \
+        sorted_entries[0][0]
         final_conf = min(1.0, cluster_weight)
         best_in_cluster = max(best_cluster, key=lambda x: x[1])
 
@@ -669,7 +671,7 @@ class ThreeLevelVoter:
 
 
 def phase_from_waveform(
-    cycle_component: list[float], current_idx: int | None = None
+        cycle_component: list[float], current_idx: int | None = None
 ) -> dict[str, Any]:
     """从周期波形推断经济阶段
 
@@ -714,21 +716,29 @@ def phase_from_waveform(
     eps = 0.005
     if abs(g) < eps:
         if v > 0.3:
-            phase = 2; confidence = min(1.0, abs(v))
+            phase = 2;
+            confidence = min(1.0, abs(v))
         elif v < -0.3:
-            phase = 4; confidence = min(1.0, abs(v))
+            phase = 4;
+            confidence = min(1.0, abs(v))
         elif a < 0:
-            phase = 2; confidence = 0.5
+            phase = 2;
+            confidence = 0.5
         else:
-            phase = 4; confidence = 0.5
+            phase = 4;
+            confidence = 0.5
     elif g > 0 and v >= 0:
-        phase = 1; confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
+        phase = 1;
+        confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
     elif g < 0 and v >= 0:
-        phase = 2; confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
+        phase = 2;
+        confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
     elif g < 0 and v < 0:
-        phase = 3; confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
+        phase = 3;
+        confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
     else:
-        phase = 4; confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
+        phase = 4;
+        confidence = min(1.0, max(0.3, 0.5 + 0.5 * abs(v)))
 
     # 拐点概率: 基于导数符号即将变化 + 二阶导大小
     if len(norm) >= 3 and current_idx > 0 and current_idx < len(norm) - 1:
@@ -761,7 +771,7 @@ def phase_from_waveform(
 
 
 def auto_select(
-    series: list[float] | np.ndarray, freq: str = "M"
+        series: list[float] | np.ndarray, freq: str = "M"
 ) -> dict[str, Any]:
     """自动路由频谱分析
 
@@ -873,7 +883,7 @@ def auto_select(
 
 
 def _extract_cycle_component(
-    series: np.ndarray, period: float
+        series: np.ndarray, period: float
 ) -> list[float]:
     """用滑动平均提取指定周期成分"""
     n = len(series)
@@ -923,9 +933,9 @@ if __name__ == "__main__":
     # 测试 3: 混合周期 (10年 + 3年)
     t3 = np.linspace(0, 30 * 12, 30 * 12)
     signal3 = (
-        np.sin(2 * np.pi * t3 / (10 * 12))
-        + 0.5 * np.sin(2 * np.pi * t3 / (3 * 12))
-        + 0.2 * np.random.randn(len(t3))
+            np.sin(2 * np.pi * t3 / (10 * 12))
+            + 0.5 * np.sin(2 * np.pi * t3 / (3 * 12))
+            + 0.2 * np.random.randn(len(t3))
     )
     result3 = auto_select(signal3, freq="M")
     print(f"测试3 - 30年混合周期 (10年+3年):")
@@ -951,11 +961,11 @@ if __name__ == "__main__":
 # ── 机构标准预处理管线 ─────────────────────────────────
 
 def cf_bandpass(
-    series: list[float] | np.ndarray,
-    low_yr: float = 3,
-    high_yr: float = 5,
-    ma_yr: float | None = None,
-    fs: float = 1.0,
+        series: list[float] | np.ndarray,
+        low_yr: float = 3,
+        high_yr: float = 5,
+        ma_yr: float | None = None,
+        fs: float = 1.0,
 ) -> dict[str, Any]:
     """机构标准周期预处理管线: MA平滑 → Butterworth带通 → Z-score
 

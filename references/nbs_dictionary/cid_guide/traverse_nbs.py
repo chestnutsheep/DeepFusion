@@ -48,8 +48,9 @@ DOMAIN_RULES = [
     ("科学技术", ["科技", "研发", "专利", "创新"]),
     ("环境资源", ["环境", "资源", "生态", "碳排放"]),
     ("区域经济", ["区域", "地区", "分省", "城市", "东中"],
-    ),
+     ),
 ]
+
 
 # ── 辅助函数 ──────────────────────────────────
 
@@ -153,7 +154,8 @@ def traverse_freq(client: NbsClient, freq_key: str, resume: bool = True) -> list
         json.dumps(results, ensure_ascii=False, default=str), encoding="utf-8",
     )
     elapsed = time.time() - start_time
-    print(f"\n    ✅ [{freq_key}] {len(results)} 个 CID, {sum(len(r['indicators']) for r in results)} 个指标, 耗时 {elapsed:.0f}s")
+    print(
+        f"\n    ✅ [{freq_key}] {len(results)} 个 CID, {sum(len(r['indicators']) for r in results)} 个指标, 耗时 {elapsed:.0f}s")
     return results
 
 
@@ -228,7 +230,8 @@ def generate_docs(metadata: dict, freq_key: str, output_dir: Path):
                 # 单 CID
                 page_lines.append(f"### {e['name']}")
                 page_lines.append(f"")
-                page_lines.append(f"**CID:** `{e['cid'][:16]}...`  |  **时间范围:** {e.get('sdate') or '?'} → {e.get('edate') or '至今'}")
+                page_lines.append(
+                    f"**CID:** `{e['cid'][:16]}...`  |  **时间范围:** {e.get('sdate') or '?'} → {e.get('edate') or '至今'}")
             else:
                 # 多时间分片
                 page_lines.append(f"### {base_name}（{len(cid_group)} 个分片）")
@@ -259,11 +262,11 @@ def generate_docs(metadata: dict, freq_key: str, output_dir: Path):
             for ind in inds[:15]:  # 前15个
                 page_lines.append(
                     f"| {escape_md(ind['name'])} "
-                    f"| {escape_md(ind.get('unit',''))} "
-                    f"| {escape_md(ind.get('mark',''))[:60]} |"
+                    f"| {escape_md(ind.get('unit', ''))} "
+                    f"| {escape_md(ind.get('mark', ''))[:60]} |"
                 )
             if len(inds) > 15:
-                page_lines.append(f"| *... 还有 {len(inds)-15} 个指标* | | |")
+                page_lines.append(f"| *... 还有 {len(inds) - 15} 个指标* | | |")
             page_lines.append(f"")
             page_lines.append(f"---")
             page_lines.append(f"")
@@ -377,9 +380,9 @@ def main():
     metadata = {}
 
     for freq in freqs:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  遍历 {freq} 数据")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         metadata[freq] = traverse_freq(client, freq, resume=not args.no_resume)
 
     # 保存 JSON 元数据
@@ -401,9 +404,9 @@ def main():
     print(f"\n[*] 元数据保存: {meta_path}")
 
     # 生成文档
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  生成文档")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for freq in freqs:
         generate_docs(metadata, freq, OUTPUT_DIR)
     generate_main_index(metadata, OUTPUT_DIR)
@@ -422,9 +425,9 @@ def main():
             shutil.copy2(src, obsidian_target / "index.md")
         print(f"    → Obsidian 备份: {obsidian_target}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  全部完成!")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

@@ -23,109 +23,237 @@ DB_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "industry_data.db"
 
-
 # ── 建表 ──────────────────────────────────────────────
 
 SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS meso_industry_classify (
-    industry_name TEXT NOT NULL,
-    industry_code TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'ths',
-    updated_at TEXT,
-    PRIMARY KEY (industry_code, source)
-);
+             CREATE TABLE IF NOT EXISTS meso_industry_classify
+             (
+                 industry_name
+                 TEXT
+                 NOT
+                 NULL,
+                 industry_code
+                 TEXT
+                 NOT
+                 NULL,
+                 source
+                 TEXT
+                 NOT
+                 NULL
+                 DEFAULT
+                 'ths',
+                 updated_at
+                 TEXT,
+                 PRIMARY
+                 KEY
+             (
+                 industry_code,
+                 source
+             )
+                 );
 
-CREATE TABLE IF NOT EXISTS meso_industry_daily (
-    industry_code TEXT NOT NULL,
-    trade_date TEXT NOT NULL,
-    open REAL,
-    close REAL,
-    high REAL,
-    low REAL,
-    volume REAL,
-    amount REAL,
-    change_pct REAL,
-    turnover_rate REAL,
-    PRIMARY KEY (industry_code, trade_date)
-);
+             CREATE TABLE IF NOT EXISTS meso_industry_daily
+             (
+                 industry_code
+                 TEXT
+                 NOT
+                 NULL,
+                 trade_date
+                 TEXT
+                 NOT
+                 NULL,
+                 open
+                 REAL,
+                 close
+                 REAL,
+                 high
+                 REAL,
+                 low
+                 REAL,
+                 volume
+                 REAL,
+                 amount
+                 REAL,
+                 change_pct
+                 REAL,
+                 turnover_rate
+                 REAL,
+                 PRIMARY
+                 KEY
+             (
+                 industry_code,
+                 trade_date
+             )
+                 );
 
-CREATE TABLE IF NOT EXISTS meso_industry_valuation (
-    industry_code TEXT NOT NULL,
-    industry_name TEXT,
-    constituent_count INTEGER,
-    pe_static REAL,
-    pe_ttm REAL,
-    pb REAL,
-    dividend_yield REAL,
-    updated_at TEXT,
-    PRIMARY KEY (industry_code)
-);
+             CREATE TABLE IF NOT EXISTS meso_industry_valuation
+             (
+                 industry_code
+                 TEXT
+                 NOT
+                 NULL,
+                 industry_name
+                 TEXT,
+                 constituent_count
+                 INTEGER,
+                 pe_static
+                 REAL,
+                 pe_ttm
+                 REAL,
+                 pb
+                 REAL,
+                 dividend_yield
+                 REAL,
+                 updated_at
+                 TEXT,
+                 PRIMARY
+                 KEY
+             (
+                 industry_code
+             )
+                 );
 
-CREATE TABLE IF NOT EXISTS meso_industry_fund_flow (
-    seq INTEGER PRIMARY KEY AUTOINCREMENT,
-    industry_name TEXT,
-    industry_code TEXT,
-    industry_pct_change REAL,
-    inflow REAL,
-    outflow REAL,
-    net_amount REAL,
-    company_count INTEGER,
-    leader_stock TEXT,
-    leader_pct_change REAL,
-    current_price REAL,
-    trade_date TEXT,
-    updated_at TEXT
-);
+             CREATE TABLE IF NOT EXISTS meso_industry_fund_flow
+             (
+                 seq
+                 INTEGER
+                 PRIMARY
+                 KEY
+                 AUTOINCREMENT,
+                 industry_name
+                 TEXT,
+                 industry_code
+                 TEXT,
+                 industry_pct_change
+                 REAL,
+                 inflow
+                 REAL,
+                 outflow
+                 REAL,
+                 net_amount
+                 REAL,
+                 company_count
+                 INTEGER,
+                 leader_stock
+                 TEXT,
+                 leader_pct_change
+                 REAL,
+                 current_price
+                 REAL,
+                 trade_date
+                 TEXT,
+                 updated_at
+                 TEXT
+             );
 
-CREATE TABLE IF NOT EXISTS meso_industry_financial (
-    industry_code TEXT NOT NULL,
-    report_date TEXT NOT NULL,
-    roe REAL,
-    revenue_growth REAL,
-    profit_growth REAL,
-    net_margin REAL,
-    debt_ratio REAL,
-    updated_at TEXT,
-    PRIMARY KEY (industry_code, report_date)
-);
+             CREATE TABLE IF NOT EXISTS meso_industry_financial
+             (
+                 industry_code
+                 TEXT
+                 NOT
+                 NULL,
+                 report_date
+                 TEXT
+                 NOT
+                 NULL,
+                 roe
+                 REAL,
+                 revenue_growth
+                 REAL,
+                 profit_growth
+                 REAL,
+                 net_margin
+                 REAL,
+                 debt_ratio
+                 REAL,
+                 updated_at
+                 TEXT,
+                 PRIMARY
+                 KEY
+             (
+                 industry_code,
+                 report_date
+             )
+                 );
 
-CREATE TABLE IF NOT EXISTS collection_meta (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    collected_at TEXT NOT NULL,
-    table_name TEXT NOT NULL,
-    rows INTEGER,
-    status TEXT DEFAULT 'ok'
-);
+             CREATE TABLE IF NOT EXISTS collection_meta
+             (
+                 id
+                 INTEGER
+                 PRIMARY
+                 KEY
+                 AUTOINCREMENT,
+                 collected_at
+                 TEXT
+                 NOT
+                 NULL,
+                 table_name
+                 TEXT
+                 NOT
+                 NULL,
+                 rows
+                 INTEGER,
+                 status
+                 TEXT
+                 DEFAULT
+                 'ok'
+             );
 
-CREATE TABLE IF NOT EXISTS meso_sw_classify (
-    industry_code TEXT PRIMARY KEY,
-    industry_name TEXT,
-    parent_name TEXT,
-    level INTEGER,
-    source TEXT,
-    constituent_count INTEGER,
-    pe_static REAL,
-    pe_ttm REAL,
-    pb REAL,
-    dividend_yield REAL
-);
+             CREATE TABLE IF NOT EXISTS meso_sw_classify
+             (
+                 industry_code
+                 TEXT
+                 PRIMARY
+                 KEY,
+                 industry_name
+                 TEXT,
+                 parent_name
+                 TEXT,
+                 level
+                 INTEGER,
+                 source
+                 TEXT,
+                 constituent_count
+                 INTEGER,
+                 pe_static
+                 REAL,
+                 pe_ttm
+                 REAL,
+                 pb
+                 REAL,
+                 dividend_yield
+                 REAL
+             );
 
-CREATE TABLE IF NOT EXISTS meso_spot_quotes (
-    stock_code TEXT PRIMARY KEY,
-    stock_name TEXT,
-    price REAL,
-    change_pct REAL,
-    turnover REAL,
-    pe_dynamic REAL,
-    pb REAL,
-    total_mv REAL,
-    circ_mv REAL,
-    collected_at TEXT
-);
+             CREATE TABLE IF NOT EXISTS meso_spot_quotes
+             (
+                 stock_code
+                 TEXT
+                 PRIMARY
+                 KEY,
+                 stock_name
+                 TEXT,
+                 price
+                 REAL,
+                 change_pct
+                 REAL,
+                 turnover
+                 REAL,
+                 pe_dynamic
+                 REAL,
+                 pb
+                 REAL,
+                 total_mv
+                 REAL,
+                 circ_mv
+                 REAL,
+                 collected_at
+                 TEXT
+             );
 
-CREATE INDEX IF NOT EXISTS idx_daily_code_date ON meso_industry_daily(industry_code, trade_date);
-CREATE INDEX IF NOT EXISTS idx_daily_date ON meso_industry_daily(trade_date);
-"""
+             CREATE INDEX IF NOT EXISTS idx_daily_code_date ON meso_industry_daily(industry_code, trade_date);
+             CREATE INDEX IF NOT EXISTS idx_daily_date ON meso_industry_daily(trade_date); \
+             """
 
 
 # ── 连接管理 ──────────────────────────────────────────
@@ -232,10 +360,10 @@ def save_daily(df: pd.DataFrame, industry_code: str):
 
 
 def get_daily(
-    industry_code: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    limit: int = 0,
+        industry_code: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        limit: int = 0,
 ) -> pd.DataFrame:
     """查询行业日行情。"""
     conn = _connect()
@@ -409,7 +537,7 @@ def save_spot_quotes(df: pd.DataFrame):
     }
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
     keep_cols = [c for c in ["stock_code", "stock_name", "price", "change_pct",
-                              "turnover", "pe_dynamic", "pb", "total_mv", "circ_mv"]
+                             "turnover", "pe_dynamic", "pb", "total_mv", "circ_mv"]
                  if c in df.columns]
     df = df[keep_cols]
 

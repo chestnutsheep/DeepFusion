@@ -36,9 +36,9 @@ def _safe_int(value: Any, default: int = 0) -> int:
 
 
 def okx_candles(
-    inst_id: str = "BTC-USDT",
-    bar: str = "1H",
-    limit: int = 162,
+        inst_id: str = "BTC-USDT",
+        bar: str = "1H",
+        limit: int = 162,
 ) -> pd.DataFrame:
     """Fetch OKX candlestick data.
 
@@ -70,9 +70,9 @@ def okx_candles(
 
 
 def okx_sentiment(
-    ccy: str = "BTC",
-    period: str = "1h",
-    inst_type: str = "SPOT",
+        ccy: str = "BTC",
+        period: str = "1h",
+        inst_type: str = "SPOT",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fetch OKX margin loan ratio & taker volume.
 
@@ -113,7 +113,7 @@ def okx_sentiment(
 
 
 def okx_funding_rate(
-    inst_id: str = "BTC-USDT-SWAP",
+        inst_id: str = "BTC-USDT-SWAP",
 ) -> dict[str, Any]:
     """Fetch OKX perpetual funding rate.
 
@@ -145,7 +145,7 @@ def okx_funding_rate(
 
 
 def okx_open_interest(
-    inst_id: str = "BTC-USDT-SWAP",
+        inst_id: str = "BTC-USDT-SWAP",
 ) -> dict[str, Any]:
     """Fetch OKX open interest for perpetual.
 
@@ -173,8 +173,8 @@ def okx_open_interest(
 
 
 def binance_ai_report(
-    symbol: str = "BTC",
-    lang: str = "zh-CN",
+        symbol: str = "BTC",
+        lang: str = "zh-CN",
 ) -> str:
     """Fetch Binance AI analysis report.
 

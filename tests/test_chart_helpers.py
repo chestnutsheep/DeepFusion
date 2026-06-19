@@ -1,8 +1,6 @@
 """测试 chart_helpers 抽取 — 验证字体加载、阶段着色、日期轴格式化
 先写测试定义预期行为，再实现提取模块。
 """
-import pytest
-import numpy as np
 
 
 class TestSetupChartFont:

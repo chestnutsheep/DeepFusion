@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +68,11 @@ def shade_phases(stages: list[int]) -> list[tuple[int, int, int]]:
 
 
 def apply_phase_shading(
-    ax,
-    dates: list,
-    stages: list[int],
-    colors: dict[int, str],
-    alpha: float = 0.12,
+        ax,
+        dates: list,
+        stages: list[int],
+        colors: dict[int, str],
+        alpha: float = 0.12,
 ) -> None:
     """在 matplotlib axes 上应用阶段着色
 

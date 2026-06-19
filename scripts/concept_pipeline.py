@@ -11,44 +11,87 @@ import pandas as pd
 import psycopg2
 
 from deep_fusion.shared.constants import DB_CONFIG
+
 DB = DB_CONFIG
+
 
 def get_conn():
     return psycopg2.connect(**DB)
+
 
 def ensure_tables():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS industry_chain.concept_classify (
-        concept_code VARCHAR(20) PRIMARY KEY,
-        concept_name VARCHAR(100) NOT NULL,
-        source VARCHAR(20) DEFAULT 'ths',
-        updated_at TIMESTAMP DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS industry_chain.concept_daily_stats (
-        date DATE NOT NULL,
-        concept_name VARCHAR(100) NOT NULL,
-        open REAL, high REAL, low REAL, close REAL,
-        volume BIGINT, amount BIGINT,
-        return_1d REAL, return_5d REAL, return_20d REAL, return_60d REAL,
-        source VARCHAR(20) DEFAULT 'ths',
-        updated_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (date, concept_name)
-    );
-    CREATE TABLE IF NOT EXISTS industry_chain.concept_pipeline_log (
-        id SERIAL PRIMARY KEY,
-        run_start TIMESTAMP DEFAULT NOW(),
-        run_end TIMESTAMP,
-        concepts_total INTEGER,
-        concepts_ok INTEGER,
-        concepts_fail TEXT,
-        stats_rows INTEGER,
-        status TEXT DEFAULT 'running'
-    );
-    """)
+                CREATE TABLE IF NOT EXISTS industry_chain.concept_classify
+                (
+                    concept_code
+                    VARCHAR
+                (
+                    20
+                ) PRIMARY KEY,
+                    concept_name VARCHAR
+                (
+                    100
+                ) NOT NULL,
+                    source VARCHAR
+                (
+                    20
+                ) DEFAULT 'ths',
+                    updated_at TIMESTAMP DEFAULT NOW
+                (
+                )
+                    );
+                CREATE TABLE IF NOT EXISTS industry_chain.concept_daily_stats
+                (
+                    date
+                    DATE
+                    NOT
+                    NULL,
+                    concept_name
+                    VARCHAR
+                (
+                    100
+                ) NOT NULL,
+                    open REAL, high REAL, low REAL, close REAL,
+                    volume BIGINT, amount BIGINT,
+                    return_1d REAL, return_5d REAL, return_20d REAL, return_60d REAL,
+                    source VARCHAR
+                (
+                    20
+                ) DEFAULT 'ths',
+                    updated_at TIMESTAMP DEFAULT NOW
+                (
+                ),
+                    PRIMARY KEY
+                (
+                    date,
+                    concept_name
+                )
+                    );
+                CREATE TABLE IF NOT EXISTS industry_chain.concept_pipeline_log
+                (
+                    id
+                    SERIAL
+                    PRIMARY
+                    KEY,
+                    run_start
+                    TIMESTAMP
+                    DEFAULT
+                    NOW
+                (
+                ),
+                    run_end TIMESTAMP,
+                    concepts_total INTEGER,
+                    concepts_ok INTEGER,
+                    concepts_fail TEXT,
+                    stats_rows INTEGER,
+                    status TEXT DEFAULT 'running'
+                    );
+                """)
     conn.commit()
     conn.close()
+
 
 def fetch_classify(conn):
     print("Fetching concept classifications from akshare...")
@@ -62,28 +105,30 @@ def fetch_classify(conn):
     cur.execute("DELETE FROM industry_chain.concept_classify")
     for _, r in df.iterrows():
         cur.execute("""
-            INSERT INTO industry_chain.concept_classify (concept_code, concept_name, source)
-            VALUES (%s, %s, 'ths')
-            ON CONFLICT (concept_code) DO UPDATE SET
-                concept_name = EXCLUDED.concept_name,
-                source = 'ths',
-                updated_at = NOW()
-        """, (str(r["concept_code"]), str(r["concept_name"])))
+                    INSERT INTO industry_chain.concept_classify (concept_code, concept_name, source)
+                    VALUES (%s, %s, 'ths') ON CONFLICT (concept_code) DO
+                    UPDATE SET
+                        concept_name = EXCLUDED.concept_name,
+                        source = 'ths',
+                        updated_at = NOW()
+                    """, (str(r["concept_code"]), str(r["concept_name"])))
     conn.commit()
     concepts = [(str(r["concept_code"]), str(r["concept_name"])) for _, r in df.iterrows()]
     print(f"  Stored {len(concepts)} concepts")
     return concepts
+
 
 def fetch_concept_kline(concept_name: str, start_date: str, end_date: str) -> pd.DataFrame:
     df = ak.stock_board_concept_index_ths(symbol=concept_name, start_date=start_date, end_date=end_date)
     if df is None or df.empty:
         return pd.DataFrame()
     df.columns = [c.strip() for c in df.columns]
-    rename = {"日期":"date","开盘价":"open","最高价":"high","最低价":"low",
-              "收盘价":"close","成交量":"volume","成交额":"amount"}
+    rename = {"日期": "date", "开盘价": "open", "最高价": "high", "最低价": "low",
+              "收盘价": "close", "成交量": "volume", "成交额": "amount"}
     df.rename(columns=rename, inplace=True)
     df["date"] = pd.to_datetime(df["date"])
     return df
+
 
 def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values("date").copy()
@@ -92,6 +137,7 @@ def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     for d in [5, 20, 60]:
         df[f"return_{d}d"] = (c / c.shift(d) - 1) * 100
     return df
+
 
 def store_daily_stats(conn, stats_df: pd.DataFrame, concept_name: str):
     cur = conn.cursor()
@@ -128,6 +174,7 @@ def store_daily_stats(conn, stats_df: pd.DataFrame, concept_name: str):
             pass
     conn.commit()
     return count
+
 
 def main():
     start_time = datetime.now()
@@ -192,22 +239,27 @@ def main():
 
     concepts_total = len(ok_list) + len(fail_list)
     cur.execute("""
-        UPDATE industry_chain.concept_pipeline_log SET
-            run_end=%s, concepts_total=%s, concepts_ok=%s,
-            concepts_fail=%s, stats_rows=%s, status='completed'
-        WHERE id=%s
-    """, (end_time, concepts_total, len(ok_list), ",".join(fail_list) if fail_list else "",
-          total_stats_rows, log_id))
+                UPDATE industry_chain.concept_pipeline_log
+                SET run_end=%s,
+                    concepts_total=%s,
+                    concepts_ok=%s,
+                    concepts_fail=%s,
+                    stats_rows=%s,
+                    status='completed'
+                WHERE id = %s
+                """, (end_time, concepts_total, len(ok_list), ",".join(fail_list) if fail_list else "",
+                      total_stats_rows, log_id))
     conn.commit()
     conn.close()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Pipeline complete in {duration:.0f}s")
     print(f"Concepts: {len(ok_list)} OK, {len(fail_list)} failed")
     print(f"Stats rows: {total_stats_rows}")
     if fail_list:
         print(f"Failed: {fail_list}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
+
 
 if __name__ == "__main__":
     main()

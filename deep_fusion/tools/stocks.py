@@ -34,9 +34,9 @@ def _extract_code_name(info) -> dict:
     description="根据股票名称、公司名称等关键词查找股票代码。当你已知股票代码时，建议直接使用其他工具（如 market_prices）跳过搜索",
 )
 async def search(
-    keyword: str = Field(description="搜索关键词，公司名称、股票名称、股票代码、证券简称"),
-    market: str = field_market,
-    ctx: Context | None = None,
+        keyword: str = Field(description="搜索关键词，公司名称、股票名称、股票代码、证券简称"),
+        market: str = field_market,
+        ctx: Context | None = None,
 ):
     if ctx:
         await ctx.report_progress(0, 100, "正在初始化搜索...")
@@ -53,7 +53,8 @@ async def search(
         return json.dumps(result, ensure_ascii=False)
     if ctx:
         await ctx.report_progress(100, 100, "未找到结果")
-    return json.dumps({"code": "", "name": "", "market": market, "error": f"Not Found for {keyword}"}, ensure_ascii=False)
+    return json.dumps({"code": "", "name": "", "market": market, "error": f"Not Found for {keyword}"},
+                      ensure_ascii=False)
 
 
 @mcp.tool(
@@ -61,8 +62,8 @@ async def search(
     description="获取各板块实时行情：沪深京A股、创业板、科创板、ST股票、新股等。不传板块参数则返回全部A股行情",
 )
 def market_overview(
-    板块: str = Field("全部A股", description="板块: 全部A股, 沪A, 深A, 京A, 创业板, 科创板, ST, 新股"),
-    limit: int = Field(30, description="返回行数"),
+        板块: str = Field("全部A股", description="板块: 全部A股, 沪A, 深A, 京A, 创业板, 科创板, ST, 新股"),
+        limit: int = Field(30, description="返回行数"),
 ) -> str:
     df = _fetch_spot(板块)
     if df is None or df.empty:
@@ -121,8 +122,8 @@ def _fetch_spot(market: str = "全部A股") -> "pd.DataFrame | None":
     description="获取个股基本信息（东方财富+雪球）、股本股东、十大股东、高管变动、历史分红等综合档案数据",
 )
 def individual_info(
-    symbol: str = Field(description="6位股票代码，如 600519"),
-    market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
+        symbol: str = Field(description="6位股票代码，如 600519"),
+        market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
     results = {}
 
@@ -159,10 +160,10 @@ def individual_info(
     description="获取个股日/周/月K线、分钟线、分笔数据、盘前数据等综合历史行情",
 )
 def individual_hist(
-    symbol: str = Field(description="6位股票代码，如 000001"),
-    period: str = Field("daily", description="周期: daily=日线, weekly=周线, monthly=月线"),
-    limit: int = Field(30, description="返回天数"),
-    minute_period: str = Field("5", description="分钟级别: 1, 5, 15, 30, 60"),
+        symbol: str = Field(description="6位股票代码，如 000001"),
+        period: str = Field("daily", description="周期: daily=日线, weekly=周线, monthly=月线"),
+        limit: int = Field(30, description="返回天数"),
+        minute_period: str = Field("5", description="分钟级别: 1, 5, 15, 30, 60"),
 ) -> str:
     results = {}
 
@@ -210,11 +211,11 @@ def individual_hist(
     description="统一获取股票/ETF历史价格及技术指标，输出标准化行情字段。支持A股/H股/美股及ETF",
 )
 def market_prices(
-    symbol: str = Field(description="股票代码，如 000001（A股）、00700（港股）、AAPL（美股）"),
-    market: str = field_market,
-    period: str = Field("daily", description="周期: daily(日线)、weekly(周线，不支持美股)"),
-    limit: int = Field(30, description="返回数量"),
-    asset: str = Field("equity", description="资产类型: equity/etf"),
+        symbol: str = Field(description="股票代码，如 000001（A股）、00700（港股）、AAPL（美股）"),
+        market: str = field_market,
+        period: str = Field("daily", description="周期: daily(日线)、weekly(周线，不支持美股)"),
+        limit: int = Field(30, description="返回数量"),
+        asset: str = Field("equity", description="资产类型: equity/etf"),
 ) -> str:
     from datetime import datetime, timedelta
 
@@ -233,7 +234,8 @@ def market_prices(
         dfs = ak.stock_us_daily(symbol=symbol)
         if dfs is None or dfs.empty:
             return None
-        dfs.rename(columns={"date": "日期", "open": "开盘", "close": "收盘", "high": "最高", "low": "最低", "volume": "成交量"}, inplace=True)
+        dfs.rename(columns={"date": "日期", "open": "开盘", "close": "收盘", "high": "最高", "low": "最低",
+                            "volume": "成交量"}, inplace=True)
         dfs["换手率"] = None
         dfs.index = pd.to_datetime(dfs["日期"], errors="coerce")
         return dfs[start_date:"2222-01-01"]
@@ -242,7 +244,8 @@ def market_prices(
         dfs = ak.fund_etf_hist_sina(symbol=f"{market}{symbol}")
         if dfs is None or dfs.empty:
             return None
-        dfs.rename(columns={"date": "日期", "open": "开盘", "close": "收盘", "high": "最高", "low": "最低", "volume": "成交量"}, inplace=True)
+        dfs.rename(columns={"date": "日期", "open": "开盘", "close": "收盘", "high": "最高", "low": "最低",
+                            "volume": "成交量"}, inplace=True)
         dfs["换手率"] = None
         dfs.index = pd.to_datetime(dfs["日期"], errors="coerce")
         return dfs[start_date:"2222-01-01"]

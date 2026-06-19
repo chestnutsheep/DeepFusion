@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('HTTP_PROXY', 'http://127.0.0.1:7897')
 os.environ.setdefault('HTTPS_PROXY', 'http://127.0.0.1:7897')
 
-
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
@@ -84,6 +83,7 @@ def _warmup_cycle_cache():
 
 
 import uvicorn
+
 print(f'  ⟡ Deep Fusion API → http://localhost:5173/api')
 threading.Thread(target=_warmup_cycle_cache, daemon=True).start()
 uvicorn.run(app, host='0.0.0.0', port=5173, log_level='warning')

@@ -3,6 +3,7 @@ import sys
 import time
 from datetime import datetime, date
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import akshare as ak
@@ -11,57 +12,154 @@ import psycopg2
 import numpy as np
 
 from deep_fusion.shared.constants import DB_CONFIG
+
 DB = DB_CONFIG
+
 
 def get_conn():
     return psycopg2.connect(**DB)
+
 
 def ensure_tables():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS industry_chain.industry_daily_stats (
-        date DATE NOT NULL,
-        industry_name TEXT NOT NULL,
-        close REAL, open REAL, high REAL, low REAL,
-        volume REAL, amount REAL,
-        return_1d REAL, return_5d REAL, return_10d REAL,
-        return_20d REAL, return_60d REAL, return_250d REAL,
-        volatility_20d REAL, volatility_60d REAL,
-        max_drawdown_20d REAL, max_drawdown_60d REAL,
-        volume_ma_20d REAL, volume_ratio REAL,
-        amount_ma_20d REAL, amount_ratio REAL,
-        momentum_score REAL,
-        win_rate_20d REAL, up_down_ratio REAL,
-        source TEXT DEFAULT 'ths',
-        updated_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (date, industry_name)
-    );
-    CREATE TABLE IF NOT EXISTS industry_chain.industry_daily_rankings (
-        date DATE NOT NULL,
-        industry_name TEXT NOT NULL,
-        rank_return_5d REAL, rank_return_20d REAL, rank_return_60d REAL,
-        rank_volatility_20d REAL, rank_momentum REAL,
-        quintile INTEGER,
-        signal TEXT,
-        source TEXT DEFAULT 'ths',
-        updated_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (date, industry_name)
-    );
-    CREATE TABLE IF NOT EXISTS industry_chain.industry_pipeline_log (
-        id SERIAL PRIMARY KEY,
-        run_start TIMESTAMP DEFAULT NOW(),
-        run_end TIMESTAMP,
-        industries_total INTEGER,
-        industries_ok INTEGER,
-        industries_fail TEXT,
-        stats_rows INTEGER,
-        ranking_rows INTEGER,
-        status TEXT DEFAULT 'running'
-    );
-    """)
+                CREATE TABLE IF NOT EXISTS industry_chain.industry_daily_stats
+                (
+                    date
+                    DATE
+                    NOT
+                    NULL,
+                    industry_name
+                    TEXT
+                    NOT
+                    NULL,
+                    close
+                    REAL,
+                    open
+                    REAL,
+                    high
+                    REAL,
+                    low
+                    REAL,
+                    volume
+                    REAL,
+                    amount
+                    REAL,
+                    return_1d
+                    REAL,
+                    return_5d
+                    REAL,
+                    return_10d
+                    REAL,
+                    return_20d
+                    REAL,
+                    return_60d
+                    REAL,
+                    return_250d
+                    REAL,
+                    volatility_20d
+                    REAL,
+                    volatility_60d
+                    REAL,
+                    max_drawdown_20d
+                    REAL,
+                    max_drawdown_60d
+                    REAL,
+                    volume_ma_20d
+                    REAL,
+                    volume_ratio
+                    REAL,
+                    amount_ma_20d
+                    REAL,
+                    amount_ratio
+                    REAL,
+                    momentum_score
+                    REAL,
+                    win_rate_20d
+                    REAL,
+                    up_down_ratio
+                    REAL,
+                    source
+                    TEXT
+                    DEFAULT
+                    'ths',
+                    updated_at
+                    TIMESTAMP
+                    DEFAULT
+                    NOW
+                (
+                ),
+                    PRIMARY KEY
+                (
+                    date,
+                    industry_name
+                )
+                    );
+                CREATE TABLE IF NOT EXISTS industry_chain.industry_daily_rankings
+                (
+                    date
+                    DATE
+                    NOT
+                    NULL,
+                    industry_name
+                    TEXT
+                    NOT
+                    NULL,
+                    rank_return_5d
+                    REAL,
+                    rank_return_20d
+                    REAL,
+                    rank_return_60d
+                    REAL,
+                    rank_volatility_20d
+                    REAL,
+                    rank_momentum
+                    REAL,
+                    quintile
+                    INTEGER,
+                    signal
+                    TEXT,
+                    source
+                    TEXT
+                    DEFAULT
+                    'ths',
+                    updated_at
+                    TIMESTAMP
+                    DEFAULT
+                    NOW
+                (
+                ),
+                    PRIMARY KEY
+                (
+                    date,
+                    industry_name
+                )
+                    );
+                CREATE TABLE IF NOT EXISTS industry_chain.industry_pipeline_log
+                (
+                    id
+                    SERIAL
+                    PRIMARY
+                    KEY,
+                    run_start
+                    TIMESTAMP
+                    DEFAULT
+                    NOW
+                (
+                ),
+                    run_end TIMESTAMP,
+                    industries_total INTEGER,
+                    industries_ok INTEGER,
+                    industries_fail TEXT,
+                    stats_rows INTEGER,
+                    ranking_rows INTEGER,
+                    status TEXT DEFAULT 'running'
+                    );
+                """)
     conn.commit()
     conn.close()
+
 
 def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values("date").copy()
@@ -90,7 +188,8 @@ def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
     for d in [5, 20]:
         rank_col = f"return_{d}d"
         rolling_median = df[rank_col].rolling(20, min_periods=1).median()
-        df[f"momentum_{['short','mid'][d//10-1 if d==10 else 0 if d==5 else 1]}"] = df[rank_col] - rolling_median
+        df[f"momentum_{['short', 'mid'][d // 10 - 1 if d == 10 else 0 if d == 5 else 1]}"] = df[
+                                                                                                 rank_col] - rolling_median
     df["momentum_score"] = (df["return_5d"].rank(pct=True) + df["return_20d"].rank(pct=True)) / 2 * 100
 
     pos_days_20 = df["return_1d"].gt(0).rolling(20).sum()
@@ -101,6 +200,7 @@ def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
     df["up_down_ratio"] = pos_mean / neg_mean.replace(0, np.nan)
 
     return df
+
 
 def store_industry_stats(conn, stats_df: pd.DataFrame, industry: str, source: str = "ths"):
     cur = conn.cursor()
@@ -130,21 +230,24 @@ def store_industry_stats(conn, stats_df: pd.DataFrame, industry: str, source: st
     conn.commit()
     return count
 
+
 def compute_rankings(conn, run_date: date):
     cur = conn.cursor()
     cur.execute("""
-        DELETE FROM industry_chain.industry_daily_rankings WHERE date = %s
-    """, (run_date,))
+                DELETE
+                FROM industry_chain.industry_daily_rankings
+                WHERE date = %s
+                """, (run_date,))
     cur.execute("""
-        SELECT industry_name, return_5d, return_20d, return_60d, volatility_20d, momentum_score
-        FROM industry_chain.industry_daily_stats
-        WHERE date = %s
-    """, (run_date,))
+                SELECT industry_name, return_5d, return_20d, return_60d, volatility_20d, momentum_score
+                FROM industry_chain.industry_daily_stats
+                WHERE date = %s
+                """, (run_date,))
     rows = cur.fetchall()
     if len(rows) < 2:
         return 0
     df = pd.DataFrame(rows, columns=["industry_name", "return_5d", "return_20d", "return_60d",
-                                      "volatility_20d", "momentum_score"])
+                                     "volatility_20d", "momentum_score"])
     n = len(df)
     df_valid = df.dropna(subset=["return_5d", "momentum_score"])
     if len(df_valid) < 5:
@@ -154,29 +257,32 @@ def compute_rankings(conn, run_date: date):
     df_valid["rank_return_60d"] = df_valid["return_60d"].rank(pct=True) * 100
     df_valid["rank_volatility_20d"] = (1 - df_valid["volatility_20d"].rank(pct=True)) * 100
     df_valid["rank_momentum"] = df_valid["momentum_score"].rank(pct=True) * 100
-    df_valid["quintile"] = pd.qcut(df_valid["rank_momentum"].rank(method="first"), 5, labels=[5,4,3,2,1]).astype(int)
+    df_valid["quintile"] = pd.qcut(df_valid["rank_momentum"].rank(method="first"), 5, labels=[5, 4, 3, 2, 1]).astype(
+        int)
+
     def signal(q):
-        return {1:"领涨",2:"强势",3:"中性",4:"弱势",5:"领跌"}.get(q,"中性")
+        return {1: "领涨", 2: "强势", 3: "中性", 4: "弱势", 5: "领跌"}.get(q, "中性")
+
     df_valid["signal"] = df_valid["quintile"].apply(signal)
     count = 0
     for _, r in df_valid.iterrows():
         cur.execute("""
-            INSERT INTO industry_chain.industry_daily_rankings
-            (date, industry_name, rank_return_5d, rank_return_20d, rank_return_60d,
-             rank_volatility_20d, rank_momentum, quintile, signal)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (date, industry_name) DO NOTHING
-        """, (run_date, r["industry_name"],
-              float(r["rank_return_5d"]) if pd.notna(r["rank_return_5d"]) else None,
-              float(r["rank_return_20d"]) if pd.notna(r["rank_return_20d"]) else None,
-              float(r["rank_return_60d"]) if pd.notna(r["rank_return_60d"]) else None,
-              float(r["rank_volatility_20d"]) if pd.notna(r["rank_volatility_20d"]) else None,
-              float(r["rank_momentum"]) if pd.notna(r["rank_momentum"]) else None,
-              int(r["quintile"]) if pd.notna(r["quintile"]) else None,
-              r["signal"]))
+                    INSERT INTO industry_chain.industry_daily_rankings
+                    (date, industry_name, rank_return_5d, rank_return_20d, rank_return_60d,
+                     rank_volatility_20d, rank_momentum, quintile, signal)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (date, industry_name) DO NOTHING
+                    """, (run_date, r["industry_name"],
+                          float(r["rank_return_5d"]) if pd.notna(r["rank_return_5d"]) else None,
+                          float(r["rank_return_20d"]) if pd.notna(r["rank_return_20d"]) else None,
+                          float(r["rank_return_60d"]) if pd.notna(r["rank_return_60d"]) else None,
+                          float(r["rank_volatility_20d"]) if pd.notna(r["rank_volatility_20d"]) else None,
+                          float(r["rank_momentum"]) if pd.notna(r["rank_momentum"]) else None,
+                          int(r["quintile"]) if pd.notna(r["quintile"]) else None,
+                          r["signal"]))
         count += 1
     conn.commit()
     return count
+
 
 def main():
     start_time = datetime.now()
@@ -209,14 +315,15 @@ def main():
             print(f"\n[{i}/{total}] {ind} ...", end=" ", flush=True)
             try:
                 df = ak.stock_board_industry_index_ths(symbol=ind,
-                    start_date="20210101", end_date=datetime.now().strftime("%Y%m%d"))
+                                                       start_date="20210101",
+                                                       end_date=datetime.now().strftime("%Y%m%d"))
                 if df is None or df.empty:
                     print("empty")
                     fail_list.append(f"{ind}(empty)")
                     continue
                 df.columns = [c.strip() for c in df.columns]
-                rename = {"日期":"date","开盘价":"open","最高价":"high","最低价":"low",
-                          "收盘价":"close","成交量":"volume","成交额":"amount"}
+                rename = {"日期": "date", "开盘价": "open", "最高价": "high", "最低价": "low",
+                          "收盘价": "close", "成交量": "volume", "成交额": "amount"}
                 df.rename(columns=rename, inplace=True)
                 df["date"] = pd.to_datetime(df["date"])
                 df = df[df["volume"] > 0].copy()
@@ -241,9 +348,10 @@ def main():
 
     # Compute rankings for each date that has data
     cur.execute("""
-        SELECT DISTINCT date FROM industry_chain.industry_daily_stats
-        ORDER BY date
-    """)
+                SELECT DISTINCT date
+                FROM industry_chain.industry_daily_stats
+                ORDER BY date
+                """)
     dates = [r[0] for r in cur.fetchall()]
     total_rank_rows = 0
     for d in dates:
@@ -256,23 +364,29 @@ def main():
 
     industries_total = len(ok_list) + len(fail_list)
     cur.execute("""
-        UPDATE industry_chain.industry_pipeline_log SET
-            run_end=%s, industries_total=%s, industries_ok=%s,
-            industries_fail=%s, stats_rows=%s, ranking_rows=%s, status='completed'
-        WHERE id=%s
-    """, (end_time, industries_total, len(ok_list), ",".join(fail_list) if fail_list else "",
-          total_stats_rows, total_rank_rows, log_id))
+                UPDATE industry_chain.industry_pipeline_log
+                SET run_end=%s,
+                    industries_total=%s,
+                    industries_ok=%s,
+                    industries_fail=%s,
+                    stats_rows=%s,
+                    ranking_rows=%s,
+                    status='completed'
+                WHERE id = %s
+                """, (end_time, industries_total, len(ok_list), ",".join(fail_list) if fail_list else "",
+                      total_stats_rows, total_rank_rows, log_id))
     conn.commit()
     conn.close()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Pipeline complete in {duration:.0f}s")
     print(f"Industries: {len(ok_list)} OK, {len(fail_list)} failed")
     print(f"Stats rows: {total_stats_rows}")
     print(f"Ranking rows: {total_rank_rows}")
     if fail_list:
         print(f"Failed: {fail_list}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
+
 
 if __name__ == "__main__":
     main()

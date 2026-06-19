@@ -18,34 +18,34 @@ DB_PATH = Path.home() / "output" / "data" / "cycle_cache.db"
 
 # ── 指标注册 ─────────────────────────────────────────
 _FRED_INDICATORS: dict[str, tuple[str, str]] = {
-    "fred_ppiaco":   ("PPIACO",            "生产者价格指数(全商品), 1913~"),
-    "fred_gs10":     ("GS10",              "10年期国债收益率, 1953~"),
-    "fred_cpiaucns": ("CPIAUCNS",          "CPI 所有城镇消费者, 1913~"),
-    "fred_gnpca":    ("GNPCA",             "实际 GNP, 1929~"),
-    "fred_indpro":   ("INDPRO",            "工业生产指数, 1919~"),
-    "fred_unrate":   ("UNRATE",            "失业率, 1948~"),
-    "fred_fedfunds": ("FEDFUNDS",          "联邦基金利率, 1954~"),
-    "fred_t5yiep":   ("T5YIE",             "5年期盈亏平衡通胀率, 2003~"),
+    "fred_ppiaco": ("PPIACO", "生产者价格指数(全商品), 1913~"),
+    "fred_gs10": ("GS10", "10年期国债收益率, 1953~"),
+    "fred_cpiaucns": ("CPIAUCNS", "CPI 所有城镇消费者, 1913~"),
+    "fred_gnpca": ("GNPCA", "实际 GNP, 1929~"),
+    "fred_indpro": ("INDPRO", "工业生产指数, 1919~"),
+    "fred_unrate": ("UNRATE", "失业率, 1948~"),
+    "fred_fedfunds": ("FEDFUNDS", "联邦基金利率, 1954~"),
+    "fred_t5yiep": ("T5YIE", "5年期盈亏平衡通胀率, 2003~"),
     # ── 三周期扩展新增 ──
-    "fred_mnfrir":    ("MNFRIR",           "制造商库存, 1919~"),
-    "fred_whlslrir":  ("WHLSLRIR",         "批发商库存, 1919~"),
-    "fred_mcumfn":    ("MCUMFN",           "制造业产能利用率, 1967~"),
-    "fred_fpi":       ("FPI",              "私人固定投资, 1947~"),
-    "fred_pnfi":      ("PNFI",             "非住宅固定投资, 1947~"),
-    "fred_houst":     ("HOUST",            "新屋开工, 1959~"),
-    "fred_ussthpi":   ("USSTHPI",          "美国房价指数, 1975~"),
-    "fred_prfi":      ("PRFI",             "住宅固定投资, 1947~"),
-    "fred_m2sl":      ("M2SL",             "M2货币存量, 1959~"),
+    "fred_mnfrir": ("MNFRIR", "制造商库存, 1919~"),
+    "fred_whlslrir": ("WHLSLRIR", "批发商库存, 1919~"),
+    "fred_mcumfn": ("MCUMFN", "制造业产能利用率, 1967~"),
+    "fred_fpi": ("FPI", "私人固定投资, 1947~"),
+    "fred_pnfi": ("PNFI", "非住宅固定投资, 1947~"),
+    "fred_houst": ("HOUST", "新屋开工, 1959~"),
+    "fred_ussthpi": ("USSTHPI", "美国房价指数, 1975~"),
+    "fred_prfi": ("PRFI", "住宅固定投资, 1947~"),
+    "fred_m2sl": ("M2SL", "M2货币存量, 1959~"),
 }
 
 _WB_INDICATORS: dict[str, tuple[str, str, str]] = {
-    "wb_gdp_growth":     ("NY.GDP.MKTP.KD.ZG", "1W", "全球GDP增长率"),
-    "wb_gdp_per_capita": ("NY.GDP.PCAP.KD",    "1W", "全球人均GDP"),
-    "wb_trade_pct":      ("NE.TRD.GNFS.ZS",    "1W", "贸易占GDP比重"),
-    "wb_population":     ("SP.POP.TOTL",       "1W", "总人口"),
-    "wb_inflation":      ("FP.CPI.TOTL.ZG",    "1W", "CPI通胀率"),
-    "wb_patent":         ("IP.PAT.RESD",       "1W", "居民专利申请量"),
-    "wb_electricity":    ("EG.USE.ELEC.KH.PC", "1W", "人均用电量"),
+    "wb_gdp_growth": ("NY.GDP.MKTP.KD.ZG", "1W", "全球GDP增长率"),
+    "wb_gdp_per_capita": ("NY.GDP.PCAP.KD", "1W", "全球人均GDP"),
+    "wb_trade_pct": ("NE.TRD.GNFS.ZS", "1W", "贸易占GDP比重"),
+    "wb_population": ("SP.POP.TOTL", "1W", "总人口"),
+    "wb_inflation": ("FP.CPI.TOTL.ZG", "1W", "CPI通胀率"),
+    "wb_patent": ("IP.PAT.RESD", "1W", "居民专利申请量"),
+    "wb_electricity": ("EG.USE.ELEC.KH.PC", "1W", "人均用电量"),
 }
 
 
@@ -62,26 +62,56 @@ def _connect() -> sqlite3.Connection:
 
 def _ensure_schema(conn: sqlite3.Connection):
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS cycle_data (
-            indicator TEXT NOT NULL,
-            date TEXT NOT NULL,
-            value REAL,
-            PRIMARY KEY (indicator, date)
-        )
-    """)
+                 CREATE TABLE IF NOT EXISTS cycle_data
+                 (
+                     indicator
+                     TEXT
+                     NOT
+                     NULL,
+                     date
+                     TEXT
+                     NOT
+                     NULL,
+                     value
+                     REAL,
+                     PRIMARY
+                     KEY
+                 (
+                     indicator,
+                     date
+                 )
+                     )
+                 """)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS cycle_cache (
-            indicator TEXT PRIMARY KEY,
-            cached_at TEXT NOT NULL
-        )
-    """)
+                 CREATE TABLE IF NOT EXISTS cycle_cache
+                 (
+                     indicator
+                     TEXT
+                     PRIMARY
+                     KEY,
+                     cached_at
+                     TEXT
+                     NOT
+                     NULL
+                 )
+                 """)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS cycle_log (
-            ts TEXT NOT NULL,
-            action TEXT NOT NULL,
-            detail TEXT NOT NULL
-        )
-    """)
+                 CREATE TABLE IF NOT EXISTS cycle_log
+                 (
+                     ts
+                     TEXT
+                     NOT
+                     NULL,
+                     action
+                     TEXT
+                     NOT
+                     NULL,
+                     detail
+                     TEXT
+                     NOT
+                     NULL
+                 )
+                 """)
     conn.commit()
 
 

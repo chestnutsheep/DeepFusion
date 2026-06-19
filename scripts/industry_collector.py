@@ -333,15 +333,35 @@ def init_db(db_path: str) -> int:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS collection_meta (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            collected_at TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            section_name TEXT NOT NULL,
-            rows INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'ok'
-        )
-    """)
+                   CREATE TABLE IF NOT EXISTS collection_meta
+                   (
+                       id
+                       INTEGER
+                       PRIMARY
+                       KEY
+                       AUTOINCREMENT,
+                       collected_at
+                       TEXT
+                       NOT
+                       NULL,
+                       tool_name
+                       TEXT
+                       NOT
+                       NULL,
+                       section_name
+                       TEXT
+                       NOT
+                       NULL,
+                       rows
+                       INTEGER
+                       DEFAULT
+                       0,
+                       status
+                       TEXT
+                       DEFAULT
+                       'ok'
+                   )
+                   """)
     cursor.execute(
         "INSERT INTO collection_meta (collected_at, tool_name, section_name, status) VALUES (?, ?, ?, ?)",
         (time.strftime("%Y-%m-%d %H:%M:%S"), "__init__", "__init__", "started"),

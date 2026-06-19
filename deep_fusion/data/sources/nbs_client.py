@@ -46,7 +46,8 @@ class _NbsClient:
         self._session.trust_env = False
         self._last_request = 0.0
         self._cid_index: list[dict] | None = None
-        self._cid_dir = Path(cid_dir) if cid_dir else (Path(__file__).resolve().parent.parent.parent / "shared" / "data")
+        self._cid_dir = Path(cid_dir) if cid_dir else (
+                    Path(__file__).resolve().parent.parent.parent / "shared" / "data")
 
     def _rate_limit(self):
         elapsed = time.time() - self._last_request
@@ -162,13 +163,13 @@ class _NbsClient:
         return [ind for ind in indicators if keyword in ind.get("i_showname", "")]
 
     def fetch_data(
-        self,
-        cid: str,
-        indicator_ids: list[str],
-        start: str = "2020",
-        end: str = "",
-        region: list[dict] | None = None,
-        freq: str = "MM",
+            self,
+            cid: str,
+            indicator_ids: list[str],
+            start: str = "2020",
+            end: str = "",
+            region: list[dict] | None = None,
+            freq: str = "MM",
     ) -> pd.DataFrame:
         if region is None:
             region = [{"text": "全国", "value": "000000000000"}]
@@ -223,12 +224,12 @@ class _NbsClient:
         return df
 
     def fetch_merged(
-        self,
-        cid_indicator_pairs: list[tuple[str, str]],
-        cid_date_ranges: list[tuple[str | None, str | None]] | None = None,
-        start: str = "2000",
-        end: str = "",
-        freq: str = "MM",
+            self,
+            cid_indicator_pairs: list[tuple[str, str]],
+            cid_date_ranges: list[tuple[str | None, str | None]] | None = None,
+            start: str = "2000",
+            end: str = "",
+            freq: str = "MM",
     ) -> pd.DataFrame:
         all_frames = []
         for i, (cid, ind_id) in enumerate(cid_indicator_pairs):
@@ -277,12 +278,12 @@ class _NbsClient:
         return result
 
     def search_and_fetch(
-        self,
-        keyword: str,
-        indicator_keyword: str = "增减",
-        start: str = "2000",
-        end: str = "",
-        freq: str = "MM",
+            self,
+            keyword: str,
+            indicator_keyword: str = "增减",
+            start: str = "2000",
+            end: str = "",
+            freq: str = "MM",
     ) -> pd.DataFrame | None:
         candidates = self.search(keyword, freq={"MM": "月度", "SS": "季度", "YY": "年度"}.get(freq, ""))
         if not candidates:
@@ -305,6 +306,7 @@ class _NbsClient:
         def _sort_key(x):
             s = x.get("sdate")
             return int(s) if s else 9999
+
         cid_infos.sort(key=_sort_key)
         pairs = [(ci["cid"], ci["indicator"]["_id"]) for ci in cid_infos]
         date_ranges = [(ci.get("sdate"), ci.get("edate")) for ci in cid_infos]
@@ -337,10 +339,10 @@ def _clean_df(df) -> tuple[list[str], list[float]]:
 
 
 def _fetch_by_indicator_name(
-    dataset_keyword: str,
-    indicator_name: str,
-    freq: str = "MM",
-    start: str = "2000",
+        dataset_keyword: str,
+        indicator_name: str,
+        freq: str = "MM",
+        start: str = "2000",
 ) -> pd.DataFrame | None:
     client = _get_nbs_client()
     cids = client.search(dataset_keyword)
@@ -362,7 +364,8 @@ def _fetch_by_indicator_name(
                 break
     if not cid_infos:
         return None
-    cid_infos.sort(key=lambda x: int(x.get("sdate") or 0) if x.get("sdate") and x["sdate"].lstrip("-").isdigit() else 9999)
+    cid_infos.sort(
+        key=lambda x: int(x.get("sdate") or 0) if x.get("sdate") and x["sdate"].lstrip("-").isdigit() else 9999)
     pairs = [(ci["cid"], ci["indicator"]["_id"]) for ci in cid_infos]
     date_ranges = [(ci.get("sdate"), ci.get("edate")) for ci in cid_infos]
     return client.fetch_merged(pairs, cid_date_ranges=date_ranges, start=start, end="", freq=freq)
@@ -477,7 +480,7 @@ def _fetch_house_price_yoy() -> tuple[list[str], list[float]]:
     _ = os.environ.pop("socks_proxy", None)
     try:
         import akshare as ak
-        cities = [("北京","上海"), ("广州","深圳"), ("杭州","成都"), ("武汉","南京"), ("天津","重庆")]
+        cities = [("北京", "上海"), ("广州", "深圳"), ("杭州", "成都"), ("武汉", "南京"), ("天津", "重庆")]
         all_data: dict[str, list[float]] = {}
         for c1, c2 in cities:
             df = ak.macro_china_new_house_price(city_first=c1, city_second=c2)
@@ -544,7 +547,6 @@ def _fetch_product_electricity() -> tuple[list[str], list[float]]:
     """发电量（亿千瓦时）"""
     logger.warning("发电量: NBS 产品级 API 暂不可用")
     return [], []
-
 
 # ═══════════════════════════════════════════════════════════════
 # Kondratiev 可选算法

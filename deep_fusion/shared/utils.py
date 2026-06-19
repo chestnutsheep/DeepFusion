@@ -159,8 +159,8 @@ def compute_kondratiev() -> dict[str, Any]:
     from .spectral import cf_bandpass
 
     # ── 1. 全球数据 ──
-    ppiaco = fetch_fred("PPIACO")      # PPI All Commodities, 1913~
-    gs10 = fetch_fred("GS10")          # 10-Year Treasury, 1953~
+    ppiaco = fetch_fred("PPIACO")  # PPI All Commodities, 1913~
+    gs10 = fetch_fred("GS10")  # 10-Year Treasury, 1953~
     wbgdp = fetch_wb("NY.GDP.MKTP.KD.ZG", "1W")  # World GDP growth, 1961~
 
     # ── 2. 中国数据 ──
@@ -234,7 +234,7 @@ def compute_kondratiev() -> dict[str, Any]:
         mx_c = mx - mx.mean(axis=0)
         U, S, Vt = np.linalg.svd(mx_c, full_matrices=False)
         pca1 = U[:, 0]
-        pca_var = float(S[0]**2 / (S**2).sum())
+        pca_var = float(S[0] ** 2 / (S ** 2).sum())
         if np.corrcoef(pca1, mx_c[:, 0])[0, 1] < 0:
             pca1 = -pca1
         bp = cf_bandpass(pca1.tolist(), low_yr=40, high_yr=70, ma_yr=9, fs=1.0)

@@ -45,9 +45,9 @@ _PHASE_NAMES = {0: "未知", 1: "回升期(复苏)", 2: "繁荣期", 3: "衰退�
 
 
 def _detect(
-    series: list[float],
-    methods: list[str] | None = None,
-    target_band: tuple[float, float] = (3, 100),
+        series: list[float],
+        methods: list[str] | None = None,
+        target_band: tuple[float, float] = (3, 100),
 ) -> dict[str, Any]:
     """核心检测逻辑（纯 Python API，也可被其他模块 import）。"""
     arr = np.asarray(series, dtype=np.float64)
@@ -134,9 +134,9 @@ def _detect(
 
 
 def _phase(
-    series: list[float],
-    low_yr: float = 40,
-    high_yr: float = 70,
+        series: list[float],
+        low_yr: float = 40,
+        high_yr: float = 70,
 ) -> dict[str, Any]:
     """CF 带通 + 相位推断（纯 Python API）。"""
     arr = np.asarray(series, dtype=np.float64)
@@ -171,15 +171,15 @@ def _phase(
     description="频谱周期检测：对输入时间序列运行 FFT/ACF/小波/MUSIC 等频谱分析+三级投票，输出检测到的周期、置信度和当前相位",
 )
 def cycle_detect(
-    data_csv: str = Field(
-        description="CSV，至少两列: period(时间), value(数值)。示例:\nperiod,value\n2000,100\n2001,102"
-    ),
-    methods: str = Field(
-        "fft,acf,wavelet,music",
-        description="检测方法，逗号分隔: fft, acf, wavelet, emd, lomb, music, esprit, mem",
-    ),
-    target_low: float = Field(3, description="目标周期下限"),
-    target_high: float = Field(100, description="目标周期上限"),
+        data_csv: str = Field(
+            description="CSV，至少两列: period(时间), value(数值)。示例:\nperiod,value\n2000,100\n2001,102"
+        ),
+        methods: str = Field(
+            "fft,acf,wavelet,music",
+            description="检测方法，逗号分隔: fft, acf, wavelet, emd, lomb, music, esprit, mem",
+        ),
+        target_low: float = Field(3, description="目标周期下限"),
+        target_high: float = Field(100, description="目标周期上限"),
 ) -> str:
     try:
         df = pd.read_csv(StringIO(data_csv))
@@ -247,9 +247,9 @@ def cycle_detect(
     description="周期相位判断：对输入时间序列运行 CF 带通滤波 + 相位推断",
 )
 def cycle_phase(
-    data_csv: str = Field(description="CSV，包含 period,value 两列"),
-    low_yr: float = Field(40, description="带通滤波低端（年）"),
-    high_yr: float = Field(70, description="带通滤波高端（年）"),
+        data_csv: str = Field(description="CSV，包含 period,value 两列"),
+        low_yr: float = Field(40, description="带通滤波低端（年）"),
+        high_yr: float = Field(70, description="带通滤波高端（年）"),
 ) -> str:
     try:
         df = pd.read_csv(StringIO(data_csv))

@@ -45,23 +45,47 @@ def _get_conn() -> sqlite3.Connection:
 def _ensure_db():
     conn = sqlite3.connect(str(DATA_LAKE_FILE))
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS macro_data (
-            indicator TEXT NOT NULL,
-            period TEXT NOT NULL,
-            value REAL,
-            metadata TEXT DEFAULT '{}',
-            source TEXT NOT NULL DEFAULT 'akshare',
-            fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
+                 CREATE TABLE IF NOT EXISTS macro_data
+                 (
+                     indicator
+                     TEXT
+                     NOT
+                     NULL,
+                     period
+                     TEXT
+                     NOT
+                     NULL,
+                     value
+                     REAL,
+                     metadata
+                     TEXT
+                     DEFAULT
+                     '{}',
+                     source
+                     TEXT
+                     NOT
+                     NULL
+                     DEFAULT
+                     'akshare',
+                     fetched_at
+                     TEXT
+                     NOT
+                     NULL
+                     DEFAULT (
+                     datetime
+                 (
+                     'now'
+                 ))
+                     )
+                 """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_macro_lookup
-        ON macro_data(indicator, period)
-    """)
+                 CREATE INDEX IF NOT EXISTS idx_macro_lookup
+                     ON macro_data(indicator, period)
+                 """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_macro_fresh
-        ON macro_data(indicator, fetched_at)
-    """)
+                 CREATE INDEX IF NOT EXISTS idx_macro_fresh
+                     ON macro_data(indicator, fetched_at)
+                 """)
     conn.commit()
     conn.close()
 
@@ -165,10 +189,11 @@ def list_indicators() -> list[str]:
 def get_stats() -> dict:
     conn = _get_conn()
     cursor = conn.execute("""
-        SELECT indicator, COUNT(*) as rows, MIN(period) as first, MAX(period) as last,
-               MAX(fetched_at) as last_fetch, source
-        FROM macro_data GROUP BY indicator ORDER BY indicator
-    """)
+                          SELECT indicator, COUNT (*) as rows, MIN (period) as first, MAX (period) as last, MAX (fetched_at) as last_fetch, source
+                          FROM macro_data
+                          GROUP BY indicator
+                          ORDER BY indicator
+                          """)
     stats = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return {"indicators": stats, "total": len(stats)}

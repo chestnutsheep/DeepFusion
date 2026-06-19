@@ -105,13 +105,16 @@ _executor = ThreadPoolExecutor(max_workers=8)
 _last_em_error: float = 0.0
 _EM_COOLDOWN = 5.0
 
+
 def _is_em_function(fun) -> bool:
     name = getattr(fun, "__name__", "") or ""
     return name.endswith("_em")
 
+
 def _has_proxy() -> bool:
     return bool(os.getenv("HTTP_PROXY") or os.getenv("http_proxy") or
                 os.getenv("HTTPS_PROXY") or os.getenv("https_proxy"))
+
 
 def _em_fallback_retry(fun, *args, **kwargs) -> pd.DataFrame | None:
     """Retry an _em call without proxy. Returns DataFrame on success, None on failure."""
@@ -166,6 +169,7 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
                     cache.set(all_df)
     return all_df
 
+
 async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
     """Async version of ak_cache that runs blocking calls in thread pool."""
     # 先 pop ttl/ttl2/force 再拼 key
@@ -179,7 +183,7 @@ async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
     all_df = cache.get()
     if all_df is None or force:
         try:
-            _LOGGER.info("Request akshare async: %s",[key, args, kwargs])
+            _LOGGER.info("Request akshare async: %s", [key, args, kwargs])
             loop = asyncio.get_event_loop()
             all_df = await loop.run_in_executor(_executor, partial(fun, *args, **kwargs))
             cache.set(all_df)
@@ -192,4 +196,3 @@ async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
                 if all_df is not None:
                     cache.set(all_df)
     return all_df
-

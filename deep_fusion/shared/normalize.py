@@ -7,7 +7,6 @@ import pandas as pd
 from .schema import INDICATOR_COLUMNS, PRICE_COLUMNS, RATE_COLUMNS, format_error_csv
 
 
-
 def _ensure_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     for col in columns:
         if col not in df.columns:
@@ -16,19 +15,19 @@ def _ensure_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 
 def normalize_price_df(
-    df: pd.DataFrame | None,
-    column_map: dict[str, str],
-    source: str,
-    currency: str,
-    limit: int,
-    float_format: str = "%.2f",
-    date_unit: str | None = None,
-    indicator_map: dict[str, str] | None = None,
+        df: pd.DataFrame | None,
+        column_map: dict[str, str],
+        source: str,
+        currency: str,
+        limit: int,
+        float_format: str = "%.2f",
+        date_unit: str | None = None,
+        indicator_map: dict[str, str] | None = None,
 ) -> str:
     if df is None or df.empty:
         return format_error_csv("empty data", source)
 
-    data= df.copy()
+    data = df.copy()
 
     for canonical, original in column_map.items():
         if original in data.columns:
@@ -60,13 +59,13 @@ def normalize_price_df(
 
 
 def normalize_rate_df(
-    df: pd.DataFrame | None,
-    column_map: dict[str, str],
-    source: str,
-    currency: str,
-    limit: int,
-    float_format: str = "%.4f",
-    date_unit: str | None = None,
+        df: pd.DataFrame | None,
+        column_map: dict[str, str],
+        source: str,
+        currency: str,
+        limit: int,
+        float_format: str = "%.4f",
+        date_unit: str | None = None,
 ) -> str:
     if df is None or df.empty:
         return format_error_csv("empty data", source)

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Callable
+from typing import Callable
 
 import requests as _rq
 from bs4 import BeautifulSoup
@@ -19,7 +19,6 @@ from ...shared.policy_db import PolicyDB
 
 db = PolicyDB()
 _ORG_MAP: dict[str, str] = {}  # url_pattern → org_name, set in _sites
-
 
 # ── 通用工具 ─────────────────────────────────────────
 
@@ -102,7 +101,7 @@ def _extract_detail(entry: dict) -> dict:
         entry["keywords"] = ",".join(found)
 
     except Exception as e:
-        print(f"  ⚠ 详情失败: {entry.get('url','?')}: {e}")
+        print(f"  ⚠ 详情失败: {entry.get('url', '?')}: {e}")
     return entry
 
 

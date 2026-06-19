@@ -24,6 +24,7 @@ from pydantic import Field
 
 class _NumpyEncoder(json.JSONEncoder):
     """处理 numpy int64/float32 等非标准 JSON 类型。"""
+
     def default(self, obj):
         if isinstance(obj, (np.integer,)):
             return int(obj)
@@ -32,6 +33,7 @@ class _NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super().default(obj)
+
 
 from ..server import mcp
 from ..shared.utils import ak_cache
@@ -105,7 +107,7 @@ def _stress_level(score: float) -> str:
                 "亚太汇率异动。直接输出各区域压力等级(CRITICAL/HIGH/MODERATE/LOW)和传导信号。",
 )
 def financial_stress_index(
-    detail: bool = Field(False, description="True=含历史序列, False=仅最新快照"),
+        detail: bool = Field(False, description="True=含历史序列, False=仅最新快照"),
 ) -> str:
     """金融压力指数 — 看出谁快爆了"""
     t0 = time.time()
@@ -334,7 +336,7 @@ def financial_stress_index(
                 "直接输出谁还得上债、谁还不上。",
 )
 def debt_sustainability(
-    countries: str = Field("CN,JP,KR,US", description="国家代码，逗号分隔: CN/JP/KR/US/DE/1W"),
+        countries: str = Field("CN,JP,KR,US", description="国家代码，逗号分隔: CN/JP/KR/US/DE/1W"),
 ) -> str:
     """债务可持续性评估 — 谁还得上债"""
     t0 = time.time()
@@ -361,7 +363,7 @@ def debt_sustainability(
             entry["gov_debt_gdp_prev"] = round(debt[-2][1], 1) if len(debt) >= 2 else None
             entry["debt_direction"] = _direction(debt[-1][1], debt[-2][1]) if len(debt) >= 2 else "N/A"
             entry["debt_risk"] = "极高" if debt[-1][1] > 200 else "高" if debt[-1][1] > 120 else \
-                                 "中等" if debt[-1][1] > 60 else "低"
+                "中等" if debt[-1][1] > 60 else "低"
         else:
             entry["gov_debt_gdp_pct"] = None
             entry["debt_risk"] = "数据缺失"
@@ -372,7 +374,7 @@ def debt_sustainability(
         if reserves:
             entry["fx_reserves_months_import"] = round(reserves[-1][1], 1)
             entry["reserve_sufficiency"] = "充足" if reserves[-1][1] >= 3 else \
-                                          "偏紧" if reserves[-1][1] >= 2 else "危险"
+                "偏紧" if reserves[-1][1] >= 2 else "危险"
         else:
             entry["fx_reserves_months_import"] = None
 
@@ -428,7 +430,7 @@ def debt_sustainability(
                 score += 10
         entry["sustainability_score"] = max(0, min(100, score))
         entry["sustainability_grade"] = "A" if score >= 70 else "B" if score >= 50 else \
-                                        "C" if score >= 30 else "D"
+            "C" if score >= 30 else "D"
 
         country_results[code] = entry
 
@@ -460,7 +462,7 @@ def debt_sustainability(
                 "资本外逃是爆掉的前兆。",
 )
 def capital_flow_monitor(
-    focus: str = Field("apac", description="关注区域: apac/china/global"),
+        focus: str = Field("apac", description="关注区域: apac/china/global"),
 ) -> str:
     """资本流动监测 — 资金在进还是在逃"""
     t0 = time.time()
@@ -487,7 +489,7 @@ def capital_flow_monitor(
                 "latest": round(latest, 4),
                 "30d_change_pct": round(change_pct, 2),
                 "direction": "贬值(资本外流)" if change_pct > 0.5 else
-                             "升值(资本流入)" if change_pct < -0.5 else "稳定",
+                "升值(资本流入)" if change_pct < -0.5 else "稳定",
             })
     indicators["fx_trends_30d"] = fx_trends
 
@@ -510,7 +512,7 @@ def capital_flow_monitor(
                         "prev": round(vals.iloc[-2], 2),
                         "direction": _direction(vals.iloc[-1], vals.iloc[-2]),
                         "change_pct": round((vals.iloc[-1] - vals.iloc[-2]) / abs(vals.iloc[-2]) * 100, 2)
-                                      if vals.iloc[-2] != 0 else None,
+                        if vals.iloc[-2] != 0 else None,
                     }
     except Exception:
         pass
@@ -523,7 +525,7 @@ def capital_flow_monitor(
             "prev": round(gs10[-2][1], 2) if len(gs10) >= 2 else None,
             "direction": _direction(gs10[-1][1], gs10[-2][1]) if len(gs10) >= 2 else "N/A",
             "signal": "美债收益率上升→资本回流美国→新兴市场承压" if gs10[-1][1] > 4.5
-                      else "美债收益率中性",
+            else "美债收益率中性",
         }
 
     # ── 4. 联邦基金利率 ──
@@ -533,7 +535,7 @@ def capital_flow_monitor(
             "latest": round(fedfunds[-1][1], 2),
             "direction": _direction(fedfunds[-1][1], fedfunds[-2][1]) if len(fedfunds) >= 2 else "N/A",
             "signal": "高利率→美元强势→资本回流美国→新兴市场外流"
-                      if fedfunds[-1][1] > 4.0 else "利率中性或宽松",
+            if fedfunds[-1][1] > 4.0 else "利率中性或宽松",
         }
 
     # ── 5. 资本流动综合判断 ──
@@ -561,7 +563,7 @@ def capital_flow_monitor(
         "indicators": indicators,
         "flow_signals": flow_signals,
         "overall_assessment": "资本外流风险" if len(depreciating) >= 2 else
-                              "温和外流" if depreciating else "基本平衡",
+        "温和外流" if depreciating else "基本平衡",
         "elapsed_seconds": round(time.time() - t0, 1),
     }
 
@@ -578,7 +580,7 @@ def capital_flow_monitor(
                 "量先跌价后跌，交易量萎缩=崩盘前兆。",
 )
 def asset_bubble_watch(
-    region: str = Field("all", description="区域: china/japan/korea/all"),
+        region: str = Field("all", description="区域: china/japan/korea/all"),
 ) -> str:
     """资产泡沫监视 — 量先跌价后跌"""
     t0 = time.time()
@@ -598,7 +600,7 @@ def asset_bubble_watch(
                 cn["house_price_yoy"] = round(values[-1], 2)
                 cn["price_direction"] = "下行" if values[-1] < 0 else "上行"
                 cn["price_signal"] = "⚠️ 房价同比转负 — 正式进入下行通道" if values[-1] < 0 else \
-                                     "⚠️ 涨幅收窄至0附近 — 下行前兆" if values[-1] < 1 else "房价仍在上行"
+                    "⚠️ 涨幅收窄至0附近 — 下行前兆" if values[-1] < 1 else "房价仍在上行"
         except Exception:
             cn["house_price_yoy"] = None
             cn["price_signal"] = "数据暂不可用"
@@ -613,7 +615,7 @@ def asset_bubble_watch(
                 change = (values[-1] - prev) / abs(prev) * 100 if prev != 0 else 0
                 cn["sales_change_pct"] = round(change, 1)
                 cn["volume_signal"] = "⚠️ 交易量萎缩 — 崩盘前兆(量先跌价后跌)" if change < -10 else \
-                                      "交易量下行" if change < 0 else "交易量企稳"
+                    "交易量下行" if change < 0 else "交易量企稳"
         except Exception:
             cn["volume_signal"] = "数据暂不可用"
 
@@ -624,7 +626,7 @@ def asset_bubble_watch(
             cn["us_house_direction"] = _direction(us_house[-1][1], us_house[-2][1]) if len(us_house) >= 2 else "N/A"
 
         cn["bubble_risk"] = "HIGH" if cn.get("house_price_yoy") is not None and cn["house_price_yoy"] < 0 else \
-                            "MODERATE" if cn.get("house_price_yoy") is not None and cn["house_price_yoy"] < 2 else "LOW"
+            "MODERATE" if cn.get("house_price_yoy") is not None and cn["house_price_yoy"] < 2 else "LOW"
         bubbles["china"] = cn
 
     # ── 日本 ──
@@ -640,7 +642,7 @@ def asset_bubble_watch(
             jp["usdjpy_latest"] = round(latest, 2)
             jp["usdjpy_30d_change_pct"] = round(change, 2)
             jp["fx_signal"] = "⚠️ 日元破160 — BOJ防线失守" if latest > 160 else \
-                              "日元在160以下，暂未失守" if latest > 150 else "日元相对稳定"
+                "日元在160以下，暂未失守" if latest > 150 else "日元相对稳定"
 
         # 日本工业产出
         jpn_indpro = _fred_latest("fred_jpn_indpro", 6)
@@ -676,7 +678,7 @@ def asset_bubble_watch(
             kr["usdkrw_latest"] = round(latest, 2)
             kr["usdkrw_direction"] = _direction(latest, prev)
             kr["fx_signal"] = "⚠️ 韩元急贬 — 资本外逃" if latest > 1400 else \
-                              "韩元偏弱" if latest > 1350 else "韩元相对稳定"
+                "韩元偏弱" if latest > 1350 else "韩元相对稳定"
 
         # 韩国政府债务
         kr_debt = _wb_latest("wb_debt_gdp_kr", 2)
@@ -690,7 +692,7 @@ def asset_bubble_watch(
     risk_levels = [b.get("bubble_risk", "LOW") for b in bubbles.values()]
     high_count = risk_levels.count("HIGH")
     overall = "MULTIPLE_HIGH_RISK" if high_count >= 2 else \
-              "ELEVATED" if high_count >= 1 else "MODERATE"
+        "ELEVATED" if high_count >= 1 else "MODERATE"
 
     result = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),

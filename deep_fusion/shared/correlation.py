@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════
 
 def compute_correlation_matrix(
-    returns: pd.DataFrame,
-    method: str = "pearson",
+        returns: pd.DataFrame,
+        method: str = "pearson",
 ) -> dict[str, Any]:
     """计算行业间相关性矩阵。
 
@@ -68,9 +68,9 @@ def compute_correlation_matrix(
 # ═══════════════════════════════════════════════════════════
 
 def hierarchical_clustering(
-    corr_matrix: pd.DataFrame,
-    n_clusters: int = 5,
-    method: str = "average",
+        corr_matrix: pd.DataFrame,
+        n_clusters: int = 5,
+        method: str = "average",
 ) -> dict[str, Any]:
     """基于相关性矩阵的层次聚类，识别行业主线簇。
 
@@ -146,8 +146,8 @@ def hierarchical_clustering(
 # ═══════════════════════════════════════════════════════════
 
 def pca_loadings(
-    returns: pd.DataFrame,
-    n_components: int = 5,
+        returns: pd.DataFrame,
+        n_components: int = 5,
 ) -> dict[str, Any]:
     """PCA 降维 → 主成分载荷 → 识别驱动因子。
 
@@ -193,7 +193,7 @@ def pca_loadings(
     K = min(n_components, len(S))
     loadings_arr = Vt[:K].T * S[:K]  # (n_industries, K)
 
-    pc_names = [f"PC{i+1}" for i in range(K)]
+    pc_names = [f"PC{i + 1}" for i in range(K)]
     loadings_df = pd.DataFrame(
         loadings_arr,
         index=returns.columns,
@@ -244,9 +244,9 @@ def pca_loadings(
 # ═══════════════════════════════════════════════════════════
 
 def rolling_correlation(
-    returns: pd.DataFrame,
-    window: int = 60,
-    method: str = "pearson",
+        returns: pd.DataFrame,
+        window: int = 60,
+        method: str = "pearson",
 ) -> dict[str, Any]:
     """滚动窗口相关系数 → 追踪行业间相关性的时变特征。
 
@@ -322,12 +322,12 @@ def rolling_correlation(
 # ═══════════════════════════════════════════════════════════
 
 def identify_themes(
-    returns: pd.DataFrame,
-    n_clusters: int = 5,
-    n_components: int = 5,
-    corr_method: str = "pearson",
-    cluster_method: str = "average",
-    remove_market_beta: bool = True,
+        returns: pd.DataFrame,
+        n_clusters: int = 5,
+        n_components: int = 5,
+        corr_method: str = "pearson",
+        cluster_method: str = "average",
+        remove_market_beta: bool = True,
 ) -> dict[str, Any]:
     """一站式主线识别：相关性 + 聚类 + PCA + 命名。
 
@@ -404,8 +404,8 @@ def identify_themes(
 
 
 def _label_themes(
-    cluster_result: dict[str, Any],
-    pca_result: dict[str, Any],
+        cluster_result: dict[str, Any],
+        pca_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """为聚类结果生成语义化主线标签。
 

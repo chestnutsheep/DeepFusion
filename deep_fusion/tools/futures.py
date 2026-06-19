@@ -36,11 +36,11 @@ FUTURES_SYMBOLS = {
     description="获取国内期货主力合约的历史价格数据，包括开高低收、成交量等技术指标",
 )
 def futures_prices(
-    symbol: str = Field(
-        "螺纹钢",
-        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
-    ),
-    limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
+        symbol: str = Field(
+            "螺纹钢",
+            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+        ),
+        limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
 ):
     symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
     df = ak_cache(ak.futures_main_sina, symbol=symbol_code)
@@ -68,10 +68,10 @@ def futures_prices(
     description="获取国内期货品种的仓单库存数据，用于判断供需关系和价格走势",
 )
 def futures_inventory(
-    symbol: str = Field(
-        "螺纹钢",
-        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
-    ),
+        symbol: str = Field(
+            "螺纹钢",
+            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+        ),
 ):
     symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
     df = ak_cache(ak.futures_inventory_em, symbol=symbol_code)
@@ -85,11 +85,11 @@ def futures_inventory(
     description="获取期货与现货价格的基差数据，用于判断市场预期和套利机会",
 )
 def futures_basis(
-    symbol: str = Field(
-        "螺纹钢",
-        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
-    ),
-    date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
+        symbol: str = Field(
+            "螺纹钢",
+            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+        ),
+        date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
 ):
     if not date:
         from datetime import datetime
@@ -106,12 +106,12 @@ def futures_basis(
     description="获取期货主力合约的机构持仓排名数据，用于判断主力资金动向",
 )
 def futures_positions(
-    symbol: str = Field(
-        "螺纹钢",
-        description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
-    ),
-    contract: str = Field("", description="合约代码如 OI2501，留空自动取主力"),
-    date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
+        symbol: str = Field(
+            "螺纹钢",
+            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+        ),
+        contract: str = Field("", description="合约代码如 OI2501，留空自动取主力"),
+        date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
 ):
     if not date:
         from datetime import datetime

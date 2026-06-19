@@ -1,8 +1,6 @@
 """同花顺行业数据源：分类、指数行情、资金流、行业一览。"""
 from __future__ import annotations
 
-from typing import Any
-
 import akshare as ak
 import pandas as pd
 

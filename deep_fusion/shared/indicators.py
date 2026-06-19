@@ -3,11 +3,11 @@ import pandas as pd
 
 
 def add_technical_indicators(
-    df: pd.DataFrame,
-    close_col: str = "收盘",
-    low_col: str = "最低",
-    high_col: str = "最高",
-    volume_col: str = "成交量",
+        df: pd.DataFrame,
+        close_col: str = "收盘",
+        low_col: str = "最低",
+        high_col: str = "最高",
+        volume_col: str = "成交量",
 ) -> None:
     if df is None or df.empty:
         return
@@ -82,7 +82,8 @@ def add_ema(df: pd.DataFrame, close: pd.Series, periods: list[int] | None = None
         df[f"EMA.{p}"] = close.ewm(span=p, adjust=False).mean()
 
 
-def add_sma(df: pd.DataFrame, close: pd.Series, low: pd.Series, high: pd.Series, volume: pd.Series | None = None) -> None:
+def add_sma(df: pd.DataFrame, close: pd.Series, low: pd.Series, high: pd.Series,
+            volume: pd.Series | None = None) -> None:
     for p in [5, 10, 20, 60]:
         df[f"MA.{p}"] = close.rolling(window=p).mean()
     tr1 = (high - low).abs()
@@ -128,8 +129,8 @@ def add_obv(df: pd.DataFrame, close: pd.Series, volume: pd.Series | None) -> Non
 
 
 def add_abv(
-    df: pd.DataFrame, close: pd.Series, volume: pd.Series | None,
-    fast: int = 5, mid: int = 10, slow: int = 20,
+        df: pd.DataFrame, close: pd.Series, volume: pd.Series | None,
+        fast: int = 5, mid: int = 10, slow: int = 20,
 ) -> None:
     if volume is None:
         return
@@ -142,7 +143,8 @@ def add_abv(
     df["ABV.MA10"] = abv.rolling(window=mid).mean()
 
 
-def add_sar(df: pd.DataFrame, close: pd.Series, low: pd.Series, high: pd.Series, acceleration: float = 0.02, max_acc: float = 0.20) -> None:
+def add_sar(df: pd.DataFrame, close: pd.Series, low: pd.Series, high: pd.Series, acceleration: float = 0.02,
+            max_acc: float = 0.20) -> None:
     length = len(close)
     sar = np.empty(length)
     sar[:] = np.nan

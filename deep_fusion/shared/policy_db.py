@@ -25,18 +25,46 @@ class PolicyDB:
 
     def _ensure_schema(self):
         self._conn.execute("""
-            CREATE TABLE IF NOT EXISTS policy_docs (
-                url TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                source TEXT DEFAULT '',
-                organization TEXT DEFAULT '',
-                publish_date TEXT DEFAULT '',
-                found_at TEXT NOT NULL,
-                keywords TEXT DEFAULT '',
-                body TEXT DEFAULT '',
-                raw_json TEXT DEFAULT ''
-            )
-        """)
+                           CREATE TABLE IF NOT EXISTS policy_docs
+                           (
+                               url
+                               TEXT
+                               PRIMARY
+                               KEY,
+                               title
+                               TEXT
+                               NOT
+                               NULL,
+                               source
+                               TEXT
+                               DEFAULT
+                               '',
+                               organization
+                               TEXT
+                               DEFAULT
+                               '',
+                               publish_date
+                               TEXT
+                               DEFAULT
+                               '',
+                               found_at
+                               TEXT
+                               NOT
+                               NULL,
+                               keywords
+                               TEXT
+                               DEFAULT
+                               '',
+                               body
+                               TEXT
+                               DEFAULT
+                               '',
+                               raw_json
+                               TEXT
+                               DEFAULT
+                               ''
+                           )
+                           """)
         self._conn.commit()
 
     def exists(self, url: str) -> bool:

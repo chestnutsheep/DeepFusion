@@ -8,6 +8,7 @@ import io
 import json
 import os
 import sys
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from starlette.middleware.cors import CORSMiddleware
@@ -20,6 +21,7 @@ from . import resources
 
 from .tools import (
     analysis,
+    anti_fraud,
     bonds,
     crypto,
     cycles,
@@ -30,16 +32,15 @@ from .tools import (
     international,
     macro,
     market,
-    policy,
     portfolio,
     precious_metals,
     stock_reports,
     stocks,
-    tech_indicators,
 )
 
 __all__ = [
     "analysis",
+    "anti_fraud",
     "bonds",
     "crypto",
     "cycles",
@@ -115,20 +116,26 @@ def main():
             try:
                 if method == "tools/list":
                     tools = await mcp.list_tools()
-                    payload = {"jsonrpc": "2.0", "result": {"tools": [t.model_dump(exclude={"fn", "serializer"}, mode="json") for t in tools]}, "id": msg_id}
+                    payload = {"jsonrpc": "2.0", "result": {
+                        "tools": [t.model_dump(exclude={"fn", "serializer"}, mode="json") for t in tools]},
+                               "id": msg_id}
                 elif method == "tools/call":
                     name = body.get("params", {}).get("name", "")
                     arguments = body.get("params", {}).get("arguments", {})
                     result = await mcp.call_tool(name, arguments)
                     payload = {"jsonrpc": "2.0", "result": result.model_dump(mode="json"), "id": msg_id}
                 else:
-                    payload = {"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Method not found: {method}"}, "id": msg_id}
+                    payload = {"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Method not found: {method}"},
+                               "id": msg_id}
                 return Response(json.dumps(payload, ensure_ascii=False), media_type="application/json")
             except Exception as e:
-                return Response(json.dumps({"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": msg_id}, ensure_ascii=False), media_type="application/json", status_code=200)
+                return Response(
+                    json.dumps({"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": msg_id},
+                               ensure_ascii=False), media_type="application/json", status_code=200)
 
         app = Starlette(routes=[Route("/mcp", mcp_handler, methods=["POST"])])
-        app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"], max_age=86400)
+        app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"],
+                           allow_headers=["*"], max_age=86400)
         import uvicorn
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     else:

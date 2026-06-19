@@ -25,10 +25,10 @@ FX_PAIRS = {
     description="获取主要货币对的实时汇率报价，输出标准化字段",
 )
 def fx_rates(
-    symbol: str = Field(
-        "USDCNY",
-        description="货币对代码，支持: USDCNY(美元/人民币), EURUSD(欧元/美元), USDJPY(美元/日元), GBPUSD(英镑/美元), AUDUSD(澳元/美元), USDCAD(美元/加元), USDCHF(美元/瑞郎), NZDUSD(纽元/美元)",
-    ),
+        symbol: str = Field(
+            "USDCNY",
+            description="货币对代码，支持: USDCNY(美元/人民币), EURUSD(欧元/美元), USDJPY(美元/日元), GBPUSD(英镑/美元), AUDUSD(澳元/美元), USDCAD(美元/加元), USDCHF(美元/瑞郎), NZDUSD(纽元/美元)",
+        ),
 ):
     raw = ak_cache(ak.fx_spot_quote, ttl=300)
     if not isinstance(raw, pd.DataFrame):
@@ -69,11 +69,11 @@ def fx_rates(
     description="获取指定货币对的历史汇率数据，用于分析汇率走势和波动",
 )
 def fx_history(
-    symbol: str = Field(
-        "USDCNY",
-        description="货币对代码，支持: USDCNY(美元/人民币), EURUSD(欧元/美元), USDJPY(美元/日元), GBPUSD(英镑/美元), AUDUSD(澳元/美元), USDCAD(美元/加元), USDCHF(美元/瑞郎), NZDUSD(纽元/美元)",
-    ),
-    limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
+        symbol: str = Field(
+            "USDCNY",
+            description="货币对代码，支持: USDCNY(美元/人民币), EURUSD(欧元/美元), USDJPY(美元/日元), GBPUSD(英镑/美元), AUDUSD(澳元/美元), USDCAD(美元/加元), USDCHF(美元/瑞郎), NZDUSD(纽元/美元)",
+        ),
+        limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
 ):
     raw = ak_cache(ak.fx_pair_quote)
     if not isinstance(raw, pd.DataFrame):

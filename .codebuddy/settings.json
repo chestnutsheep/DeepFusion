@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "code-review-ai@codebuddy-plugins-official": true
+  }
+}

@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════
 
 def granger_causality_matrix(
-    returns: pd.DataFrame,
-    max_lag: int = 5,
-    significance: float = 0.05,
+        returns: pd.DataFrame,
+        max_lag: int = 5,
+        significance: float = 0.05,
 ) -> dict[str, Any]:
     """计算 N×N Granger 因果检验 p 值矩阵。
 
@@ -127,8 +127,8 @@ def _empty_granger_result() -> dict[str, Any]:
 
 
 def _granger_fallback(
-    returns: pd.DataFrame,
-    max_lag: int,
+        returns: pd.DataFrame,
+        max_lag: int,
 ) -> dict[str, Any]:
     """statsmodels 不可用时的降级方案：互相关分析。"""
     from scipy.signal import correlate
@@ -185,8 +185,8 @@ def _granger_fallback(
 # ═══════════════════════════════════════════════════════════
 
 def identify_leading_industries(
-    causality_result: dict[str, Any],
-    top_n: int = 10,
+        causality_result: dict[str, Any],
+        top_n: int = 10,
 ) -> dict[str, Any]:
     """从 Granger 因果矩阵中识别领先（龙头）行业。
 

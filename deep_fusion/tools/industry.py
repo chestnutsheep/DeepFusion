@@ -11,6 +11,7 @@ def _val(v):
         return v.default
     return v
 
+
 from ..cache import ak_cache
 from ..data.sources import caixin_indices as caixin
 from ..data.sources import industry_cninfo as cninfo
@@ -27,7 +28,7 @@ from ..shared import industry_db as db
     description="获取同花顺/巨潮行业分类列表",
 )
 def industry_classify(
-    分类标准: str = Field("同花顺", description="同花顺 / 巨潮"),
+        分类标准: str = Field("同花顺", description="同花顺 / 巨潮"),
 ) -> str:
     # 优先本地 SQLite
     cached = db.get_classify("ths")
@@ -51,9 +52,9 @@ def industry_classify(
     description="获取行业历史行情（OHLCV）、估值水平、资金流向，优先本地缓存",
 )
 def industry_quotes(
-    industry: str = Field("", description="行业名称，如 银行"),
-    period: str = Field("daily", description="K线周期: daily/weekly/monthly"),
-    limit: int = 30,
+        industry: str = Field("", description="行业名称，如 银行"),
+        period: str = Field("daily", description="K线周期: daily/weekly/monthly"),
+        limit: int = 30,
 ) -> str:
     results = []
 
@@ -91,8 +92,8 @@ def industry_quotes(
     description="行业资金流排行（同花顺）",
 )
 def industry_capital_flow(
-    industry: str = Field("", description="行业名称，留空返回全排行"),
-    limit: int = 20,
+        industry: str = Field("", description="行业名称，留空返回全排行"),
+        limit: int = 20,
 ) -> str:
     flow = ths.get_fund_flow()
     if flow is None or flow.empty:
@@ -105,11 +106,11 @@ def industry_capital_flow(
 @mcp.tool(
     name="industry_daily_collect",
     description="批量采集同花顺行业日行情（OHLCV）写入本地 SQLite，约90行业×5年数据。"
-    "自动增量：DB已是最新则跳过，否则从最后日期补增量。force=True强制全量重采。",
+                "自动增量：DB已是最新则跳过，否则从最后日期补增量。force=True强制全量重采。",
 )
 def industry_daily_collect(
-    start_date: str = "20200101",
-    force: bool = Field(False, description="强制全量重采，绕过DB新鲜度检查和缓存"),
+        start_date: str = "20200101",
+        force: bool = Field(False, description="强制全量重采，绕过DB新鲜度检查和缓存"),
 ) -> str:
     import time
     force = _val(force)
@@ -123,7 +124,7 @@ def industry_daily_collect(
     for name, rows in list(results.items())[:5]:
         lines.append(f"  {name}: {rows} 行")
     if len(results) > 5:
-        lines.append(f"  ... 还有 {len(results)-5} 个")
+        lines.append(f"  ... 还有 {len(results) - 5} 个")
     return "\n".join(lines)
 
 
@@ -132,10 +133,10 @@ def industry_daily_collect(
     description="查询本地 SQLite 中的行业日行情",
 )
 def industry_daily_query(
-    industry: str = "",
-    start_date: str = "",
-    end_date: str = "",
-    limit: int = 20,
+        industry: str = "",
+        start_date: str = "",
+        end_date: str = "",
+        limit: int = 20,
 ) -> str:
     # 支持行业名称 → 代码查找
     code = industry
@@ -217,9 +218,9 @@ def industry_collect() -> str:
     description="申万三级行业树（31一级→131二级→336三级），含估值数据",
 )
 def industry_sw_tree(
-    行业: str = "",
-    深度: int = 3,
-    展开: int = 2,
+        行业: str = "",
+        深度: int = 3,
+        展开: int = 2,
 ) -> str:
     from ..data.sources.industry_sw import get_tree, tree_to_text
 
@@ -250,8 +251,9 @@ def industry_sw_tree(
     description="查询申万指数成分股（一/二/三级行业通用，差异只在池子大小）",
 )
 def industry_sw_constituents(
-    行业代码: str = Field(..., description="申万指数代码，如 801010(一级) / 801011(二级) / 850111(三级)，不传.si后缀"),
-    limit: int = Field(50, description="返回前N只"),
+        行业代码: str = Field(...,
+                              description="申万指数代码，如 801010(一级) / 801011(二级) / 850111(三级)，不传.si后缀"),
+        limit: int = Field(50, description="返回前N只"),
 ) -> str:
     from ..data.sources.industry_sw import get_constituents
     df = get_constituents(行业代码)
@@ -265,8 +267,9 @@ def industry_sw_constituents(
     description="查询申万指数成分股及当日涨跌幅/最新价/换手率（一/二/三级行业通用），用于二级行业下钻查看个股",
 )
 def industry_sw_constituents_detail(
-    行业代码: str = Field(..., description="申万指数代码，如 801010(一级) / 801011(二级) / 850111(三级)，不传.si后缀"),
-    limit: int = Field(50, description="返回前N只（按权重降序）"),
+        行业代码: str = Field(...,
+                              description="申万指数代码，如 801010(一级) / 801011(二级) / 850111(三级)，不传.si后缀"),
+        limit: int = Field(50, description="返回前N只（按权重降序）"),
 ) -> str:
     from ..data.sources.industry_sw import get_constituents_with_quotes
     df = get_constituents_with_quotes(行业代码)
@@ -280,10 +283,10 @@ def industry_sw_constituents_detail(
     description="申万指数分析日报表：市场表征/一级行业/二级行业/风格指数，含PE/PB/涨跌幅",
 )
 def industry_sw_daily(
-    symbol: str = "一级行业",
-    start_date: str = "",
-    end_date: str = "",
-    limit: int = 50,
+        symbol: str = "一级行业",
+        start_date: str = "",
+        end_date: str = "",
+        limit: int = 50,
 ) -> str:
     from ..data.sources.industry_sw import get_daily_analysis
     df = get_daily_analysis(symbol, start_date or None, end_date or None)
@@ -311,8 +314,8 @@ def industry_db_status() -> str:
     description="大宗商品现货行情（99qh），单个品种返回2012年至今全部历史数据",
 )
 def spot_prices(
-    symbol: str = "螺纹钢",
-    limit: int = 20,
+        symbol: str = "螺纹钢",
+        limit: int = 20,
 ) -> str:
     df = spot.get_spot(symbol)
     if df is None or df.empty:
@@ -351,8 +354,8 @@ def spot_symbols() -> str:
     description="财新指数数据（19个指数）：数字经济/新经济/大宗商品/高质量因子/AI策略/PMI等",
 )
 def caixin_indices(
-    name: str = "中国新经济指数",
-    limit: int = 20,
+        name: str = "中国新经济指数",
+        limit: int = 20,
 ) -> str:
     df = caixin.get_index(name)
     if df is None or df.empty:
@@ -447,10 +450,10 @@ def _compute_momentum(returns) -> list:
 
 
 def _enrich_themes(
-    themes_raw: list,
-    momentum: list,
-    fund_flow_df,
-    rolling_trend: dict,
+        themes_raw: list,
+        momentum: list,
+        fund_flow_df,
+        rolling_trend: dict,
 ) -> list:
     """为基础聚类结果添加动量/资金流/趋势信号 → 综合评分。"""
     import numpy as np
@@ -598,12 +601,12 @@ def _compute_rolling_trends(returns, cluster_result, window: int = 60) -> dict:
 @mcp.tool(
     name="industry_themes",
     description="行业相关性主线识别 — 从行业日行情计算相关性/聚类/动量/资金流，聚合出市场当前主线。"
-    "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
 )
 def industry_themes(
-    window: int = Field(120, description="收益率回看窗口(交易日)"),
-    n_clusters: int = Field(5, description="目标主线数"),
-    corr_method: str = Field("pearson", description="相关系数类型: pearson/spearman/kendall"),
+        window: int = Field(120, description="收益率回看窗口(交易日)"),
+        n_clusters: int = Field(5, description="目标主线数"),
+        corr_method: str = Field("pearson", description="相关系数类型: pearson/spearman/kendall"),
 ) -> str:
     """行业主线识别：相关性聚类 + 近期动量 + 资金流 → 当前市场主线。"""
     import json
@@ -680,7 +683,7 @@ def industry_themes(
 
 
 def _build_themes_summary(
-    themes: list, momentum: list, pca_top: dict, returns,
+        themes: list, momentum: list, pca_top: dict, returns,
 ) -> str:
     """生成行业主线识别的可读性摘要。"""
     lines = []
@@ -706,7 +709,7 @@ def _build_themes_summary(
         net = ff.get("net_amount_total", 0)
         leader = ff.get("best_leader", "")
         leader_pct = ff.get("best_leader_pct")
-        net_desc = f"净流入{net/1e8:+.2f}亿" if abs(net) >= 1e8 else f"净流入{net/1e4:+.1f}万"
+        net_desc = f"净流入{net / 1e8:+.2f}亿" if abs(net) >= 1e8 else f"净流入{net / 1e4:+.1f}万"
         leader_desc = f"，龙头{leader}涨{leader_pct:+.2f}%" if leader and leader_pct else ""
         lines.append(f"    资金面: {net_desc}{leader_desc}")
         # 簇内相关
@@ -776,10 +779,10 @@ def _build_themes_summary(
 @mcp.tool(
     name="industry_themes_dcc",
     description="DCC-GARCH 时变条件相关 — 估计行业间动态相关性矩阵，识别联动加强/减弱的行业对。"
-    "计算较慢(约30s)，返回JSON。",
+                "计算较慢(约30s)，返回JSON。",
 )
 def industry_themes_dcc(
-    window: int = Field(120, description="收益率回看窗口(交易日)"),
+        window: int = Field(120, description="收益率回看窗口(交易日)"),
 ) -> str:
     """DCC-GARCH 动态条件相关分析。"""
     import json
@@ -946,11 +949,11 @@ def _build_dcc_summary(out: dict, returns) -> str:
 @mcp.tool(
     name="industry_themes_causality",
     description="Granger因果检验 + 龙头行业识别 — 找出领先/滞后行业及因果传导链。"
-    "计算较慢(约60s)，需要statsmodels。返回JSON。",
+                "计算较慢(约60s)，需要statsmodels。返回JSON。",
 )
 def industry_themes_causality(
-    window: int = Field(120, description="收益率回看窗口(交易日)"),
-    max_lag: int = Field(5, description="最大检验滞后期"),
+        window: int = Field(120, description="收益率回看窗口(交易日)"),
+        max_lag: int = Field(5, description="最大检验滞后期"),
 ) -> str:
     """Granger 因果检验 + 领先行业识别。"""
     import json

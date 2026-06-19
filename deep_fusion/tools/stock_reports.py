@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-import akshare as ak # pyright: ignore[reportMissingImports]
+import akshare as ak  # pyright: ignore[reportMissingImports]
 from pydantic import Field
 
 from ..server import mcp
@@ -11,7 +11,8 @@ def _prev_quarter_end() -> str:
     today = datetime.now()
     q = (today.month - 1) // 3
     quarter_start_month = q * 3 + 1
-    quarter_end = datetime(today.year if q > 0 or today.month > 3 else today.year - 1, quarter_start_month, 1) - timedelta(days=1)
+    quarter_end = datetime(today.year if q > 0 or today.month > 3 else today.year - 1, quarter_start_month,
+                           1) - timedelta(days=1)
     if quarter_end > today:
         quarter_end = datetime(today.year - 1, 10, 1) - timedelta(days=1)
     return quarter_end.strftime("%Y%m%d")
@@ -22,8 +23,8 @@ def _prev_quarter_end() -> str:
     description="获取个股新闻、内部交易（高管持股变动）、股东人数变化、十大股东变动等内部人员行为印证数据",
 )
 def sentiment_side(
-    symbol: str = Field(description="6位股票代码，如 002318"),
-    market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
+        symbol: str = Field(description="6位股票代码，如 002318"),
+        market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
     results = {}
 
@@ -56,8 +57,8 @@ def sentiment_side(
     description="获取个股资金流向、机构调研记录、机构持仓明细等外部机构反响与资金流向综合数据",
 )
 def capital_tracking(
-    symbol: str = Field(description="6位股票代码，如 000425"),
-    market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
+        symbol: str = Field(description="6位股票代码，如 000425"),
+        market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
     results = {}
 
@@ -90,15 +91,16 @@ def capital_tracking(
     description="获取个股86项财务指标，包括营收、净利润、毛利率、净利率、ROE、每股收益等所有关键财务数据",
 )
 def financial_indicators(
-    symbol: str = Field(description="6位股票代码，如 000001"),
-    start_year: str = Field("2020", description="起始年份，如 2020"),
-    limit: int = Field(20, description="返回期数"),
+        symbol: str = Field(description="6位股票代码，如 000001"),
+        start_year: str = Field("2020", description="起始年份，如 2020"),
+        limit: int = Field(20, description="返回期数"),
 ) -> str:
     results = {}
     info = ak_cache(ak.stock_individual_info_em, symbol=symbol, ttl=43200)
     if info is not None and not info.empty:
         results["个股基本信息"] = info.to_string()
-    indicators = ak_cache(ak.stock_financial_analysis_indicator, symbol=symbol, start_year=start_year, ttl=86400, ttl2=172800)
+    indicators = ak_cache(ak.stock_financial_analysis_indicator, symbol=symbol, start_year=start_year, ttl=86400,
+                          ttl2=172800)
     if indicators is not None and not indicators.empty:
         results["财务指标"] = indicators.tail(limit).to_csv(index=False, float_format="%.3f")
     output = []
@@ -114,8 +116,8 @@ def financial_indicators(
     description="获取个股资产负债表、利润表、现金流量表等三大财务报表数据",
 )
 def financial_statements(
-    symbol: str = Field(description="6位股票代码，如 600519"),
-    market: str = Field("sh", description="市场标识: sh, sz, bj"),
+        symbol: str = Field(description="6位股票代码，如 600519"),
+        market: str = Field("sh", description="市场标识: sh, sz, bj"),
 ) -> str:
     stock_code = f"{market}{symbol}"
     results = {}
@@ -136,8 +138,8 @@ def financial_statements(
     description="获取行业内成长性、估值、杜邦分析、公司规模等四个维度的同业对比数据",
 )
 def peer_comparison(
-    symbol: str = Field(description="6位股票代码，如 600519"),
-    market: str = Field("sh", description="市场标识: sh, sz, bj"),
+        symbol: str = Field(description="6位股票代码，如 600519"),
+        market: str = Field("sh", description="市场标识: sh, sz, bj"),
 ) -> str:
     stock_code = f"{market.upper()}{symbol}"
     results = {}
@@ -166,7 +168,7 @@ def peer_comparison(
     description="获取港股市场的股票财务报告关键指标",
 )
 def stock_indicators_hk(
-    symbol: str = Field(description="5位港股代码，如 00700"),
+        symbol: str = Field(description="5位港股代码，如 00700"),
 ):
     dfs = ak_cache(ak.stock_financial_hk_analysis_indicator_em, symbol=symbol, indicator="报告期")
     if dfs is None or dfs.empty:
@@ -180,7 +182,7 @@ def stock_indicators_hk(
     description="获取美股市场的股票财务报告关键指标",
 )
 def stock_indicators_us(
-    symbol: str = Field(description="美股字母代码，如 AAPL"),
+        symbol: str = Field(description="美股字母代码，如 AAPL"),
 ):
     dfs = ak_cache(ak.stock_financial_us_analysis_indicator_em, symbol=symbol, indicator="单季报")
     if dfs is None or dfs.empty:

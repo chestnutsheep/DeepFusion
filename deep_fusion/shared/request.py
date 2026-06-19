@@ -84,7 +84,8 @@ def safe_get(url: str, params: dict[str, Any] | None = None, timeout: int | None
     return None
 
 
-def safe_post(url: str, json: dict[str, Any] | None = None, headers: dict[str, str] | None = None, timeout: int | None = None) -> requests.Response | None:
+def safe_post(url: str, json: dict[str, Any] | None = None, headers: dict[str, str] | None = None,
+              timeout: int | None = None) -> requests.Response | None:
     session = _get_session()
     _rotate_ua(session)
     t = timeout or REQUEST_TIMEOUT

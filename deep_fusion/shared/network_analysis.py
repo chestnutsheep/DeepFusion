@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════
 
 def build_correlation_network(
-    corr_matrix: pd.DataFrame,
-    threshold: float = 0.5,
-    edge_weight: str = "abs_corr",
+        corr_matrix: pd.DataFrame,
+        threshold: float = 0.5,
+        edge_weight: str = "abs_corr",
 ) -> dict[str, Any]:
     """将相关性矩阵转化为网络图。
 
@@ -93,9 +93,9 @@ def build_correlation_network(
 # ═══════════════════════════════════════════════════════════
 
 def detect_communities(
-    network_result: dict[str, Any],
-    method: str = "louvain",
-    resolution: float = 1.0,
+        network_result: dict[str, Any],
+        method: str = "louvain",
+        resolution: float = 1.0,
 ) -> dict[str, Any]:
     """社区检测 — 识别行业主线簇。
 
@@ -164,7 +164,7 @@ def detect_communities(
 # ═══════════════════════════════════════════════════════════
 
 def compute_centrality(
-    network_result: dict[str, Any],
+        network_result: dict[str, Any],
 ) -> dict[str, Any]:
     """计算各中心性指标 → 识别核心行业。
 
@@ -224,10 +224,10 @@ def compute_centrality(
 # ═══════════════════════════════════════════════════════════
 
 def full_network_analysis(
-    corr_matrix: pd.DataFrame,
-    threshold: float = 0.5,
-    community_method: str = "louvain",
-    resolution: float = 1.0,
+        corr_matrix: pd.DataFrame,
+        threshold: float = 0.5,
+        community_method: str = "louvain",
+        resolution: float = 1.0,
 ) -> dict[str, Any]:
     """一站式网络分析：建图 → 社区检测 → 中心性 → 综合报告。
 
@@ -262,9 +262,9 @@ def full_network_analysis(
 
 
 def _profile_communities(
-    communities_result: dict[str, Any],
-    centrality_result: dict[str, Any],
-    corr_matrix: pd.DataFrame,
+        communities_result: dict[str, Any],
+        centrality_result: dict[str, Any],
+        corr_matrix: pd.DataFrame,
 ) -> list[dict[str, Any]]:
     """为每个社区生成画像。"""
     profiles = []

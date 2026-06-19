@@ -20,10 +20,10 @@ import pytest
 # ═══════════════════════════════════════════════════════════
 
 def _make_correlated_returns(
-    n_industries: int = 10,
-    n_days: int = 300,
-    n_clusters: int = 3,
-    seed: int = 42,
+        n_industries: int = 10,
+        n_days: int = 300,
+        n_clusters: int = 3,
+        seed: int = 42,
 ) -> pd.DataFrame:
     """生成具有已知聚类结构的行业收益率数据。
 
@@ -57,7 +57,7 @@ def _make_correlated_returns(
     Z = rng.standard_normal((n_days, n_industries))
     X = Z @ L.T * 0.02  # 2% 日波动率
 
-    industries = [f"行业_{i+1:02d}" for i in range(n_industries)]
+    industries = [f"行业_{i + 1:02d}" for i in range(n_industries)]
     dates = pd.bdate_range("2024-01-01", periods=n_days)
 
     return pd.DataFrame(X, index=dates, columns=industries)

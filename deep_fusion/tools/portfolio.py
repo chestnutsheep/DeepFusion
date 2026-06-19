@@ -4,10 +4,10 @@ from io import StringIO
 import pandas as pd
 from pydantic import Field
 
+from .stocks import market_prices
 from ..server import mcp
 from ..shared.fields import field_market
 from ..shared.utils import load_portfolio, save_portfolio
-from .stocks import market_prices
 
 
 @mcp.tool(
@@ -15,10 +15,10 @@ from .stocks import market_prices
     description="在模拟盘中添加一笔持仓记录，用于后续跟踪盈亏",
 )
 def portfolio_add(
-    symbol: str = Field(description="股票或币种代码"),
-    price: float = Field(description="买入价格"),
-    volume: float = Field(description="买入数量"),
-    market: str = field_market,
+        symbol: str = Field(description="股票或币种代码"),
+        price: float = Field(description="买入价格"),
+        volume: float = Field(description="买入数量"),
+        market: str = field_market,
 ):
     p = load_portfolio()
     p[f"{symbol}.{market}"] = {
@@ -48,7 +48,8 @@ def portfolio_view():
             current_price = float(df["close"].iloc[-1])
             profit = (current_price - v["price"]) * v["volume"]
             ratio = (current_price / v["price"] - 1) * 100
-            results.append(f"{k}: 成本 {v['price']:.2f} -> 现价 {current_price:.2f} | 盈亏 {profit:+.2f} ({ratio:+.2f}%)")
+            results.append(
+                f"{k}: 成本 {v['price']:.2f} -> 现价 {current_price:.2f} | 盈亏 {profit:+.2f} ({ratio:+.2f}%)")
         except Exception:
             results.append(f"{k}: 成本 {v['price']:.2f} (无法获取实时现价)")
     return "\n".join(results)

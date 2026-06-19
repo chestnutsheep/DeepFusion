@@ -1,5 +1,5 @@
 """kitchin cycle classification"""
-from .engine import _institutional_preprocess, _direction, _ma
+
 
 def _classify_kitchin(periods: list[str], data: dict, cfg: CycleConfig) -> list[dict]:
     dem = [data[p].get("demand_yoy") for p in periods]
@@ -15,10 +15,14 @@ def _classify_kitchin(periods: list[str], data: dict, cfg: CycleConfig) -> list[
         idir = _direction(inv_z[i], inv_z[i - 1] if i > 0 else None)
         stage = 0
         if dd is not None and idir is not None:
-            if dd == -1 and idir == -1: stage = 1
-            elif dd == 1 and idir == -1: stage = 2
-            elif dd == 1 and idir == 1: stage = 3
-            elif dd == -1 and idir == 1: stage = 4
+            if dd == -1 and idir == -1:
+                stage = 1
+            elif dd == 1 and idir == -1:
+                stage = 2
+            elif dd == 1 and idir == 1:
+                stage = 3
+            elif dd == -1 and idir == 1:
+                stage = 4
         real_inv = (data[p].get("inventory_yoy") or 0) - ((data[p].get("pmi") or 50) - 50)
         results.append({
             "period": p, "demand_yoy": data[p].get("demand_yoy"),
@@ -34,7 +38,7 @@ def _classify_kitchin(periods: list[str], data: dict, cfg: CycleConfig) -> list[
 
 
 """juglar cycle classification"""
-from .engine import _institutional_preprocess, _direction, _ma
+
 
 def _classify_juglar(periods: list[str], data: dict, cfg: CycleConfig) -> list[dict]:
     # 四指标加权: 设备投资(0.4) + 制造业固投(0.25) + 固投总量(0.15) + 产能利用率(0.2)
@@ -61,10 +65,14 @@ def _classify_juglar(periods: list[str], data: dict, cfg: CycleConfig) -> list[d
         z, g = comp_z[i], _direction(comp_z[i], comp_z[i - 1] if i > 0 else None)
         phase = 0
         if comp_z[i] is not None and g is not None:
-            if z > 0 and g >= 0:     phase = 2
-            elif z <= 0 and g >= 0:  phase = 1
-            elif z > 0 and g < 0:    phase = 3
-            elif z <= 0 and g < 0:   phase = 4
+            if z > 0 and g >= 0:
+                phase = 2
+            elif z <= 0 and g >= 0:
+                phase = 1
+            elif z > 0 and g < 0:
+                phase = 3
+            elif z <= 0 and g < 0:
+                phase = 4
         results.append({
             "period": p,
             "equip_yoy": eq_v[i], "manufacturing_yoy": mf_v[i], "fix_inv_yoy": fx_v[i],
@@ -79,6 +87,7 @@ def _classify_juglar(periods: list[str], data: dict, cfg: CycleConfig) -> list[d
 
 """kuznets cycle classification"""
 from .engine import _institutional_preprocess, _direction, _ma
+
 
 def _classify_kuznets(periods: list[str], data: dict, cfg: CycleConfig) -> list[dict]:
     # 四指标加权: 房价(0.5) + 销售面积(0.2) + 新开工面积(0.2) + 开发投资(0.1)
@@ -106,10 +115,14 @@ def _classify_kuznets(periods: list[str], data: dict, cfg: CycleConfig) -> list[
         z, g = comp_z[i], _direction(comp_z[i], comp_z[i - 1] if i > 0 else None)
         phase = 0
         if comp_z[i] is not None and g is not None:
-            if z > 0 and g >= 0:     phase = 2
-            elif z <= 0 and g >= 0:  phase = 1
-            elif z > 0 and g < 0:    phase = 3
-            elif z <= 0 and g < 0:   phase = 4
+            if z > 0 and g >= 0:
+                phase = 2
+            elif z <= 0 and g >= 0:
+                phase = 1
+            elif z > 0 and g < 0:
+                phase = 3
+            elif z <= 0 and g < 0:
+                phase = 4
         results.append({
             "period": p,
             "house_price_yoy": hp_v[i],
@@ -121,6 +134,4 @@ def _classify_kuznets(periods: list[str], data: dict, cfg: CycleConfig) -> list[
         })
     return results
 
-
 # ── 4 份配置表 ──────────────────────────────────────────
-

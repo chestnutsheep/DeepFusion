@@ -2,8 +2,8 @@
 import akshare as ak
 import pandas as pd
 
-from ...shared.utils import ak_cache
 from ...shared.indicators import add_technical_indicators
+from ...shared.utils import ak_cache
 
 
 def momentum_screen(top_n: int = 30, min_price: float = 3.0) -> str:
@@ -87,7 +87,6 @@ def technical_signals(symbol: str, period: str = "daily") -> str:
     Returns:
         str: formatted CSV with MACD, RSI, KDJ, Bollinger signals
     """
-    import numpy as np
 
     kline = ak_cache(
         ak.stock_zh_a_hist, symbol=symbol, period=period,

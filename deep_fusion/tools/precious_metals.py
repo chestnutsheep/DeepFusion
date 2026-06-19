@@ -32,11 +32,11 @@ INTL_SYMBOLS = {
     description="获取上海黄金交易所现货历史价格数据，包括黄金、白银等品种的价格走势和技术指标",
 )
 def pm_spot_prices(
-    symbol: str = Field(
-        "Au99.99",
-        description="品种代码，支持: Au99.99(黄金9999), Au99.95(黄金9995), Au(T+D)(黄金T+D), Ag99.99(白银9999), Ag(T+D)(白银T+D)",
-    ),
-    limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
+        symbol: str = Field(
+            "Au99.99",
+            description="品种代码，支持: Au99.99(黄金9999), Au99.95(黄金9995), Au(T+D)(黄金T+D), Ag99.99(白银9999), Ag(T+D)(白银T+D)",
+        ),
+        limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
 ):
     df = ak_cache(ak.spot_hist_sge, symbol=symbol)
     if df is None or df.empty:
@@ -73,7 +73,7 @@ def pm_spot_prices(
     description="获取国际贵金属实时价格，包括伦敦金、伦敦银、COMEX黄金、COMEX白银等",
 )
 def pm_international_prices(
-    symbol: str = Field("XAU", description="品种代码，支持: XAU(伦敦金), XAG(伦敦银), GC(COMEX黄金), SI(COMEX白银)"),
+        symbol: str = Field("XAU", description="品种代码，支持: XAU(伦敦金), XAG(伦敦银), GC(COMEX黄金), SI(COMEX白银)"),
 ):
     df = ak_cache(ak.futures_foreign_commodity_realtime, symbol=symbol, ttl=300)
     if df is None or df.empty:
@@ -86,8 +86,8 @@ def pm_international_prices(
     description="获取全球黄金或白银ETF持仓量变化数据，用于判断机构资金流向",
 )
 def pm_etf_holdings(
-    metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
-    limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
+        metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
+        limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
 ):
     if metal.lower() == "gold":
         df = ak_cache(ak.macro_cons_gold)
@@ -106,8 +106,8 @@ def pm_etf_holdings(
     description="获取COMEX交易所黄金或白银库存数据，用于判断供需关系",
 )
 def pm_comex_inventory(
-    metal: str = Field("黄金", description="金属类型，支持: 黄金, 白银"),
-    limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
+        metal: str = Field("黄金", description="金属类型，支持: 黄金, 白银"),
+        limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
 ):
     df = ak_cache(ak.futures_comex_inventory, symbol=metal)
     if df is None or df.empty:
@@ -121,7 +121,7 @@ def pm_comex_inventory(
     description="获取贵金属期货与现货价格的基差数据，用于判断市场预期和套利机会",
 )
 def pm_basis(
-    metal: str = Field("黄金", description="金属类型，支持: 黄金, 白银"),
+        metal: str = Field("黄金", description="金属类型，支持: 黄金, 白银"),
 ):
     df = ak_cache(ak.futures_spot_price, vars_list=[metal])
     if df is None or df.empty:
@@ -134,8 +134,8 @@ def pm_basis(
     description="获取上海黄金交易所发布的黄金或白银基准价格，这是国内贵金属定价的重要参考",
 )
 def pm_benchmark_price(
-    metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
-    limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
+        metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
+        limit: int = Field(30, description="返回数量(int)，建议30-90", strict=False),
 ):
     if metal.lower() == "gold":
         df = ak_cache(ak.spot_golden_benchmark_sge)
@@ -154,8 +154,8 @@ def pm_benchmark_price(
     description="复合技能：一键获取贵金属的价格走势、ETF持仓、COMEX库存、期现基差等综合诊断数据",
 )
 async def pm_composite_diagnostic(
-    metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
-    ctx: Context | None = None,
+        metal: str = Field("gold", description="金属类型，支持: gold(黄金), silver(白银)"),
+        ctx: Context | None = None,
 ):
     if ctx:
         await ctx.report_progress(0, 100, "开始贵金属综合诊断...")

@@ -44,7 +44,7 @@ def collect_all_industry_daily(start_date: str = "20200101", force: bool = False
         else:
             effective_start = start_date
 
-        print(f"  [{i+1}/{len(industry_list)}] {name} ({code}) from={effective_start}...")
+        print(f"  [{i + 1}/{len(industry_list)}] {name} ({code}) from={effective_start}...")
         try:
             df = ak_cache(
                 ak.stock_board_industry_index_ths,

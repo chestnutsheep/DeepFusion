@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════
 
 def _fit_univariate_garch(
-    series: np.ndarray,
-    dist: str = "normal",
+        series: np.ndarray,
+        dist: str = "normal",
 ) -> dict[str, Any]:
     """对单个序列拟合 GARCH(1,1) 模型。
 
@@ -102,9 +102,9 @@ def _simple_garch_estimate(series: np.ndarray) -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════
 
 def _dcc_log_likelihood(
-    params: np.ndarray,
-    std_resid_matrix: np.ndarray,
-    Q_bar: np.ndarray,
+        params: np.ndarray,
+        std_resid_matrix: np.ndarray,
+        Q_bar: np.ndarray,
 ) -> float:
     """DCC 模型对数似然函数。
 
@@ -155,7 +155,7 @@ def _dcc_log_likelihood(
 
 
 def _estimate_dcc_params(
-    std_resid_matrix: np.ndarray,
+        std_resid_matrix: np.ndarray,
 ) -> tuple[float, float]:
     """估计 DCC 参数 (a, b)。"""
     Q_bar = np.corrcoef(std_resid_matrix.T)
@@ -230,8 +230,8 @@ class DCCResult:
 
 
 def fit_dcc_garch(
-    returns: pd.DataFrame,
-    garch_dist: str = "normal",
+        returns: pd.DataFrame,
+        garch_dist: str = "normal",
 ) -> DCCResult:
     """拟合 DCC-GARCH 模型。
 

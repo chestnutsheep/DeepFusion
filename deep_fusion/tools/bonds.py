@@ -6,7 +6,6 @@
 """
 
 import akshare as ak
-import pandas as pd
 from pydantic import Field
 
 from ..server import mcp
@@ -19,8 +18,8 @@ from ..shared.utils import ak_cache
                 "一次性返回全量历史序列，前端按需截取。",
 )
 def bond_yields(
-    limit: int = Field(10, description="返回最近期数（日频），传0返回全量"),
-    china_only: bool = Field(False, description="True=仅中国，False=中美全量"),
+        limit: int = Field(10, description="返回最近期数（日频），传0返回全量"),
+        china_only: bool = Field(False, description="True=仅中国，False=中美全量"),
 ) -> str:
     """获取中国+美国国债收益率（一次性拉取，日频缓存）"""
     df = ak_cache(ak.bond_zh_us_rate, ttl=86400, ttl2=172800)
@@ -43,7 +42,7 @@ def bond_yields(
                 "反映市场恐慌/贪婪程度。值越高=恐慌越大，历史区间15~35。",
 )
 def option_ivix(
-    limit: int = Field(30, description="返回最近天数，传0返回全量"),
+        limit: int = Field(30, description="返回最近天数，传0返回全量"),
 ) -> str:
     """获取QVIX（一次性拉取全量历史，日频缓存）"""
     df = ak_cache(ak.index_option_50etf_qvix, ttl=86400, ttl2=172800)
@@ -61,7 +60,7 @@ def option_ivix(
     description="获取美国ISM制造业PMI、Markit制造业PMI、服务业PMI等经济指标",
 )
 def us_economic_indicators(
-    limit: int = Field(12, description="返回月数"),
+        limit: int = Field(12, description="返回月数"),
 ) -> str:
     """拉取美国ISM制造业PMI + 服务业PMI"""
     results = {}

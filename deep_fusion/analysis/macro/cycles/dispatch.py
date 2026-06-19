@@ -6,6 +6,7 @@ from .engine import CycleEngine, CycleConfig, IndicatorDef
 
 logger = logging.getLogger(__name__)
 
+
 # ── _nbs — lazy-resolved fetch wrapper ──
 
 def _nbs(name: str, key: str) -> IndicatorDef:
@@ -15,6 +16,7 @@ def _nbs(name: str, key: str) -> IndicatorDef:
     e.g. fetch_ind_yoy → cache key "ind_yoy"
     """
     _cache_key = name.replace("fetch_", "").replace("_nbs_", "")
+
     def _resolve():
         from ....shared.cycle_db import get, set as db_set
         from ....tools.cycles import _FN_MAP
@@ -28,6 +30,7 @@ def _nbs(name: str, key: str) -> IndicatorDef:
             except Exception:
                 pass
         return dates, vals
+
     return IndicatorDef(key=key, fetch_fn=_resolve)
 
 
@@ -45,16 +48,16 @@ CYCLES: dict[str, CycleConfig] = {
         ],
         core_key="inventory_yoy", requires=["demand_yoy"], ma_window=3,
         classify_fn=_classify_kitchin,
-        phase_names={1: "主动去库存", 2: "被动去库存", 3: "主动补库存", 4: "被动补库存"},
+        phase_names={1: "被动去库存", 2: "主动去库存", 3: "主动补库存", 4: "被动补库存"},
     ),
     "juglar": CycleConfig(
         id="juglar", name="朱格拉周期(固定资本投资周期)",
         desc="设备投资(0.4)+制造业固投(0.25)+固投总量(0.15)+产能利用率(0.2)加权 → 4阶段",
         indicators=[
-            _nbs("fetch_equip_invest", "equip_yoy"),              # 核心 0.4
+            _nbs("fetch_equip_invest", "equip_yoy"),  # 核心 0.4
             _nbs("fetch_manufacturing_invest", "manufacturing_yoy"),  # 辅助 0.25
-            _nbs("fetch_fix_inv_monthly", "fix_inv_yoy"),         # 辅助 0.15
-            _nbs("fetch_capacity_util", "capacity_util"),         # 辅助 0.2
+            _nbs("fetch_fix_inv_monthly", "fix_inv_yoy"),  # 辅助 0.15
+            _nbs("fetch_capacity_util", "capacity_util"),  # 辅助 0.2
             _nbs("fetch_ind_yoy", "ind_yoy"),
             IndicatorDef(key="ppi_yoy", akshare_fn="macro_china_ppi", akshare_col="当月同比增长"),
             _nbs("fetch_pmi", "pmi"),
@@ -67,10 +70,10 @@ CYCLES: dict[str, CycleConfig] = {
         id="kuznets", name="库兹涅茨周期(房地产周期)",
         desc="房价(0.5)+[销售(0.2)+新开工(0.2)+开发投资(0.1)]加权 CF 带通 → 4阶段",
         indicators=[
-            _nbs("fetch_house_price", "house_price_yoy"),         # 主判定 0.5
-            _nbs("fetch_re_sales_area", "sales_yoy"),             # 辅助 0.2
-            _nbs("fetch_re_new_start", "new_start_yoy"),          # 辅助 0.2
-            _nbs("fetch_re_dev_yoy", "re_yoy"),                   # 辅助 0.1
+            _nbs("fetch_house_price", "house_price_yoy"),  # 主判定 0.5
+            _nbs("fetch_re_sales_area", "sales_yoy"),  # 辅助 0.2
+            _nbs("fetch_re_new_start", "new_start_yoy"),  # 辅助 0.2
+            _nbs("fetch_re_dev_yoy", "re_yoy"),  # 辅助 0.1
             _nbs("fetch_pmi", "pmi"),
         ],
         core_key="house_price_yoy", requires=["sales_yoy", "re_yoy"], ma_window=6,
@@ -128,6 +131,7 @@ def _make_report_fn(cid, pk, dk, vk, nm):
     def _fn(limit: int = 0) -> str:
         p, d, r = _compute(cid, limit)
         return _fmt_report(p, d, r, pk, dk, vk, nm)
+
     _fn.__name__ = f"{cid}_cycle"
     return _fn
 
@@ -139,6 +143,7 @@ def _make_chart_fn(cid):
             return "数据不足"
         from .kondratiev import _chart_dispatch
         return _chart_dispatch(cid, r, d, output_path)
+
     _fn.__name__ = f"chart_{cid}_cycle"
     return _fn
 

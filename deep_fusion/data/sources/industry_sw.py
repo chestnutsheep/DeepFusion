@@ -12,6 +12,7 @@ from ...shared import industry_db as db
 _LABEL = {1: "申万一级", 2: "申万二级", 3: "申万三级"}
 _SW_SYMBOLS = ["市场表征", "一级行业", "二级行业", "风格指数"]
 
+
 # ═══════════════════════════════════════════════════════
 #  三级分类 + 树
 # ═══════════════════════════════════════════════════════
@@ -37,6 +38,7 @@ def _fetch_and_rename(fn, level: int) -> pd.DataFrame:
         df["parent_name"] = ""
     return df
 
+
 def get_sw_all() -> dict[int, pd.DataFrame]:
     return {
         1: _fetch_and_rename(ak.sw_index_first_info, 1),
@@ -44,24 +46,26 @@ def get_sw_all() -> dict[int, pd.DataFrame]:
         3: _fetch_and_rename(ak.sw_index_third_info, 3),
     }
 
+
 def save_to_db() -> int:
     all_levels = get_sw_all()
     conn = db._connect()
     conn.execute("DROP TABLE IF EXISTS meso_sw_classify")
     conn.execute("""
-        CREATE TABLE meso_sw_classify (
-            industry_code TEXT PRIMARY KEY,
-            industry_name TEXT,
-            parent_name TEXT,
-            level INTEGER,
-            source TEXT,
-            constituent_count INTEGER,
-            pe_static REAL,
-            pe_ttm REAL,
-            pb REAL,
-            dividend_yield REAL
-        )
-    """)
+                 CREATE TABLE meso_sw_classify
+                 (
+                     industry_code     TEXT PRIMARY KEY,
+                     industry_name     TEXT,
+                     parent_name       TEXT,
+                     level             INTEGER,
+                     source            TEXT,
+                     constituent_count INTEGER,
+                     pe_static         REAL,
+                     pe_ttm            REAL,
+                     pb                REAL,
+                     dividend_yield    REAL
+                 )
+                 """)
     total = 0
     for level, df in all_levels.items():
         if df.empty:
@@ -72,8 +76,8 @@ def save_to_db() -> int:
                    (industry_code, industry_name, parent_name, level, source,
                     constituent_count, pe_static, pe_ttm, pb, dividend_yield)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (r.get("industry_code",""), r.get("industry_name",""),
-                 r.get("parent_name",""), level, "sw",
+                (r.get("industry_code", ""), r.get("industry_name", ""),
+                 r.get("parent_name", ""), level, "sw",
                  r.get("constituent_count"), r.get("pe_static"),
                  r.get("pe_ttm"), r.get("pb"), r.get("dividend_yield")),
             )
@@ -82,6 +86,7 @@ def save_to_db() -> int:
     db._log_collection("meso_sw_classify", total)
     conn.close()
     return total
+
 
 def get_tree() -> list[dict]:
     conn = db._connect()
@@ -112,8 +117,10 @@ def get_tree() -> list[dict]:
                     f["children"].append(s2)
     return by_level[1]
 
+
 def tree_to_text(tree: list[dict], max_depth: int = 3) -> str:
     lines = []
+
     def walk(nodes, depth, prefix):
         for i, n in enumerate(nodes):
             last = i == len(nodes) - 1
@@ -124,17 +131,19 @@ def tree_to_text(tree: list[dict], max_depth: int = 3) -> str:
             lines.append(f"{prefix}{conn}{n['name']}{cnt}{pe}")
             if depth < max_depth - 1 and n.get("children"):
                 walk(n["children"], depth + 1, prefix + child_p)
+
     walk(tree, 0, "")
     return "\n".join(lines)
+
 
 # ═══════════════════════════════════════════════════════
 #  SW 指数分析日报表
 # ═══════════════════════════════════════════════════════
 
 def get_daily_analysis(
-    symbol: str = "一级行业",
-    start_date: str | None = None,
-    end_date: str | None = None,
+        symbol: str = "一级行业",
+        start_date: str | None = None,
+        end_date: str | None = None,
 ) -> pd.DataFrame:
     """申万指数分析日报表。
 
@@ -162,6 +171,7 @@ def get_daily_analysis(
     if df is None or df.empty:
         return pd.DataFrame()
     return df
+
 
 # ═══════════════════════════════════════════════════════
 #  成分股查询

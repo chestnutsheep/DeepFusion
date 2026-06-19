@@ -31,6 +31,7 @@ from ..data.sources.nbs_client import (
     _fetch_nbs_capacity_util, _fetch_house_price_yoy,
 )
 
+
 # ── PMI / M2 拉取函数（data_lake-first + akshare 回退） ──
 
 def _fetch_pmi():
@@ -43,6 +44,7 @@ def _fetch_pmi():
         return [], []
     return _parse_ak(df, "制造业-指数")
 
+
 def _fetch_m2_yoy():
     """M2 同比增速 → (periods, values) 供 CycleEngine 使用"""
     import akshare as ak
@@ -52,6 +54,7 @@ def _fetch_m2_yoy():
     if df is None or df.empty:
         return [], []
     return _parse_ak(df, "今值")
+
 
 # ── FN_MAP — _nbs() 延迟解析用 ──────────────────────────
 _FN_MAP: dict[str, Any] = {
@@ -109,6 +112,7 @@ for _cid in ["kitchin", "juglar", "kuznets"]:
 
     _fn_chart = _make_chart_fn(_cid)
     mcp.tool(name=_meta["chart_name"], description=_meta.get("chart_desc", f"生成{_cfg.name}分析图"))(_fn_chart)
+
 
 # ── data_* 工具（返回 JSON 数据） ──────────────────────────
 @mcp.tool(
@@ -398,8 +402,8 @@ def cycle_collect() -> str:
     lines.append("")
     lines.append("=== 计算结果预热 ===")
     for cid, ckey in [("kitchin", "cycles_data_kitchin"),
-                       ("juglar", "cycles_data_juglar"),
-                       ("kuznets", "cycles_data_kuznets")]:
+                      ("juglar", "cycles_data_juglar"),
+                      ("kuznets", "cycles_data_kuznets")]:
         try:
             _ck = CacheKey.init(ckey, ttl=604800, ttl2=2592000)
             if _ck.get() is None:
@@ -430,8 +434,8 @@ def cycle_collect() -> str:
     description="FRED 数据查询。传注册名(fred_ppiaco)或任意 series_id(GDPC1/UNRATE/...)",
 )
 def fred_data(
-    series: str = "fred_ppiaco",
-    limit: int = 20,
+        series: str = "fred_ppiaco",
+        limit: int = 20,
 ) -> str:
     from ..data.sources.fred import SERIES, get as fred_get
     from ..data.sources.wb_fred_adapter import fetch_fred
@@ -467,9 +471,9 @@ def fred_list() -> str:
     description="世界银行数据查询。传注册名(wb_gdp_growth)或任意 indicator+国家代码",
 )
 def wb_data(
-    indicator: str = "wb_gdp_growth",
-    country: str = "1W",
-    limit: int = 20,
+        indicator: str = "wb_gdp_growth",
+        country: str = "1W",
+        limit: int = 20,
 ) -> str:
     from ..data.sources.world_bank import INDICATORS, get as wb_get
     from ..data.sources.wb_fred_adapter import fetch_wb
@@ -528,7 +532,7 @@ def cycle_cache_status() -> str:
     description="判断当前长波周期（康德拉季耶夫周期）阶段。可选方法: pca(默认, 8谱法+相位映射), wavelet(Morlet小波功率谱), bandpass(40-60年带通滤波)",
 )
 def kondratiev_cycle(
-    method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
+        method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
 ) -> str:
     _ck = CacheKey.init(f"cycles_report_kondratiev_{method}_v3", ttl=604800, ttl2=2592000)
     cached = _ck.get()
@@ -550,7 +554,7 @@ def kondratiev_cycle(
         f"  年份范围: {result.get('year_range', '?')}",
         f"  参与指标: {', '.join(result.get('indicators_used', []))}",
     ]
-    pv_pct = f"{pv*100:.0f}%" if pv else "N/A"
+    pv_pct = f"{pv * 100:.0f}%" if pv else "N/A"
     lines.append(f"  PCA第一主成分方差占比: {pv_pct}  {'⚠ 较低(<70%), 合成指数代表性有限' if pv and pv < 0.6 else '✅'}")
     if dp:
         lines.append(f"  主周期长度: {dp:.1f} 年  (置信度: {conf:.2f})")
@@ -616,8 +620,8 @@ def kondratiev_cycle(
     description="生成康波周期分析图（PCA合成指数+主周期标注），保存为PNG。可选方法: pca/wavelet/bandpass",
 )
 def chart_kondratiev_cycle(
-    method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
-    output_path: str = Field("kondratiev_cycle.png", description="图表保存路径"),
+        method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
+        output_path: str = Field("kondratiev_cycle.png", description="图表保存路径"),
 ) -> str:
     result, vals = _compute_kondratiev(method)
     if not vals:
@@ -630,7 +634,7 @@ def chart_kondratiev_cycle(
     description="获取康波周期原始数据（PCA合成指数序列）",
 )
 def data_kondratiev(
-    method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
+        method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
 ) -> str:
     _ck = CacheKey.init(f"cycles_data_kondratiev_{method}_v5", ttl=604800, ttl2=2592000)
     cached = _ck.get()

@@ -1,13 +1,11 @@
 """加密货币 MCP 工具 — 数据由 data/sources/crypto_adapter.py 提供，本层只做注册+格式化。"""
 import asyncio
 from io import StringIO
-from typing import Any
 
 import pandas as pd
 from fastmcp import Context
 from pydantic import Field
 
-from ..server import mcp
 from ..data.sources.crypto_adapter import (
     okx_candles,
     okx_sentiment,
@@ -15,9 +13,8 @@ from ..data.sources.crypto_adapter import (
     okx_open_interest,
     binance_ai_report as _binance_report,
     fear_greed_index as _fng,
-    _safe_float,
-    _safe_int,
 )
+from ..server import mcp
 from ..shared.indicators import add_technical_indicators
 from ..shared.normalize import normalize_price_df
 from ..shared.schema import format_error_csv
@@ -28,12 +25,12 @@ from ..shared.schema import format_error_csv
     description="获取OKX加密货币的历史K线数据，输出标准化行情字段",
 )
 def crypto_prices(
-    symbol: str = Field("BTC-USDT", description="产品ID，格式: BTC-USDT"),
-    period: str = Field(
-        "1H",
-        description="K线时间粒度: 1m/3m/5m/15m/30m/1H/2H/4H/6H/12H/1D/2D/3D/1W/1M/3M",
-    ),
-    limit: int = Field(100, description="返回数量(int)，最大300，最小建议30", strict=False),
+        symbol: str = Field("BTC-USDT", description="产品ID，格式: BTC-USDT"),
+        period: str = Field(
+            "1H",
+            description="K线时间粒度: 1m/3m/5m/15m/30m/1H/2H/4H/6H/12H/1D/2D/3D/1W/1M/3M",
+        ),
+        limit: int = Field(100, description="返回数量(int)，最大300，最小建议30", strict=False),
 ):
     if not period.endswith("m"):
         period = period.upper()
@@ -47,11 +44,11 @@ def crypto_prices(
         "date": "时间", "open": "开盘", "high": "最高", "low": "最低",
         "close": "收盘", "volume": "成交量", "amount": "成交额",
     }, source="okx", currency=currency, limit=limit, float_format="%.4f", date_unit=str,
-        indicator_map={
-            "macd": "MACD", "dif": "DIF", "dea": "DEA",
-            "kdj_k": "KDJ.K", "kdj_d": "KDJ.D", "kdj_j": "KDJ.J",
-            "rsi": "RSI", "boll_u": "BOLL.U", "boll_m": "BOLL.M", "boll_l": "BOLL.L",
-        })
+                              indicator_map={
+                                  "macd": "MACD", "dif": "DIF", "dea": "DEA",
+                                  "kdj_k": "KDJ.K", "kdj_d": "KDJ.D", "kdj_j": "KDJ.J",
+                                  "rsi": "RSI", "boll_u": "BOLL.U", "boll_m": "BOLL.M", "boll_l": "BOLL.L",
+                              })
 
 
 @mcp.tool(
@@ -59,9 +56,9 @@ def crypto_prices(
     description="获取OKX加密货币杠杆多空比与主动买卖数据",
 )
 def crypto_sentiment_metrics(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
-    period: str = Field("1h", description="时间粒度: 5m/1H/1D"),
-    inst_type: str = Field("SPOT", description="产品类型 SPOT/CONTRACTS"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        period: str = Field("1h", description="时间粒度: 5m/1H/1D"),
+        inst_type: str = Field("SPOT", description="产品类型 SPOT/CONTRACTS"),
 ):
     loan_df, taker_df = okx_sentiment(symbol, period, inst_type)
     if loan_df.empty and taker_df.empty:
@@ -81,7 +78,7 @@ def crypto_sentiment_metrics(
     description="获取币安对加密货币的AI分析报告，推荐使用",
 )
 def binance_ai_report(
-    symbol: str = Field("BTC", description="加密货币币种，格式: BTC 或 ETH"),
+        symbol: str = Field("BTC", description="加密货币币种，格式: BTC 或 ETH"),
 ):
     return _binance_report(symbol)
 
@@ -91,7 +88,7 @@ def binance_ai_report(
     description="获取OKX永续合约的资金费率，正费率表示多头付费给空头",
 )
 def crypto_funding_rate(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
 ):
     inst_id = f"{symbol}-USDT-SWAP"
     data = okx_funding_rate(inst_id)
@@ -111,7 +108,7 @@ def crypto_funding_rate(
     description="获取OKX永续合约的持仓量数据",
 )
 def crypto_open_interest(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
 ):
     inst_id = f"{symbol}-USDT-SWAP"
     data = okx_open_interest(inst_id)
@@ -151,8 +148,8 @@ def fear_greed_index():
     description="一键获取加密货币技术面、情绪面和AI报告的综合诊断数据",
 )
 async def crypto_composite_diagnostic(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
-    ctx: Context | None = None,
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        ctx: Context | None = None,
 ):
     if ctx:
         await ctx.report_progress(0, 100, "开始加密货币诊断...")
@@ -180,8 +177,8 @@ async def crypto_composite_diagnostic(
     description="生成加密货币 ASCII 走势图",
 )
 def draw_crypto_chart(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
-    bar: str = Field("1D", description="K线周期: 1H/4H/1D"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        bar: str = Field("1D", description="K线周期: 1H/4H/1D"),
 ):
     inst_id = f"{symbol}-USDT"
     data = crypto_prices.fn(symbol=inst_id, period=bar, limit=20)
@@ -211,9 +208,9 @@ def draw_crypto_chart(
         threshold = min_p + (h / height) * rng
         chart.append("".join("█" if p >= threshold else " " for p in prices))
     return (
-        f"\n{symbol} 最近 {len(prices)} 根 {bar} K线走势:\n"
-        + "\n".join(chart)
-        + f"\n最低: {min_p:.2f}  最高: {max_p:.2f}"
+            f"\n{symbol} 最近 {len(prices)} 根 {bar} K线走势:\n"
+            + "\n".join(chart)
+            + f"\n最低: {min_p:.2f}  最高: {max_p:.2f}"
     )
 
 
@@ -222,10 +219,10 @@ def draw_crypto_chart(
     description="基于历史价格与技术指标进行简单策略回测（SMA/RSI/MACD）",
 )
 def backtest_crypto_strategy(
-    symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
-    strategy: str = Field("SMA", description="策略类型: SMA/RSI/MACD"),
-    bar: str = Field("4H", description="K线周期: 1H/4H/1D"),
-    limit: int = Field(200, description="回测K线数量", strict=False),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        strategy: str = Field("SMA", description="策略类型: SMA/RSI/MACD"),
+        bar: str = Field("4H", description="K线周期: 1H/4H/1D"),
+        limit: int = Field(200, description="回测K线数量", strict=False),
 ):
     inst_id = f"{symbol}-USDT"
     data = crypto_prices.fn(symbol=inst_id, period=bar, limit=limit)
@@ -257,9 +254,12 @@ def backtest_crypto_strategy(
         pos = 0
         for v in rsi:
             if pd.isna(v):
-                positions.append(pos); continue
-            if v < 30: pos = 1
-            elif v > 70: pos = 0
+                positions.append(pos);
+                continue
+            if v < 30:
+                pos = 1
+            elif v > 70:
+                pos = 0
             positions.append(pos)
         signal = pd.Series(positions, index=dfs.index)
         desc = "RSI(30/70)"

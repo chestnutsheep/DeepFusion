@@ -147,7 +147,7 @@ def main():
         f"回看窗口: {args.window}\n"
     )
     _save_text("00_data_overview.txt", overview_text)
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  2. 相关性矩阵
@@ -185,7 +185,7 @@ def main():
         "matrix": corr_matrix.values.tolist(),
     })
     _save_text("01_correlation_matrix.txt", _fmt_matrix(corr_matrix, max_rows=30, max_cols=30))
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  3. PCA 载荷
@@ -218,7 +218,7 @@ def main():
     cum = 0.0
     for i, v in enumerate(ev_values[:5]):
         cum += float(v)
-        pca_text += f"  PC{i+1}: {float(v)*100:.1f}% (累计 {cum*100:.1f}%)\n"
+        pca_text += f"  PC{i + 1}: {float(v) * 100:.1f}% (累计 {cum * 100:.1f}%)\n"
     pca_text += "\n各 PC 载荷 TOP5:\n"
     for pc, contrib in pca_data["top_contributors"].items():
         pca_text += f"\n{pc}:\n"
@@ -239,8 +239,8 @@ def main():
 
     _save_json("02_pca_loadings.json", pca_data)
     _save_text("02_pca_loadings.txt", pca_text)
-    print(f"  PC1 解释方差: {float(ev_values[0])*100:.1f}%")
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  PC1 解释方差: {float(ev_values[0]) * 100:.1f}%")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  4. 层次聚类
@@ -267,7 +267,7 @@ def main():
     })
     _save_text("03_clustering.txt", cluster_text)
     print(f"  簇数: {len(clustering.get('clusters', {}))}")
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  5. 主线识别 (调用 MCP 工具)
@@ -290,7 +290,7 @@ def main():
         _save_text("04_themes_summary.txt", summary)
 
     print(f"  主线数: {len(data_themes.get('themes', []))}")
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  6. 滚动相关趋势
@@ -335,7 +335,7 @@ def main():
 
     _save_json("05_rolling_correlation.json", rolling_data)
     _save_text("05_rolling_correlation.txt", rolling_text)
-    print(f"  耗时: {time.time()-t0:.1f}s")
+    print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  7. DCC-GARCH
@@ -358,10 +358,10 @@ def main():
         if dcc_summary:
             _save_text("06_dcc_garch_summary.txt", dcc_summary)
 
-        print(f"  DCC参数: a={data_dcc.get('dcc_params',{}).get('a')}, "
-              f"b={data_dcc.get('dcc_params',{}).get('b')}, "
-              f"a+b={data_dcc.get('dcc_params',{}).get('a_plus_b')}")
-        print(f"  耗时: {time.time()-t0:.1f}s")
+        print(f"  DCC参数: a={data_dcc.get('dcc_params', {}).get('a')}, "
+              f"b={data_dcc.get('dcc_params', {}).get('b')}, "
+              f"a+b={data_dcc.get('dcc_params', {}).get('a_plus_b')}")
+        print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  8. Granger 因果
@@ -387,7 +387,7 @@ def main():
         n_sig = data_causality.get("meta", {}).get("n_significant", 0)
         n_total = data_causality.get("meta", {}).get("n_total", 0)
         print(f"  显著因果对: {n_sig}/{n_total}")
-        print(f"  耗时: {time.time()-t0:.1f}s")
+        print(f"  耗时: {time.time() - t0:.1f}s")
 
     # ══════════════════════════════════════════════════════
     #  9. 相关网络分析
@@ -456,7 +456,7 @@ def main():
 
             _save_text("08_network.txt", net_text)
             print(f"  社区数: {len(data_network['communities'])}")
-            print(f"  耗时: {time.time()-t0:.1f}s")
+            print(f"  耗时: {time.time() - t0:.1f}s")
 
         except ImportError:
             print("  ⚠️ networkx 未安装，跳过网络分析")
@@ -490,10 +490,10 @@ def main():
                 "stable": "→稳定",
             }
             trend_text = trend_map.get(t.get("trend", ""), "")
-            lines.append(f"  主线{t['rank']}: {t['label']}  |  评分 {t.get('score','?')}  |  {trend_text}")
+            lines.append(f"  主线{t['rank']}: {t['label']}  |  评分 {t.get('score', '?')}  |  {trend_text}")
             mom = t.get("momentum", {})
             if mom:
-                lines.append(f"    动量: 5d={mom.get('avg_5d',0):+.2%}  10d={mom.get('avg_10d',0):+.2%}")
+                lines.append(f"    动量: 5d={mom.get('avg_5d', 0):+.2%}  10d={mom.get('avg_10d', 0):+.2%}")
             ff = t.get("fund_flow", {})
             if ff and ff.get("net_amount_total"):
                 lines.append(f"    资金净流入: {ff['net_amount_total']:,.0f}")
@@ -517,7 +517,7 @@ def main():
     ev_list = pca_result.get("explained_variance", [])
     ev_values_summary = list(ev_list) if hasattr(ev_list, '__iter__') else []
     for i, v in enumerate(ev_values_summary[:3]):
-        lines.append(f"  PC{i+1}: 解释方差 {float(v)*100:.1f}%")
+        lines.append(f"  PC{i + 1}: 解释方差 {float(v) * 100:.1f}%")
     pca_contribs = pca_result.get("top_contributors", {})
     for pc in list(pca_contribs.keys())[:3]:
         contrib = pca_contribs[pc]
