@@ -4,6 +4,7 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "industry_data.db"
 
+
 def main():
     conn = sqlite3.connect(str(DB_PATH))
     codes = [r[0] for r in conn.execute(
@@ -39,12 +40,13 @@ def main():
 
     # Sample
     for row in conn.execute(
-        "SELECT industry_code, trade_date, close, change_pct "
-        "FROM meso_industry_daily WHERE change_pct IS NOT NULL LIMIT 3"
+            "SELECT industry_code, trade_date, close, change_pct "
+            "FROM meso_industry_daily WHERE change_pct IS NOT NULL LIMIT 3"
     ):
         print(row)
 
     conn.close()
+
 
 if __name__ == "__main__":
     main()
