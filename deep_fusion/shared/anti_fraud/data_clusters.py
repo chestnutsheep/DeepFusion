@@ -13,32 +13,27 @@
   - 复用 isolated-tools 的 StockCode 智能解析器
   - 单个底层调用失败不阻塞整体，对应 key 返回 {"error": "原因"}
   - 个股类调用遍历 symbols 列表，结果以 symbol 为 key
+  - 走 DeepFusion 规矩：akshare 调用统一用 ak_cache 缓存，
+    季度末/交易日用 shared.utils 现成实现
 """
 
-import json
 from datetime import datetime, timedelta
-from typing import Optional
 
-import akshare as ak
+import akshare as ak  # pyright: ignore[reportMissingImports]
 import pandas as pd
 
+from 改动.DeepFusion.core.data_clusters import _safe_call, _recent_trade_date
 from .akshare_api import (
     resolve_stock_code, StockCode,
     BALANCE_SHEET_FIELDS, PROFIT_SHEET_FIELDS, CASH_FLOW_FIELDS,
 )
+from ..utils import _prev_quarter_end, recent_trade_date
+from ...cache import ak_cache
 
 
 # ──────────────────────────────────────────────
 # 内部工具函数
 # ──────────────────────────────────────────────
-
-def _safe_call(fn, *args, **kwargs):
-    """安全调用，捕获异常返回 (result, error)"""
-    try:
-        return fn(*args, **kwargs), None
-    except Exception as e:
-        return None, str(e)
-
 
 def _df_to_records(df) -> list:
     """DataFrame 转 list[dict]，None 返回空列表"""
@@ -47,32 +42,10 @@ def _df_to_records(df) -> list:
     return df.to_dict("records")
 
 
-def _prev_quarter_end() -> str:
-    """上个季度末日期 YYYYMMDD"""
-    today = datetime.now()
-    q = (today.month - 1) // 3
-    quarter_start_month = q * 3 + 1
-    quarter_end = datetime(
-        today.year if q > 0 or today.month > 3 else today.year - 1,
-        quarter_start_month, 1
-    ) - timedelta(days=1)
-    if quarter_end > today:
-        quarter_end = datetime(today.year - 1, 10, 1) - timedelta(days=1)
-    return quarter_end.strftime("%Y%m%d")
-
-
-def _recent_trade_date() -> str:
-    """最近交易日 YYYYMMDD"""
-    try:
-        df = ak.tool_trade_date_hist_sina()
-        if df is not None and not df.empty:
-            today = datetime.now().date()
-            dates = [d for d in df["trade_date"] if d.date() <= today]
-            if dates:
-                return dates[-1].strftime("%Y%m%d")
-    except Exception:
-        pass
-    return datetime.now().strftime("%Y%m%d")
+def _recent_trade_date_str() -> str:
+    """最近交易日 YYYYMMDD（shared.utils.recent_trade_date 返回 date 对象）"""
+    d = recent_trade_date()
+    return d.strftime("%Y%m%d") if hasattr(d, "strftime") else str(d)
 
 
 # ──────────────────────────────────────────────
@@ -82,21 +55,19 @@ def _recent_trade_date() -> str:
 def _individual_info(sc: StockCode) -> dict:
     """个股档案信息"""
     result = {}
-    info, err = _safe_call(ak.stock_individual_info_em, symbol=sc.symbol_pure)
-    if err:
-        result["error"] = err
-    elif info is not None and not info.empty:
+    info = ak_cache(ak.stock_individual_info_em, symbol=sc.symbol_pure, ttl=43200)
+    if info is not None and not info.empty:
         result["基本信息"] = _df_to_records(info) if hasattr(info, "to_dict") else str(info)
-    holder, _ = _safe_call(ak.stock_main_stock_holder, stock=sc.symbol_pure)
+    holder = ak_cache(ak.stock_main_stock_holder, stock=sc.symbol_pure, ttl=43200)
     if holder is not None and not holder.empty:
         if "截至日期" in holder.columns and len(holder) > 0:
             latest_date = holder["截至日期"].dropna().iloc[0]
             holder = holder[holder["截至日期"] == latest_date]
         result["主要股东"] = _df_to_records(holder.head(10))
-    mgmt, _ = _safe_call(ak.stock_management_change_ths, symbol=sc.symbol_pure)
+    mgmt = ak_cache(ak.stock_management_change_ths, symbol=sc.symbol_pure, ttl=43200)
     if mgmt is not None and not mgmt.empty:
         result["高管变动"] = _df_to_records(mgmt.head(10))
-    dividend, _ = _safe_call(ak.stock_dividend_cninfo, symbol=sc.symbol_pure)
+    dividend = ak_cache(ak.stock_dividend_cninfo, symbol=sc.symbol_pure, ttl=43200)
     if dividend is not None and not dividend.empty:
         result["历史分红"] = _df_to_records(dividend.head(10))
     return result
@@ -105,16 +76,14 @@ def _individual_info(sc: StockCode) -> dict:
 def _financial_indicators(sc: StockCode, start_year: str = "2020", limit: int = 20) -> dict:
     """86项财务指标"""
     result = {}
-    info, _ = _safe_call(ak.stock_individual_info_em, symbol=sc.symbol_pure)
+    info = ak_cache(ak.stock_individual_info_em, symbol=sc.symbol_pure, ttl=43200)
     if info is not None and not info.empty:
         result["个股基本信息"] = _df_to_records(info) if hasattr(info, "to_dict") else str(info)
-    indicators, err = _safe_call(
+    indicators = ak_cache(
         ak.stock_financial_analysis_indicator,
-        symbol=sc.symbol_pure, start_year=start_year
+        symbol=sc.symbol_pure, start_year=start_year, ttl=86400, ttl2=172800,
     )
-    if err:
-        result["error"] = err
-    elif indicators is not None and not indicators.empty:
+    if indicators is not None and not indicators.empty:
         result["财务指标"] = _df_to_records(indicators.tail(limit))
     return result
 
@@ -130,7 +99,7 @@ def _financial_statements(sc: StockCode, limit: int = 20) -> dict:
         ("现金流量表", ak.stock_cash_flow_sheet_by_report_em, CASH_FLOW_FIELDS),
     ]
     for stmt_name, fn, field_map in em_calls:
-        df, err = _safe_call(fn, symbol=sc.symbol_em)
+        df = ak_cache(fn, symbol=sc.symbol_em, ttl=86400, ttl2=172800)
         if df is not None and not df.empty:
             available = [c for c in field_map if c in df.columns]
             if available:
@@ -142,8 +111,6 @@ def _financial_statements(sc: StockCode, limit: int = 20) -> dict:
                 result[stmt_name] = _df_to_records(sub.head(limit))
             else:
                 result[stmt_name] = _df_to_records(df.head(limit))
-        elif err:
-            result[stmt_name] = {"error": err}
     return result
 
 
@@ -151,11 +118,11 @@ def _market_prices(sc: StockCode, limit: int = 60) -> list:
     """历史行情"""
     delta_days = limit + 62
     start_date = (datetime.now() - timedelta(days=delta_days)).strftime("%Y%m%d")
-    df, _ = _safe_call(ak.stock_zh_a_daily, symbol=sc.symbol_em, adjust="qfq")
+    df = ak_cache(ak.stock_zh_a_daily, symbol=sc.symbol_em, adjust="qfq", ttl=3600)
     if df is None or (hasattr(df, "empty") and df.empty):
-        df, _ = _safe_call(
+        df = ak_cache(
             ak.stock_zh_a_hist, symbol=sc.symbol_pure, period="daily",
-            start_date=start_date, end_date="22220101"
+            start_date=start_date, end_date="22220101", ttl=3600,
         )
     if df is None or (hasattr(df, "empty") and df.empty):
         return []
@@ -168,16 +135,16 @@ def _market_prices(sc: StockCode, limit: int = 60) -> list:
 def _capital_tracking(sc: StockCode) -> dict:
     """资金动向"""
     result = {}
-    fund, _ = _safe_call(ak.stock_individual_fund_flow, stock=sc.symbol_pure, market=sc.prefix_em)
+    fund = ak_cache(ak.stock_individual_fund_flow, stock=sc.symbol_pure, market=sc.prefix_em, ttl=3600)
     if fund is not None and not fund.empty:
         result["个股资金流"] = _df_to_records(fund.tail(30))
     date_str = datetime.now().strftime("%Y%m%d")
-    tj, _ = _safe_call(ak.stock_jgdy_tj_em, date=date_str)
+    tj = ak_cache(ak.stock_jgdy_tj_em, date=date_str, ttl=43200)
     if tj is not None and not tj.empty:
         tj_symbol = tj[tj.iloc[:, 1] == sc.symbol_pure].head(5)
         if not tj_symbol.empty:
             result["机构调研统计"] = _df_to_records(tj_symbol)
-    detail, _ = _safe_call(ak.stock_jgdy_detail_em, date=date_str)
+    detail = ak_cache(ak.stock_jgdy_detail_em, date=date_str, ttl=43200)
     if detail is not None and not detail.empty:
         detail_symbol = detail[detail.iloc[:, 1] == sc.symbol_pure].head(5)
         if not detail_symbol.empty:
@@ -195,27 +162,25 @@ def _peer_comparison(sc: StockCode) -> dict:
         ("杜邦分析比较", ak.stock_zh_dupont_comparison_em),
         ("公司规模比较", ak.stock_zh_scale_comparison_em),
     ]:
-        df, err = _safe_call(fn, symbol=stock_code)
+        df = ak_cache(fn, symbol=stock_code, ttl=86400, ttl2=172800)
         if df is not None and not df.empty:
             result[key] = _df_to_records(df)
-        elif err:
-            result[key] = {"error": err}
     return result
 
 
 def _sentiment_side(sc: StockCode) -> dict:
     """个股侧面消息"""
     result = {}
-    news, _ = _safe_call(ak.stock_news_em, symbol=sc.symbol_pure)
+    news = ak_cache(ak.stock_news_em, symbol=sc.symbol_pure, ttl=3600)
     if news is not None and not news.empty:
         result["个股新闻"] = _df_to_records(news.head(10))
-    mgmt, _ = _safe_call(ak.stock_management_change_ths, symbol=sc.symbol_pure)
+    mgmt = ak_cache(ak.stock_management_change_ths, symbol=sc.symbol_pure, ttl=43200)
     if mgmt is not None and not mgmt.empty:
         result["高管持股变动"] = _df_to_records(mgmt.head(10))
-    gdhs, _ = _safe_call(ak.stock_zh_a_gdhs_detail_em, symbol=sc.symbol_pure)
+    gdhs = ak_cache(ak.stock_zh_a_gdhs_detail_em, symbol=sc.symbol_pure, ttl=43200)
     if gdhs is not None and not gdhs.empty:
         result["股东人数变化"] = _df_to_records(gdhs)
-    holders, _ = _safe_call(ak.stock_gdfx_top_10_em, symbol=sc.symbol_em, date=_prev_quarter_end())
+    holders = ak_cache(ak.stock_gdfx_top_10_em, symbol=sc.symbol_em, date=_prev_quarter_end(), ttl=43200)
     if holders is not None and not holders.empty:
         result["十大股东变动"] = _df_to_records(holders.head(10))
     return result
@@ -223,10 +188,10 @@ def _sentiment_side(sc: StockCode) -> dict:
 
 def _stock_tech_indicators(sc: StockCode) -> dict:
     """技术指标"""
-    df, _ = _safe_call(ak.stock_zh_a_daily, symbol=sc.symbol_em, adjust="qfq")
+    df = ak_cache(ak.stock_zh_a_daily, symbol=sc.symbol_em, adjust="qfq", ttl=3600)
     if df is None or (hasattr(df, "empty") and df.empty):
-        df, _ = _safe_call(ak.stock_zh_a_hist, symbol=sc.symbol_pure, period="daily",
-                           start_date="20240101", end_date="22220101")
+        df = ak_cache(ak.stock_zh_a_hist, symbol=sc.symbol_pure, period="daily",
+                      start_date="20240101", end_date="22220101", ttl=3600)
     if df is None or (hasattr(df, "empty") and df.empty):
         return {"error": f"无法获取 {sc.symbol_pure} 的K线数据"}
 
