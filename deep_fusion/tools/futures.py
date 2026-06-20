@@ -9,25 +9,62 @@ from ..shared.normalize import normalize_price_df
 from ..shared.schema import format_error_csv
 from ..shared.utils import ak_cache
 
+# 期货品种映射：中文名 → {code: 合约代码, sina: 新浪品种编号}
+# akshare 各接口的 symbol 格式不同：
+#   futures_main_sina   → 新浪编号 (如 "RB0")
+#   futures_inventory_em → 中文名称 (如 "螺纹钢")
+#   futures_spot_price  → 合约代码 (如 "RB")
+#   futures_hold_pos_sina → symbol 是持仓类型，contract 是合约代码
 FUTURES_SYMBOLS = {
-    "螺纹钢": "RB",
-    "铁矿石": "I",
-    "原油": "SC",
-    "沪铜": "CU",
-    "沪金": "AU",
-    "沪银": "AG",
-    "焦炭": "J",
-    "焦煤": "JM",
-    "动力煤": "ZC",
-    "玉米": "C",
-    "豆粕": "M",
-    "豆油": "Y",
-    "棕榈油": "P",
-    "白糖": "SR",
-    "棉花": "CF",
-    "PTA": "TA",
-    "甲醇": "MA",
-    "玻璃": "FG",
+    "螺纹钢":   {"code": "RB",  "sina": "RB0"},
+    "铁矿石":   {"code": "I",   "sina": "I0"},
+    "原油":     {"code": "SC",  "sina": "SC0"},
+    "沪铜":     {"code": "CU",  "sina": "CU0"},
+    "沪金":     {"code": "AU",  "sina": "AU0"},
+    "沪银":     {"code": "AG",  "sina": "AG0"},
+    "焦炭":     {"code": "J",   "sina": "J0"},
+    "焦煤":     {"code": "JM",  "sina": "JM0"},
+    "动力煤":   {"code": "ZC",  "sina": "ZC0"},
+    "玉米":     {"code": "C",   "sina": "C0"},
+    "豆粕":     {"code": "M",   "sina": "M0"},
+    "豆油":     {"code": "Y",   "sina": "Y0"},
+    "棕榈油":   {"code": "P",   "sina": "P0"},
+    "白糖":     {"code": "SR",  "sina": "SR0"},
+    "棉花":     {"code": "CF",  "sina": "CF0"},
+    "PTA":      {"code": "TA",  "sina": "TA0"},
+    "甲醇":     {"code": "MA",  "sina": "MA0"},
+    "玻璃":     {"code": "FG",  "sina": "FG0"},
+    "热卷":     {"code": "HC",  "sina": "HC0"},
+    "沪铝":     {"code": "AL",  "sina": "AL0"},
+    "沪锌":     {"code": "ZN",  "sina": "ZN0"},
+    "沪铅":     {"code": "PB",  "sina": "PB0"},
+    "沪镍":     {"code": "NI",  "sina": "NI0"},
+    "锡":       {"code": "SN",  "sina": "SN0"},
+    "橡胶":     {"code": "RU",  "sina": "RU0"},
+    "纸浆":     {"code": "SP",  "sina": "SP0"},
+    "不锈钢":   {"code": "SS",  "sina": "SS0"},
+    "沥青":     {"code": "BU",  "sina": "BU0"},
+    "燃油":     {"code": "FU",  "sina": "FU0"},
+    "纯碱":     {"code": "SA",  "sina": "SA0"},
+    "尿素":     {"code": "UR",  "sina": "UR0"},
+    "苹果":     {"code": "AP",  "sina": "AP0"},
+    "红枣":     {"code": "CJ",  "sina": "CJ0"},
+    "菜油":     {"code": "OI",  "sina": "OI0"},
+    "菜粕":     {"code": "RM",  "sina": "RM0"},
+    "乙二醇":   {"code": "EG",  "sina": "EG0"},
+    "聚丙烯":   {"code": "PP",  "sina": "PP0"},
+    "塑料":     {"code": "L",   "sina": "L0"},
+    "PVC":      {"code": "V",   "sina": "V0"},
+    "硅铁":     {"code": "SF",  "sina": "SF0"},
+    "锰硅":     {"code": "SM",  "sina": "SM0"},
+    "鸡蛋":     {"code": "JD",  "sina": "JD0"},
+    "生猪":     {"code": "LH",  "sina": "LH0"},
+    "氧化铝":   {"code": "AO",  "sina": "AO0"},
+    "20号胶":   {"code": "NR",  "sina": "NR0"},
+    "低硫燃油": {"code": "LU",  "sina": "LU0"},
+    "工业硅":   {"code": "SI",  "sina": "SI0"},
+    "碳酸锂":   {"code": "LC",  "sina": "LC0"},
+    "多晶硅":   {"code": "PS",  "sina": "PS0"},
 }
 
 
@@ -38,12 +75,13 @@ FUTURES_SYMBOLS = {
 def futures_prices(
         symbol: str = Field(
             "螺纹钢",
-            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+            description="期货品种中文名称，如: 螺纹钢, 铁矿石, 原油, 沪铜, 沪金, 沪银, 焦炭, 焦煤, 动力煤, 玉米, 豆粕, 豆油, 棕榈油, 白糖, 棉花, PTA, 甲醇, 玻璃, 热卷, 沪铝, 沪锌, 沪铅, 沪镍, 锡, 橡胶, 纸浆, 不锈钢, 沥青, 燃油, 纯碱, 尿素, 苹果, 红枣, 菜油, 菜粕, 乙二醇, 聚丙烯, 塑料, PVC, 硅铁, 锰硅, 鸡蛋, 生猪, 氧化铝, 20号胶, 低硫燃油, 工业硅, 碳酸锂, 多晶硅",
         ),
         limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
 ):
-    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
-    df = ak_cache(ak.futures_main_sina, symbol=symbol_code)
+    info = FUTURES_SYMBOLS.get(symbol)
+    sina_code = info["sina"] if info else symbol
+    df = ak_cache(ak.futures_main_sina, symbol=sina_code)
     if df is None or df.empty:
         return normalize_price_df(None, {}, source="akshare", currency="CNY", limit=limit, date_unit=str)
     df = df.tail(limit).copy()
@@ -70,11 +108,11 @@ def futures_prices(
 def futures_inventory(
         symbol: str = Field(
             "螺纹钢",
-            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+            description="期货品种中文名称，如: 螺纹钢, 铁矿石, 原油, 沪铜, 沪金, 沪银, 焦炭, 焦煤, 动力煤, 玉米, 豆粕, 豆油, 棕榈油, 白糖, 棉花, PTA, 甲醇, 玻璃, 热卷, 沪铝, 沪锌, 沪铅, 沪镍, 锡, 橡胶, 纸浆, 不锈钢, 沥青, 燃油, 纯碱, 尿素, 苹果, 红枣, 菜油, 菜粕, 乙二醇, 聚丙烯, 塑料, PVC, 硅铁, 锰硅, 鸡蛋, 生猪, 氧化铝, 20号胶, 低硫燃油, 工业硅, 碳酸锂, 多晶硅",
         ),
 ):
-    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
-    df = ak_cache(ak.futures_inventory_em, symbol=symbol_code)
+    # futures_inventory_em 期望中文名称
+    df = ak_cache(ak.futures_inventory_em, symbol=symbol)
     if df is None or df.empty:
         return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
     return df.to_csv(index=False, float_format="%.2f")
@@ -87,15 +125,17 @@ def futures_inventory(
 def futures_basis(
         symbol: str = Field(
             "螺纹钢",
-            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+            description="期货品种中文名称，如: 螺纹钢, 铁矿石, 原油, 沪铜, 沪金, 沪银, 焦炭, 焦煤, 动力煤, 玉米, 豆粕, 豆油, 棕榈油, 白糖, 棉花, PTA, 甲醇, 玻璃, 热卷, 沪铝, 沪锌, 沪铅, 沪镍, 锡, 橡胶, 纸浆, 不锈钢, 沥青, 燃油, 纯碱, 尿素, 苹果, 红枣, 菜油, 菜粕, 乙二醇, 聚丙烯, 塑料, PVC, 硅铁, 锰硅, 鸡蛋, 生猪, 氧化铝, 20号胶, 低硫燃油, 工业硅, 碳酸锂, 多晶硅",
         ),
         date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
 ):
     if not date:
         from datetime import datetime
         date = datetime.now().strftime("%Y%m%d")
-    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
-    df = ak_cache(ak.futures_spot_price, date=date, vars_list=[symbol_code])
+    info = FUTURES_SYMBOLS.get(symbol)
+    code = info["code"] if info else symbol
+    # futures_spot_price 期望合约品种代码列表
+    df = ak_cache(ak.futures_spot_price, date=date, vars_list=[code])
     if df is None or df.empty:
         return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
     return df.to_csv(index=False, float_format="%.2f")
@@ -108,18 +148,24 @@ def futures_basis(
 def futures_positions(
         symbol: str = Field(
             "螺纹钢",
-            description="期货品种，支持: 螺纹钢(RB), 铁矿石(I), 原油(SC), 沪铜(CU), 沪金(AU), 沪银(AG), 焦炭(J), 焦煤(JM), 动力煤(ZC), 玉米(C), 豆粕(M), 豆油(Y), 棕榈油(P), 白糖(SR), 棉花(CF), PTA(TA), 甲醇(MA), 玻璃(FG)",
+            description="期货品种中文名称，如: 螺纹钢, 铁矿石, 原油, 沪铜, 沪金, 沪银, 焦炭, 焦煤, 动力煤, 玉米, 豆粕, 豆油, 棕榈油, 白糖, 棉花, PTA, 甲醇, 玻璃, 热卷, 沪铝, 沪锌, 沪铅, 沪镍, 锡, 橡胶, 纸浆, 不锈钢, 沥青, 燃油, 纯碱, 尿素, 苹果, 红枣, 菜油, 菜粕, 乙二醇, 聚丙烯, 塑料, PVC, 硅铁, 锰硅, 鸡蛋, 生猪, 氧化铝, 20号胶, 低硫燃油, 工业硅, 碳酸锂, 多晶硅",
         ),
-        contract: str = Field("", description="合约代码如 OI2501，留空自动取主力"),
+        position_type: str = Field(
+            "成交量",
+            description="持仓类型: 成交量, 多单持仓, 空单持仓",
+        ),
+        contract: str = Field("", description="合约代码如 RB2510，留空自动取主力"),
         date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
 ):
     if not date:
         from datetime import datetime
         date = datetime.now().strftime("%Y%m%d")
-    symbol_code = FUTURES_SYMBOLS.get(symbol, symbol)
+    info = FUTURES_SYMBOLS.get(symbol)
+    code = info["code"] if info else symbol
     if not contract:
-        contract = symbol_code
-    df = ak_cache(ak.futures_hold_pos_sina, symbol=symbol_code, contract=contract, date=date)
+        contract = code
+    # futures_hold_pos_sina: symbol 是持仓类型(成交量/多单持仓/空单持仓)，contract 是合约代码
+    df = ak_cache(ak.futures_hold_pos_sina, symbol=position_type, contract=contract, date=date)
     if df is None or df.empty:
         return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
     return df.to_csv(index=False, float_format="%.2f")

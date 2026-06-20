@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/DeepFusion.iml" filepath="$PROJECT_DIR$/.idea/DeepFusion.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/deep-fusion.iml" filepath="$PROJECT_DIR$/.idea/deep-fusion.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/deep-fusion@1.iml" filepath="$PROJECT_DIR$/.idea/deep-fusion@1.iml" />
     </modules>
   </component>
 </project>

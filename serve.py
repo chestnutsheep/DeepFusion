@@ -5,9 +5,19 @@ import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Akshare/东方财富数据源通过 proxy:7897
+# 东方财富(_em)和国外数据源通过 proxy:7897
+# 国内数据源(申万/同花顺/新浪/雪球/巨潮/NBS)不走代理
 os.environ.setdefault('HTTP_PROXY', 'http://127.0.0.1:7897')
 os.environ.setdefault('HTTPS_PROXY', 'http://127.0.0.1:7897')
+os.environ.setdefault('NO_PROXY',
+    'swsresearch.com,'
+    '10jqka.com.cn,'
+    'sina.com.cn,'
+    'xueqiu.com,'
+    'cninfo.com.cn,'
+    'stats.gov.cn,'
+    'data.stats.gov.cn,'
+    'localhost,127.0.0.1')
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware

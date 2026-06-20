@@ -105,18 +105,22 @@ def fund_rank(fund_type: str, ttl: int = 86400) -> pd.DataFrame | None:
 # ── 期货 ─────────────────────────────────────────────
 
 def futures_main(symbol: str, ttl: int = 86400) -> pd.DataFrame | None:
+    """futures_main_sina expects 新浪品种编号 (e.g. "RB0"), NOT Chinese name or contract code."""
     return ak_cache(ak.futures_main_sina, symbol=symbol, ttl=ttl)
 
 
 def futures_inventory(symbol: str, ttl: int = 86400) -> pd.DataFrame | None:
+    """futures_inventory_em expects Chinese name (e.g. "螺纹钢"), NOT contract code."""
     return ak_cache(ak.futures_inventory_em, symbol=symbol, ttl=ttl)
 
 
 def futures_spot_price(date: str, vars_list: list, ttl: int = 86400) -> pd.DataFrame | None:
+    """futures_spot_price expects contract code list (e.g. ["RB"]), NOT Chinese name."""
     return ak_cache(ak.futures_spot_price, date=date, vars_list=vars_list, ttl=ttl)
 
 
 def futures_hold(symbol: str, contract: str, date: str, ttl: int = 86400) -> pd.DataFrame | None:
+    """futures_hold_pos_sina: symbol is position type (成交量/多单持仓/空单持仓), contract is contract code."""
     return ak_cache(ak.futures_hold_pos_sina, symbol=symbol, contract=contract, date=date, ttl=ttl)
 
 

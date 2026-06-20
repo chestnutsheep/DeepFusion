@@ -21,8 +21,8 @@ from datetime import datetime, timedelta
 
 import akshare as ak  # pyright: ignore[reportMissingImports]
 import pandas as pd
+from pandas import Series
 
-from 改动.DeepFusion.core.data_clusters import _safe_call, _recent_trade_date
 from .akshare_api import (
     resolve_stock_code, StockCode,
     BALANCE_SHEET_FIELDS, PROFIT_SHEET_FIELDS, CASH_FLOW_FIELDS,
@@ -215,7 +215,7 @@ def _stock_tech_indicators(sc: StockCode) -> dict:
         ema26 = df["close"].ewm(span=26, adjust=False).mean()
         dif = ema12 - ema26
         dea = dif.ewm(span=9, adjust=False).mean()
-        macd_val = (dif - dea) * 2
+        macd_val: Series = (dif - dea) * 2
         result["MACD"] = round(float(macd_val.iloc[-1]), 4)
         result["DIF"] = round(float(dif.iloc[-1]), 4)
         result["DEA"] = round(float(dea.iloc[-1]), 4)
@@ -256,13 +256,13 @@ def _stock_tech_indicators(sc: StockCode) -> dict:
 
 def _macro_growth(limit: int = 8) -> dict:
     result = {}
-    gdp, _ = _safe_call(ak.macro_china_gdp)
+    gdp = ak_cache(ak.macro_china_gdp, ttl=86400)
     if gdp is not None and not gdp.empty:
         result["GDP季度"] = _df_to_records(gdp.tail(limit))
-    gdp_y, _ = _safe_call(ak.macro_china_gdp_yearly)
+    gdp_y = ak_cache(ak.macro_china_gdp_yearly, ttl=86400)
     if gdp_y is not None and not gdp_y.empty:
         result["GDP年率"] = _df_to_records(gdp_y.tail(limit))
-    ind, _ = _safe_call(ak.macro_china_industrial_production_yoy)
+    ind = ak_cache(ak.macro_china_industrial_production_yoy, ttl=86400)
     if ind is not None and not ind.empty:
         result["工业增加值同比"] = _df_to_records(ind.tail(limit))
     return result
@@ -270,10 +270,10 @@ def _macro_growth(limit: int = 8) -> dict:
 
 def _macro_inflation(limit: int = 12) -> dict:
     result = {}
-    cpi, _ = _safe_call(ak.macro_china_cpi)
+    cpi = ak_cache(ak.macro_china_cpi, ttl=86400)
     if cpi is not None and not cpi.empty:
         result["CPI月度"] = _df_to_records(cpi.tail(limit))
-    ppi, _ = _safe_call(ak.macro_china_ppi)
+    ppi = ak_cache(ak.macro_china_ppi, ttl=86400)
     if ppi is not None and not ppi.empty:
         result["PPI月度"] = _df_to_records(ppi.tail(limit))
     return result
@@ -281,10 +281,10 @@ def _macro_inflation(limit: int = 12) -> dict:
 
 def _macro_business(limit: int = 12) -> dict:
     result = {}
-    pmi, _ = _safe_call(ak.macro_china_pmi)
+    pmi = ak_cache(ak.macro_china_pmi, ttl=86400)
     if pmi is not None and not pmi.empty:
         result["制造业PMI"] = _df_to_records(pmi.tail(limit))
-    caixin, _ = _safe_call(ak.macro_china_cx_pmi_yearly)
+    caixin = ak_cache(ak.macro_china_cx_pmi_yearly, ttl=86400)
     if caixin is not None and not caixin.empty:
         result["财新制造业PMI"] = _df_to_records(caixin.tail(limit))
     return result
@@ -292,39 +292,39 @@ def _macro_business(limit: int = 12) -> dict:
 
 def _macro_monetary(limit: int = 12) -> dict:
     result = {}
-    m2, _ = _safe_call(ak.macro_china_m2_yearly)
+    m2 = ak_cache(ak.macro_china_m2_yearly, ttl=86400)
     if m2 is not None and not m2.empty:
         result["M2货币供应年率"] = _df_to_records(m2.tail(limit))
-    shrzgm, _ = _safe_call(ak.macro_china_shrzgm)
+    shrzgm = ak_cache(ak.macro_china_shrzgm, ttl=86400)
     if shrzgm is not None and not shrzgm.empty:
         result["社会融资规模"] = _df_to_records(shrzgm.tail(limit))
-    lpr, _ = _safe_call(ak.macro_china_lpr)
+    lpr = ak_cache(ak.macro_china_lpr, ttl=86400)
     if lpr is not None and not lpr.empty:
         result["LPR利率"] = _df_to_records(lpr.tail(limit))
     return result
 
 
 def _stock_sector_fund_flow_rank(days: str = "今日", cate: str = "行业资金流") -> list:
-    df, _ = _safe_call(ak.stock_sector_fund_flow_rank, indicator=days, sector_type=cate)
+    df = ak_cache(ak.stock_sector_fund_flow_rank, indicator=days, sector_type=cate, ttl=3600)
     return _df_to_records(df)
 
 
 def _northbound_funds() -> list:
-    df, _ = _safe_call(ak.stock_hsgt_hist_em, symbol="北向资金")
+    df = ak_cache(ak.stock_hsgt_hist_em, symbol="北向资金", ttl=3600)
     if df is not None and not df.empty:
         return _df_to_records(df.tail(10))
     return []
 
 
 def _margin_balance() -> list:
-    df, _ = _safe_call(ak.stock_margin_account_info)
+    df = ak_cache(ak.stock_margin_account_info, ttl=3600)
     if df is not None and not df.empty:
         return _df_to_records(df.tail(30))
     return []
 
 
 def _sector_valuation() -> list:
-    df, _ = _safe_call(ak.sw_index_first_info)
+    df = ak_cache(ak.sw_index_first_info, ttl=86400)
     if df is not None and not df.empty:
         if "市盈率" in df.columns:
             df["市盈率"] = pd.to_numeric(df["市盈率"], errors="coerce")
@@ -334,8 +334,8 @@ def _sector_valuation() -> list:
 
 
 def _stock_zt_pool_em(limit: int = 50) -> list:
-    date = _recent_trade_date()
-    df, _ = _safe_call(ak.stock_zt_pool_em, date=date)
+    date = _recent_trade_date_str()
+    df = ak_cache(ak.stock_zt_pool_em, date=date, ttl=3600)
     if df is not None and not df.empty:
         for col in ["序号", "流通市值", "总市值"]:
             if col in df.columns:
@@ -347,14 +347,14 @@ def _stock_zt_pool_em(limit: int = 50) -> list:
 
 
 def _stock_lhb_ggtj_sina(days: str = "5", limit: int = 50) -> list:
-    df, _ = _safe_call(ak.stock_lhb_ggtj_sina, symbol=days)
+    df = ak_cache(ak.stock_lhb_ggtj_sina, symbol=days, ttl=3600)
     if df is not None and not df.empty:
         return _df_to_records(df.head(limit))
     return []
 
 
 def _option_ivix(limit: int = 30) -> list:
-    df, _ = _safe_call(ak.index_option_50etf_qvix)
+    df = ak_cache(ak.index_option_50etf_qvix, ttl=3600)
     if df is not None and not df.empty:
         return _df_to_records(df.tail(limit))
     return []
@@ -367,9 +367,9 @@ def _policy_search(keyword: str, limit: int = 20) -> list:
     """
     result = []
     # 1. 巨潮披露报告（含问询函、监管函等）
-    df, _ = _safe_call(ak.stock_zh_a_disclosure_report_cninfo,
-                       symbol="全部", market="沪深京",
-                       category="公司治理", start_date="20240101")
+    df = ak_cache(ak.stock_zh_a_disclosure_report_cninfo,
+                  symbol="全部", market="沪深京",
+                  category="公司治理", start_date="20240101", ttl=43200)
     if df is not None and not df.empty:
         title_col = "公告标题" if "公告标题" in df.columns else df.columns[2]
         if keyword:
@@ -377,7 +377,7 @@ def _policy_search(keyword: str, limit: int = 20) -> list:
             df = df[mask]
         result.extend(_df_to_records(df.head(limit)))
     # 2. 东方财富公告（补充）
-    df2, _ = _safe_call(ak.stock_notice_report, symbol="全部", date=_recent_trade_date())
+    df2 = ak_cache(ak.stock_notice_report, symbol="全部", date=_recent_trade_date_str(), ttl=3600)
     if df2 is not None and not df2.empty:
         title_col = "公告标题" if "公告标题" in df2.columns else df2.columns[2]
         if keyword:
@@ -389,7 +389,7 @@ def _policy_search(keyword: str, limit: int = 20) -> list:
 
 def _industry_sw_tree(keyword: str = "") -> list:
     """申万行业树"""
-    df, _ = _safe_call(ak.sw_index_first_info)
+    df = ak_cache(ak.sw_index_first_info, ttl=86400)
     if df is None or df.empty:
         return []
     if keyword:
@@ -400,7 +400,7 @@ def _industry_sw_tree(keyword: str = "") -> list:
 
 def _industry_sw_constituents_detail(industry_code: str, limit: int = 50) -> list:
     """申万行业成分股"""
-    df, _ = _safe_call(ak.index_component_sw, symbol=industry_code)
+    df = ak_cache(ak.index_component_sw, symbol=industry_code, ttl=86400)
     if df is None or df.empty:
         return []
     return _df_to_records(df.head(limit))
@@ -410,11 +410,11 @@ def _industry_quotes(industry: str, limit: int = 30) -> dict:
     """行业行情+估值+资金流"""
     result = {}
     # 申万行业指数行情
-    df, _ = _safe_call(ak.sw_index_daily, symbol="801010")
+    df = ak_cache(ak.sw_index_daily, symbol="801010", ttl=3600)
     if df is not None and not df.empty:
         result["行业指数行情"] = _df_to_records(df.tail(limit))
     # 行业估值
-    val, _ = _safe_call(ak.sw_index_first_info)
+    val = ak_cache(ak.sw_index_first_info, ttl=86400)
     if val is not None and not val.empty:
         if industry:
             mask = val["行业名称"].apply(lambda t: industry in str(t) if pd.notna(t) else False)
@@ -425,7 +425,7 @@ def _industry_quotes(industry: str, limit: int = 30) -> dict:
 
 def _industry_capital_flow(industry: str = "", limit: int = 20) -> list:
     """行业资金流排行"""
-    df, _ = _safe_call(ak.stock_sector_fund_flow_rank, indicator="今日", sector_type="行业资金流")
+    df = ak_cache(ak.stock_sector_fund_flow_rank, indicator="今日", sector_type="行业资金流", ttl=3600)
     if df is None or df.empty:
         return []
     if industry and "名称" in df.columns:
@@ -436,7 +436,7 @@ def _industry_capital_flow(industry: str = "", limit: int = 20) -> list:
 
 def _sector_rotation() -> list:
     """行业轮动排行"""
-    df, _ = _safe_call(ak.stock_sector_fund_flow_rank, indicator="今日", sector_type="行业资金流")
+    df = ak_cache(ak.stock_sector_fund_flow_rank, indicator="今日", sector_type="行业资金流", ttl=3600)
     if df is None or df.empty:
         return []
     if "今日涨跌幅" in df.columns:
@@ -457,11 +457,11 @@ def _independent_director(sc: StockCode) -> dict:
     """
     result = {}
     # 高管持股变动（含独董）
-    df, _ = _safe_call(ak.stock_hold_management_person_em, symbol=sc.symbol_pure)
+    df = ak_cache(ak.stock_hold_management_person_em, symbol=sc.symbol_pure, ttl=43200)
     if df is not None and not df.empty:
         result["高管持股变动"] = _df_to_records(df.head(20))
     # 高管变动
-    mgmt, _ = _safe_call(ak.stock_management_change_ths, symbol=sc.symbol_pure)
+    mgmt = ak_cache(ak.stock_management_change_ths, symbol=sc.symbol_pure, ttl=43200)
     if mgmt is not None and not mgmt.empty:
         result["高管变动"] = _df_to_records(mgmt.head(20))
     result["note"] = "akshare 无独董出席率直接接口，仅提供高管变动记录"
@@ -470,9 +470,9 @@ def _independent_director(sc: StockCode) -> dict:
 
 def _related_transactions(sc: StockCode) -> dict:
     """关联交易（巨潮关联交易披露）"""
-    df, _ = _safe_call(ak.stock_zh_a_disclosure_relation_cninfo,
-                       symbol="全部", market="沪深京",
-                       start_date="20230101", end_date=datetime.now().strftime("%Y%m%d"))
+    df = ak_cache(ak.stock_zh_a_disclosure_relation_cninfo,
+                  symbol="全部", market="沪深京",
+                  start_date="20230101", end_date=datetime.now().strftime("%Y%m%d"), ttl=43200)
     if df is None or df.empty:
         return {"note": "无关联交易披露数据"}
     # 筛选该股票
@@ -484,10 +484,10 @@ def _related_transactions(sc: StockCode) -> dict:
 
 def _inquiry_letters(sc: StockCode) -> dict:
     """问询函频次（通过巨潮披露报告筛选问询类）"""
-    df, _ = _safe_call(ak.stock_zh_a_disclosure_report_cninfo,
-                       symbol="全部", market="沪深京",
-                       category="公司治理",
-                       start_date="20230101")
+    df = ak_cache(ak.stock_zh_a_disclosure_report_cninfo,
+                  symbol="全部", market="沪深京",
+                  category="公司治理",
+                  start_date="20230101", ttl=43200)
     if df is None or df.empty:
         return {"问询函频次": 0, "note": "无披露数据"}
     code_col = "股票代码" if "股票代码" in df.columns else df.columns[1]
@@ -509,10 +509,10 @@ def _inquiry_letters(sc: StockCode) -> dict:
 def _guarantee_and_lawsuit(sc: StockCode) -> dict:
     """对外担保+诉讼（巨潮）"""
     result = {}
-    guar, _ = _safe_call(ak.stock_cg_guarantee_cninfo, symbol=sc.symbol_pure)
+    guar = ak_cache(ak.stock_cg_guarantee_cninfo, symbol=sc.symbol_pure, ttl=43200)
     if guar is not None and not guar.empty:
         result["对外担保"] = _df_to_records(guar.head(20))
-    lawsuit, _ = _safe_call(ak.stock_cg_lawsuit_cninfo, symbol=sc.symbol_pure)
+    lawsuit = ak_cache(ak.stock_cg_lawsuit_cninfo, symbol=sc.symbol_pure, ttl=43200)
     if lawsuit is not None and not lawsuit.empty:
         result["诉讼"] = _df_to_records(lawsuit.head(20))
     return result
@@ -522,7 +522,7 @@ def _resolve_sw_code(sector: str) -> str:
     """通过申万行业树查找 sector 对应的申万行业代码（如 "801010"）"""
     if not sector:
         return ""
-    df, _ = _safe_call(ak.sw_index_first_info)
+    df = ak_cache(ak.sw_index_first_info, ttl=86400)
     if df is None or df.empty:
         return ""
     name_col = "行业名称" if "行业名称" in df.columns else df.columns[1]
@@ -548,7 +548,7 @@ def tech_invest_data(concept: str, symbols: list, start_year: str = "2020") -> d
     # 解析所有 StockCode
     sc_list = []
     for s in symbols:
-        sc, err = _safe_call(resolve_stock_code, s)
+        sc, err = resolve_stock_code(s)
         if err:
             sc_list.append((s, None))
         else:
@@ -624,7 +624,7 @@ def anti_fraud_data(symbol: str, concept: str = "") -> dict:
     簇2: 反诈验证 —— 三步交叉验证，复用底层调用结果。
     输入: symbol 股票代码, concept 概念名(用于政策搜索)
     """
-    sc, err = _safe_call(resolve_stock_code, symbol)
+    sc, err = resolve_stock_code(symbol)
     if err or sc is None:
         return {"symbol": symbol, "error": f"代码解析失败: {err}"}
 
@@ -668,7 +668,7 @@ def bl_pathology_data(symbol: str) -> dict:
     簇3: 暴雷病理学 —— 多维度扫描暴雷信号。
     输入: symbol 股票代码
     """
-    sc, err = _safe_call(resolve_stock_code, symbol)
+    sc, err = resolve_stock_code(symbol)
     if err or sc is None:
         return {"symbol": symbol, "error": f"代码解析失败: {err}"}
 
