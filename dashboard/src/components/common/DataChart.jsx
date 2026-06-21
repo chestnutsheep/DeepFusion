@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import * as echarts from 'echarts';
 
 /* 注册一个极简暗色主题 — 只覆盖背景/文字/分割线，不碰系列色 */
@@ -29,9 +29,10 @@ echarts.registerTheme('df-dark', {
  * @param {number} zoomStart   dataZoom 初始 start 百分比
  * @param {number} zoomEnd     dataZoom 初始 end 百分比
  * @param {object[]} annotations 拐点标注 [{ year, type:'peak'|'trough', label, detail }]
- * @param {'value'|'log'} yAxisType  Y轴类型: value=线性, log=对数
+ * @param {'value'|'log'} yAxisType  Y轴类型: value=线性, log=对数（初始值，可被切换按钮覆盖）
  * @param {boolean} normalize        是否归一化到基期100（多品种对比）
  * @param {'first'|'last'} normalizeBase 归一化基期: first=首个有效值, last=最后有效值
+ * @param {boolean} showYAxisToggle  是否显示 Y轴 线性/对数 切换按钮
  */
 export default function DataChart({
   data, series, dateKey = 'period', height = 400,
@@ -40,7 +41,9 @@ export default function DataChart({
   yAxisType = 'value',
   normalize = false,
   normalizeBase = 'first',
+  showYAxisToggle = true,
 }) {
+  const [activeYType, setActiveYType] = useState(yAxisType);
   const chartRef = useRef(null);
   useEffect(() => {
     if (!chartRef.current || !data?.length) return;
@@ -72,12 +75,12 @@ export default function DataChart({
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
       yAxis: hasDualY
         ? [
-            { type: yAxisType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: activeYType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } } },
-            { type: yAxisType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: activeYType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { show: false } },
           ]
-        : { type: yAxisType },
+        : { type: activeYType },
       series: processedSeries.map((s, sIdx) => {
         const entry = {
           name: s.name,
@@ -192,6 +195,26 @@ export default function DataChart({
     }
     chart.setOption(option);
     return () => chart.dispose();
-  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, yAxisType, normalize, normalizeBase]);
-  return <div ref={chartRef} style={{ width: '100%', height }} />;
+  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, activeYType, normalize, normalizeBase]);
+  return (
+    <div style={{ position: 'relative', width: '100%', height }}>
+      {showYAxisToggle && (
+        <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4, zIndex: 10 }}>
+          <button onClick={() => setActiveYType('value')} style={{
+            padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
+            background: activeYType === 'value' ? 'rgba(212,168,83,0.35)' : 'transparent',
+            color: activeYType === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
+            fontWeight: activeYType === 'value' ? 700 : 400,
+          }}>线性</button>
+          <button onClick={() => setActiveYType('log')} style={{
+            padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
+            background: activeYType === 'log' ? 'rgba(212,168,83,0.35)' : 'transparent',
+            color: activeYType === 'log' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
+            fontWeight: activeYType === 'log' ? 700 : 400,
+          }}>对数</button>
+        </div>
+      )}
+      <div ref={chartRef} style={{ width: '100%', height }} />
+    </div>
+  );
 }

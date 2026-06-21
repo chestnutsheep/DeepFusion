@@ -172,7 +172,7 @@ export default function StockPanel() {
         <span style={{ fontSize: 18, fontWeight: 700 }}>{stockName || '—'}</span>
         <span style={{ marginLeft: 12, color: 'var(--text-muted)' }}>{symbol ? `${symbol}.${market.toUpperCase()}` : '请输入代码查询'}</span>
       </div>
-      <DataChart data={klineData} series={chartSeries} dateKey="period" height={300} yAxisType="log" />
+      <DataChart data={klineData} series={chartSeries} dateKey="period" height={300} />
       <DataGrid config={STOCK_FINANCE_CONFIG} data={finData} prevData={{}} columns={4} gap={16} />
     </div>
   );

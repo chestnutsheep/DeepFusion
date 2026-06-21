@@ -509,11 +509,11 @@ function FuturesSection() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 价格走势 · {symbol} 主力</h3>
-          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
+          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
         </CardWrapper>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 库存变化 · {symbol}</h3>
-          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} yAxisType="log" />
+          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} />
         </CardWrapper>
       </div>
 
@@ -583,11 +583,11 @@ function MetalsSection() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
           <CardWrapper style={{ padding: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 黄金现货走势 · Au99.99</h3>
-            <DataChart data={goldData} series={[{ key: 'close', name: '黄金', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
+            <DataChart data={goldData} series={[{ key: 'close', name: '黄金', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
           </CardWrapper>
           <CardWrapper style={{ padding: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 白银现货走势 · Ag(T+D)</h3>
-            <DataChart data={silverData} series={[{ key: 'close', name: '白银', color: '#C49BA5', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
+            <DataChart data={silverData} series={[{ key: 'close', name: '白银', color: '#C49BA5', type: 'line' }]} dateKey="period" height={260} />
           </CardWrapper>
         </div>
       )}
@@ -662,11 +662,11 @@ function CryptoSection() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
           <CardWrapper style={{ padding: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 BTC · 日线</h3>
-            <DataChart data={btcData} series={[{ key: 'close', name: 'BTC', color: '#D4A853', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
+            <DataChart data={btcData} series={[{ key: 'close', name: 'BTC', color: '#D4A853', type: 'line' }]} dateKey="period" height={280} />
           </CardWrapper>
           <CardWrapper style={{ padding: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 ETH · 日线</h3>
-            <DataChart data={ethData} series={[{ key: 'close', name: 'ETH', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
+            <DataChart data={ethData} series={[{ key: 'close', name: 'ETH', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={280} />
           </CardWrapper>
         </div>
       )}

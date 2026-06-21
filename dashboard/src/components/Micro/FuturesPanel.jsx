@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+噢import {useMemo, useState} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataCard from '../common/DataCard.jsx';
@@ -88,11 +88,11 @@ export default function FuturesPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 14, marginBottom: 16 }}>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 价格走势 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· {symbol} 主力</span></h3>
-          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
+          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={280} />
         </CardWrapper>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 库存变化 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· {symbol}</span></h3>
-          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={280} yAxisType="log" />
+          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={280} />
         </CardWrapper>
       </div>
 
