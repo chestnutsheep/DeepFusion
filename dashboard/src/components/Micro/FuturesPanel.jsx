@@ -30,15 +30,16 @@ function parseGenericCsv(csv, dateCol = 0, valCol = 1, slicePeriod = 10) {
 }
 
 export default function FuturesPanel() {
-  const [symbol, setSymbol] = useState('螺纹钢');
-  const [inputVal, setInputVal] = useState('螺纹钢');
+  const [symbol, setSymbol] = useState('原油');
+  const [inputVal, setInputVal] = useState('原油');
   const commonSymbols = [
-    { name: '螺纹钢', label: '⛏️ 螺纹钢' },
-    { name: '铁矿石', label: '🪨 铁矿石' },
-    { name: '沪铜', label: '🪙 铜' },
     { name: '原油', label: '🛢️ 原油' },
-    { name: '豆粕', label: '🌾 豆粕' },
     { name: '沪金', label: '🥇 黄金' },
+    { name: '沪银', label: '🥈 白银' },
+    { name: '沪铜', label: '🪙 铜' },
+    { name: '碳酸锂', label: '⚡ 碳酸锂' },
+    { name: '多晶硅', label: '☀️ 多晶硅' },
+    { name: '铁矿石', label: '🪨 铁矿石' },
   ];
 
   const { data: priceRaw } = useMCP('futures_prices', symbol ? { symbol, limit: 90 } : null);
@@ -87,11 +88,11 @@ export default function FuturesPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 14, marginBottom: 16 }}>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 价格走势 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· {symbol} 主力</span></h3>
-          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={280} />
+          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
         </CardWrapper>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 库存变化 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>· {symbol}</span></h3>
-          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={280} />
+          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={280} yAxisType="log" />
         </CardWrapper>
       </div>
 

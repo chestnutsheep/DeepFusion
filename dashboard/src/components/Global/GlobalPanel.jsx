@@ -463,14 +463,15 @@ function BubbleSection() {
 // ══════════════════════════════════════════
 
 function FuturesSection() {
-  const [symbol, setSymbol] = useState('螺纹钢');
+  const [symbol, setSymbol] = useState('原油');
   const commonSymbols = [
-    { name: '螺纹钢', label: '⛏️ 螺纹钢' },
-    { name: '铁矿石', label: '🪨 铁矿石' },
-    { name: '沪铜', label: '🪙 铜' },
     { name: '原油', label: '🛢️ 原油' },
-    { name: '豆粕', label: '🌾 豆粕' },
     { name: '沪金', label: '🥇 黄金' },
+    { name: '沪银', label: '🥈 白银' },
+    { name: '沪铜', label: '🪙 铜' },
+    { name: '碳酸锂', label: '⚡ 碳酸锂' },
+    { name: '多晶硅', label: '☀️ 多晶硅' },
+    { name: '铁矿石', label: '🪨 铁矿石' },
   ];
 
   const { data: priceRaw } = useMCP('futures_prices', { symbol, limit: 60 });
@@ -508,11 +509,11 @@ function FuturesSection() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 价格走势 · {symbol} 主力</h3>
-          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
+          <DataChart data={priceData} series={[{ key: 'close', name: `${symbol}`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
         </CardWrapper>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 库存变化 · {symbol}</h3>
-          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} />
+          <DataChart data={invData} series={[{ key: 'value', name: '库存', color: '#7B5E7B', type: 'bar' }]} dateKey="period" height={260} yAxisType="log" />
         </CardWrapper>
       </div>
 
@@ -527,6 +528,7 @@ function FuturesSection() {
 }
 
 function MetalsSection() {
+  const [showNorm, setShowNorm] = useState(false);
   const { data: goldRaw } = useMCP('pm_spot_prices', { symbol: 'Au99.99', limit: 60 });
   const { data: silverRaw } = useMCP('pm_spot_prices', { symbol: 'Ag(T+D)', limit: 60 });
   const { data: etfGoldRaw } = useMCP('pm_etf_holdings', { metal: 'gold', limit: 30 });
@@ -541,23 +543,55 @@ function MetalsSection() {
   const silverLatest = silverData[silverData.length - 1]?.close;
   const ratio = goldLatest && silverLatest ? (goldLatest / silverLatest) : null;
 
+  // 归一化对比：合并黄金白银数据到同一时间轴
+  const mergedData = useMemo(() => {
+    const goldMap = new Map(goldData.map(d => [d.period, d.close]));
+    const silverMap = new Map(silverData.map(d => [d.period, d.close]));
+    const allDates = [...new Set([...goldMap.keys(), ...silverMap.keys()])].sort();
+    return allDates.map(d => ({
+      period: d,
+      gold: goldMap.get(d) ?? null,
+      silver: silverMap.get(d) ?? null,
+    }));
+  }, [goldData, silverData]);
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
-        <DataCard label="🥇 黄金 Au99.99" value={goldLatest} unit="元/克" decimals={2} higherBetter={null} detail="SGE" />
-        <DataCard label="🥈 白银 Ag(T+D)" value={silverLatest} unit="元/千克" decimals={0} higherBetter={null} detail="SGE" />
-        <DataCard label="金银比" value={ratio} unit="" decimals={1} higherBetter={null} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <DataCard label="🥇 黄金 Au99.99" value={goldLatest} unit="元/克" decimals={2} higherBetter={null} detail="SGE" />
+          <DataCard label="🥈 白银 Ag(T+D)" value={silverLatest} unit="元/千克" decimals={0} higherBetter={null} detail="SGE" />
+          <DataCard label="金银比" value={ratio} unit="" decimals={1} higherBetter={null} />
+        </div>
+        <button onClick={() => setShowNorm(!showNorm)} style={{
+          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          background: showNorm ? 'var(--accent-gold)' : 'transparent',
+          color: showNorm ? '#000' : 'var(--text-secondary)',
+          border: '1px solid var(--border-subtle)', cursor: 'pointer',
+        }}>{showNorm ? '📊 归一化对比' : '📈 绝对值'}</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+
+      {showNorm ? (
         <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 黄金现货走势 · Au99.99</h3>
-          <DataChart data={goldData} series={[{ key: 'close', name: '黄金', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 贵金属归一化走势 · 基期=100</h3>
+          <DataChart data={mergedData} series={[
+            { key: 'gold', name: '黄金', color: '#D4A853', type: 'line' },
+            { key: 'silver', name: '白银', color: '#C49BA5', type: 'line' },
+          ]} dateKey="period" height={260} normalize={true} normalizeBase="first" />
         </CardWrapper>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 白银现货走势 · Ag(T+D)</h3>
-          <DataChart data={silverData} series={[{ key: 'close', name: '白银', color: '#C49BA5', type: 'line' }]} dateKey="period" height={260} />
-        </CardWrapper>
-      </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 黄金现货走势 · Au99.99</h3>
+            <DataChart data={goldData} series={[{ key: 'close', name: '黄金', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
+          </CardWrapper>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 白银现货走势 · Ag(T+D)</h3>
+            <DataChart data={silverData} series={[{ key: 'close', name: '白银', color: '#C49BA5', type: 'line' }]} dateKey="period" height={260} yAxisType="log" />
+          </CardWrapper>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14, marginTop: 14 }}>
         <CardWrapper style={{ padding: 16 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>🏦 黄金ETF持仓量</h3>
@@ -573,6 +607,7 @@ function MetalsSection() {
 }
 
 function CryptoSection() {
+  const [showNorm, setShowNorm] = useState(false);
   const { data: btcRaw } = useMCP('crypto_prices', { symbol: 'BTC-USDT', period: '1D', limit: 90 });
   const { data: ethRaw } = useMCP('crypto_prices', { symbol: 'ETH-USDT', period: '1D', limit: 90 });
   const { data: sentimentRaw } = useMCP('crypto_sentiment_metrics', { symbol: 'BTC', period: '1D' });
@@ -584,26 +619,57 @@ function CryptoSection() {
   const btcLatest = btcData[btcData.length - 1]?.close;
   const ethLatest = ethData[ethData.length - 1]?.close;
 
+  // 归一化对比：合并 BTC ETH 数据到同一时间轴
+  const mergedData = useMemo(() => {
+    const btcMap = new Map(btcData.map(d => [d.period, d.close]));
+    const ethMap = new Map(ethData.map(d => [d.period, d.close]));
+    const allDates = [...new Set([...btcMap.keys(), ...ethMap.keys()])].sort();
+    return allDates.map(d => ({
+      period: d,
+      btc: btcMap.get(d) ?? null,
+      eth: ethMap.get(d) ?? null,
+    }));
+  }, [btcData, ethData]);
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
-        <DataCard label="₿ BTC" value={btcLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
-        <DataCard label="Ξ ETH" value={ethLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
-        <CardWrapper style={{ padding: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 BTC 合约</span>
-          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{fundingRaw || '暂无'}</pre>
-        </CardWrapper>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <DataCard label="₿ BTC" value={btcLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
+          <DataCard label="Ξ ETH" value={ethLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
+        </div>
+        <button onClick={() => setShowNorm(!showNorm)} style={{
+          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          background: showNorm ? 'var(--accent-gold)' : 'transparent',
+          color: showNorm ? '#000' : 'var(--text-secondary)',
+          border: '1px solid var(--border-subtle)', cursor: 'pointer',
+        }}>{showNorm ? '📊 归一化对比' : '📈 绝对值'}</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+      <CardWrapper style={{ padding: 12, marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 BTC 合约</span>
+        <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{fundingRaw || '暂无'}</pre>
+      </CardWrapper>
+
+      {showNorm ? (
         <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 BTC · 日线</h3>
-          <DataChart data={btcData} series={[{ key: 'close', name: 'BTC', color: '#D4A853', type: 'line' }]} dateKey="period" height={280} />
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 加密货币归一化走势 · 基期=100</h3>
+          <DataChart data={mergedData} series={[
+            { key: 'btc', name: 'BTC', color: '#D4A853', type: 'line' },
+            { key: 'eth', name: 'ETH', color: '#5B8FA8', type: 'line' },
+          ]} dateKey="period" height={280} normalize={true} normalizeBase="first" />
         </CardWrapper>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 ETH · 日线</h3>
-          <DataChart data={ethData} series={[{ key: 'close', name: 'ETH', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={280} />
-        </CardWrapper>
-      </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 BTC · 日线</h3>
+            <DataChart data={btcData} series={[{ key: 'close', name: 'BTC', color: '#D4A853', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
+          </CardWrapper>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 ETH · 日线</h3>
+            <DataChart data={ethData} series={[{ key: 'close', name: 'ETH', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={280} yAxisType="log" />
+          </CardWrapper>
+        </div>
+      )}
       {sentimentRaw && (
         <CardWrapper style={{ padding: 14, marginTop: 14, borderLeft: '3px solid var(--accent-red)' }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>📊 市场情绪指标</h3>
@@ -615,6 +681,7 @@ function CryptoSection() {
 }
 
 function ForexSection() {
+  const [showNorm, setShowNorm] = useState(false);
   const { data: usdcnyRaw } = useMCP('fx_history', { symbol: 'USDCNY', limit: 60 });
   const { data: eurusdRaw } = useMCP('fx_history', { symbol: 'EURUSD', limit: 60 });
   const { data: fredRaw } = useMCP('fred_data', { series: 'fred_gs10', limit: 60 });
@@ -623,18 +690,49 @@ function ForexSection() {
   const eurusdData = useMemo(() => parseFxHistory(eurusdRaw), [eurusdRaw]);
   const fredData = useMemo(() => parseFxHistory(fredRaw), [fredRaw]);
 
+  // 归一化对比：合并汇率数据到同一时间轴
+  const mergedFxData = useMemo(() => {
+    const cnyMap = new Map(usdcnyData.map(d => [d.period, d.value]));
+    const eurMap = new Map(eurusdData.map(d => [d.period, d.value]));
+    const allDates = [...new Set([...cnyMap.keys(), ...eurMap.keys()])].sort();
+    return allDates.map(d => ({
+      period: d,
+      usdcny: cnyMap.get(d) ?? null,
+      eurusd: eurMap.get(d) ?? null,
+    }));
+  }, [usdcnyData, eurusdData]);
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 USD/CNY 走势</h3>
-          <DataChart data={usdcnyData} series={[{ key: 'value', name: 'USDCNY', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
-        </CardWrapper>
-        <CardWrapper style={{ padding: 16 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 EUR/USD 走势</h3>
-          <DataChart data={eurusdData} series={[{ key: 'value', name: 'EURUSD', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={260} />
-        </CardWrapper>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button onClick={() => setShowNorm(!showNorm)} style={{
+          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          background: showNorm ? 'var(--accent-gold)' : 'transparent',
+          color: showNorm ? '#000' : 'var(--text-secondary)',
+          border: '1px solid var(--border-subtle)', cursor: 'pointer',
+        }}>{showNorm ? '📊 归一化对比' : '📈 绝对值'}</button>
       </div>
+
+      {showNorm ? (
+        <CardWrapper style={{ padding: 16, marginBottom: 14 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 汇率归一化走势 · 基期=100</h3>
+          <DataChart data={mergedFxData} series={[
+            { key: 'usdcny', name: 'USDCNY', color: '#D4A853', type: 'line' },
+            { key: 'eurusd', name: 'EURUSD', color: '#5B8FA8', type: 'line' },
+          ]} dateKey="period" height={260} normalize={true} normalizeBase="first" />
+        </CardWrapper>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 USD/CNY 走势</h3>
+            <DataChart data={usdcnyData} series={[{ key: 'value', name: 'USDCNY', color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
+          </CardWrapper>
+          <CardWrapper style={{ padding: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📈 EUR/USD 走势</h3>
+            <DataChart data={eurusdData} series={[{ key: 'value', name: 'EURUSD', color: '#5B8FA8', type: 'line' }]} dateKey="period" height={260} />
+          </CardWrapper>
+        </div>
+      )}
       <CardWrapper style={{ padding: 16, marginTop: 14 }}>
         <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>🇺🇸 美国10Y国债收益率 · FRED</h3>
         <DataChart data={fredData} series={[{ key: 'value', name: '10Y收益率', color: '#C47B7B', type: 'line' }]} dateKey="period" height={240} />

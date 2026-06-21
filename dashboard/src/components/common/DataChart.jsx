@@ -29,11 +29,17 @@ echarts.registerTheme('df-dark', {
  * @param {number} zoomStart   dataZoom 初始 start 百分比
  * @param {number} zoomEnd     dataZoom 初始 end 百分比
  * @param {object[]} annotations 拐点标注 [{ year, type:'peak'|'trough', label, detail }]
+ * @param {'value'|'log'} yAxisType  Y轴类型: value=线性, log=对数
+ * @param {boolean} normalize        是否归一化到基期100（多品种对比）
+ * @param {'first'|'last'} normalizeBase 归一化基期: first=首个有效值, last=最后有效值
  */
 export default function DataChart({
   data, series, dateKey = 'period', height = 400,
   zoom = true, zoomStart = 80, zoomEnd = 100,
   annotations,
+  yAxisType = 'value',
+  normalize = false,
+  normalizeBase = 'first',
 }) {
   const chartRef = useRef(null);
   useEffect(() => {
@@ -44,24 +50,39 @@ export default function DataChart({
     // 检测是否有 yAxisIndex > 0 的系列，有则启用双Y轴
     const hasDualY = series.some(s => s.yAxisIndex === 1);
 
+    // 归一化处理：将每个 series 的数据归一化为基期=100
+    const processedSeries = normalize
+      ? series.map(s => {
+          const rawVals = data.map(r => r[s.key]);
+          const validIdx = normalizeBase === 'last'
+            ? rawVals.findLastIndex(v => v != null && !isNaN(v) && v !== 0)
+            : rawVals.findIndex(v => v != null && !isNaN(v) && v !== 0);
+          const baseVal = validIdx >= 0 ? rawVals[validIdx] : null;
+          const normVals = baseVal
+            ? rawVals.map(v => (v != null && !isNaN(v)) ? (v / baseVal) * 100 : null)
+            : rawVals;
+          return { ...s, _normData: normVals };
+        })
+      : series;
+
     const option = {
       tooltip: { trigger: 'axis' },
-      legend: { data: series.map(s => s.name), bottom: 0 },
+      legend: { data: processedSeries.map(s => s.name), bottom: 0 },
       grid: { left: '8%', right: hasDualY ? '8%' : '5%', top: '10%', bottom: '15%', containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
       yAxis: hasDualY
         ? [
-            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: yAxisType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } } },
-            { type: 'value', name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: yAxisType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
               splitLine: { show: false } },
           ]
-        : { type: 'value' },
-      series: series.map((s, sIdx) => {
+        : { type: yAxisType },
+      series: processedSeries.map((s, sIdx) => {
         const entry = {
           name: s.name,
           type: s.type || 'line',
-          data: data.map(r => r[s.key]),
+          data: normalize ? s._normData : data.map(r => r[s.key]),
           smooth: true,
           connectNulls: true,
           lineStyle: { color: s.color, width: 2 },
@@ -171,6 +192,6 @@ export default function DataChart({
     }
     chart.setOption(option);
     return () => chart.dispose();
-  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations]);
+  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, yAxisType, normalize, normalizeBase]);
   return <div ref={chartRef} style={{ width: '100%', height }} />;
 }
