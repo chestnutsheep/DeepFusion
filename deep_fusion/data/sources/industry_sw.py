@@ -205,6 +205,31 @@ def get_constituents(industry_code: str) -> pd.DataFrame:
 #  成分股 + 当日行情聚合
 # ═══════════════════════════════════════════════════════
 
+def _fallback_hist_quotes(stock_codes: list, limit: int = 5) -> pd.DataFrame | None:
+    """Fallback：当实时行情不可用时，从 akshare 获取最近交易日的历史日行情。
+
+    对每个股票取最近1个交易日的收盘价、涨跌幅、换手率。
+    返回 DataFrame(columns: stock_code, close, change_pct, turnover_rate) 或 None。
+    """
+    rows = []
+    for code in stock_codes[:50]:  # 限制最多50只，避免超时
+        try:
+            df = ak.stock_zh_a_hist(symbol=code, period="daily", adjust="qfq")
+            if df is not None and not df.empty:
+                latest = df.iloc[-1]
+                rows.append({
+                    "stock_code": code,
+                    "close": latest.get("收盘", pd.NA),
+                    "change_pct": latest.get("涨跌幅", pd.NA),
+                    "turnover_rate": latest.get("换手率", pd.NA),
+                })
+        except Exception:
+            continue
+    if not rows:
+        return None
+    return pd.DataFrame(rows)
+
+
 def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
     """查询申万指数成分股并聚合当日行情（涨跌幅/最新价/换手率等）。
 
@@ -233,31 +258,47 @@ def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
     # Step 2b: SQLite 无数据时，fallback 到 akshare 实时 API
     if spot_renamed.empty:
         spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, key="stock_zh_a_spot_em")
+
         if spot is None or spot.empty:
-            # 无行情时仅返回成分股基础信息
-            cons = cons.copy()
-            cons["change_pct"] = pd.NA
-            cons["price"] = pd.NA
-            cons["turnover"] = pd.NA
-            cons["pe_dynamic"] = pd.NA
-            cons["pb"] = pd.NA
-            return cons.sort_values("weight", ascending=False).reset_index(drop=True)
+            # 实时行情不可用（休市/周末）→ fallback 到最近交易日历史数据
+            hist_quotes = _fallback_hist_quotes(codes)
+            if hist_quotes is not None and not hist_quotes.empty:
+                spot_renamed = hist_quotes.rename(columns={
+                    "stock_code": "stock_code",
+                    "close": "price",
+                    "change_pct": "change_pct",
+                    "turnover_rate": "turnover",
+                })
+                # 历史数据无 PE/PB，保留为 NA
+                if "pe_dynamic" not in spot_renamed.columns:
+                    spot_renamed["pe_dynamic"] = pd.NA
+                if "pb" not in spot_renamed.columns:
+                    spot_renamed["pb"] = pd.NA
+            else:
+                # 无行情也无历史 → 仅返回成分股基础信息
+                cons = cons.copy()
+                cons["change_pct"] = pd.NA
+                cons["price"] = pd.NA
+                cons["turnover"] = pd.NA
+                cons["pe_dynamic"] = pd.NA
+                cons["pb"] = pd.NA
+                return cons.sort_values("weight", ascending=False).reset_index(drop=True)
+        else:
+            # akshare 实时行情可用 → 行情列重命名
+            spot_renamed = spot.rename(columns={
+                "代码": "stock_code",
+                "最新价": "price",
+                "涨跌幅": "change_pct",
+                "换手率": "turnover",
+                "市盈率-动态": "pe_dynamic",
+                "市净率": "pb",
+            })
 
-        # 行情列重命名
-        spot_renamed = spot.rename(columns={
-            "代码": "stock_code",
-            "最新价": "price",
-            "涨跌幅": "change_pct",
-            "换手率": "turnover",
-            "市盈率-动态": "pe_dynamic",
-            "市净率": "pb",
-        })
-
-        # 同时存入 SQLite，下次直接命中
-        try:
-            db.save_spot_quotes(spot)
-        except Exception:
-            pass
+            # 同时存入 SQLite，下次直接命中
+            try:
+                db.save_spot_quotes(spot)
+            except Exception:
+                pass
 
     # 只保留需要的列
     quote_cols = ["stock_code", "price", "change_pct", "turnover", "pe_dynamic", "pb"]

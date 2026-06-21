@@ -42,12 +42,15 @@ export default function DataChart({
   normalize = false,
   normalizeBase = 'first',
   showYAxisToggle = true,
+  onPointClick,
 }) {
   const [activeYType, setActiveYType] = useState(yAxisType);
   const chartRef = useRef(null);
   useEffect(() => {
     if (!chartRef.current || !data?.length) return;
-    const chart = echarts.init(chartRef.current, 'df-dark');
+    // 获取已有实例或创建新实例（不每次 dispose）
+    let chart = echarts.getInstanceByDom(chartRef.current);
+    if (!chart) chart = echarts.init(chartRef.current, 'df-dark');
     const dates = data.map(r => r[dateKey]);
 
     // 检测是否有 yAxisIndex > 0 的系列，有则启用双Y轴
@@ -193,9 +196,30 @@ export default function DataChart({
         },
       ];
     }
-    chart.setOption(option);
-    return () => chart.dispose();
-  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, activeYType, normalize, normalizeBase]);
+    // notMerge=true 全量替换 option，确保 yAxis type 切换生效
+    chart.setOption(option, { notMerge: true });
+    chart.resize();
+
+    // 点击数据点回调
+    if (onPointClick) {
+      chart.off('click'); // 防止重复绑定
+      chart.on('click', (params) => {
+        if (params.componentType === 'series') {
+          onPointClick(params);
+        }
+      });
+    }
+  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, activeYType, normalize, normalizeBase, onPointClick]);
+
+  // 组件卸载时 dispose
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        const chart = echarts.getInstanceByDom(chartRef.current);
+        if (chart) chart.dispose();
+      }
+    };
+  }, []);
   return (
     <div style={{ position: 'relative', width: '100%', height }}>
       {showYAxisToggle && (

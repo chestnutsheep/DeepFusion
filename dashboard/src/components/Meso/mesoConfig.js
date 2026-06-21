@@ -14,7 +14,7 @@ export const BAROMETER_CARDS = {
 
 // ── 验证球（Checkpoint）配置 ──
 export const CHECKPOINT_CONFIG = {
-  industry: '种植业与林业',  // 二级行业名
+  industry: '证券',  // 二级行业名 — 使用数据覆盖更广的行业
   level: 2,
   lookbackDays: 2,           // 比较前2个交易日的方向
 };

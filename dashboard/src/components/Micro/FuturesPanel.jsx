@@ -1,4 +1,4 @@
-噢import {useMemo, useState} from 'react';
+import {useMemo, useState} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataCard from '../common/DataCard.jsx';

@@ -1,5 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {useMCP} from '../../hooks/useMCP';
+import {useAppStore} from '../../store/index.js';
 import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
@@ -308,13 +310,15 @@ function getCategoryOf(name) {
 
 // ── 下钻组件 ──
 
-/** 成分股下钻：查看二级行业的成分股及涨跌幅 */
+/** 成分股下钻：权重 treemap + 涨跌幅热色，点击跳转个股 */
 function ConstituentDrilldown({ target, onBack }) {
   // target: { industry_code, industry_name }
+  const navigate = useNavigate();
   const { data: consRaw, isLoading } = useMCP(
     'industry_sw_constituents_detail',
     target.industry_code ? { 行业代码: target.industry_code, limit: 200 } : null,
   );
+  const treemapRef = useRef(null);
 
   const constituents = useMemo(() => {
     if (!consRaw) return [];
@@ -344,40 +348,118 @@ function ConstituentDrilldown({ target, onBack }) {
     });
   }, [consRaw]);
 
-  const [sortKey, setSortKey] = useState('weight');
-  const [sortDesc, setSortDesc] = useState(true);
+  // 权重>=2% 的成分股用于 treemap
+  const treemapData = useMemo(() => {
+    return constituents
+      .filter(c => c.weight != null && c.weight >= 2)
+      .sort((a, b) => b.weight - a.weight);
+  }, [constituents]);
 
-  const sorted = useMemo(() => {
-    const arr = [...constituents];
-    arr.sort((a, b) => {
-      const va = a[sortKey] ?? -Infinity;
-      const vb = b[sortKey] ?? -Infinity;
-      return sortDesc ? vb - va : va - vb;
-    });
-    return arr;
-  }, [constituents, sortKey, sortDesc]);
-
-  const toggleSort = (key) => {
-    if (sortKey === key) setSortDesc(d => !d);
-    else { setSortKey(key); setSortDesc(true); }
-  };
+  // 权重<2% 的成分股汇总
+  const smallWeightCount = useMemo(() => {
+    return constituents.filter(c => c.weight != null && c.weight < 2).length;
+  }, [constituents]);
 
   const avgChange = constituents.length
     ? constituents.reduce((s, c) => s + (c.change_pct || 0), 0) / constituents.filter(c => c.change_pct != null).length
     : 0;
 
-  const SortTh = ({ label, field, align = 'right' }) => (
-    <th
-      onClick={() => toggleSort(field)}
-      style={{
-        textAlign: align, padding: '6px 8px', fontSize: 'var(--fs-xs)', color: 'var(--accent-gold)',
-        borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {label} {sortKey === field ? (sortDesc ? '↓' : '↑') : ''}
-    </th>
-  );
+  // 绘制 treemap
+  useEffect(() => {
+    if (!treemapRef.current || !treemapData.length) return;
+    let chart = echarts.getInstanceByDom(treemapRef.current);
+    if (!chart) chart = echarts.init(treemapRef.current, 'df-dark');
+
+    const data = treemapData.map(c => ({
+      name: c.name,
+      value: Math.max(0.5, c.weight),
+      itemStyle: { color: changeToColor(c.change_pct), borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
+      _code: c.code,
+      _change: c.change_pct,
+      _weight: c.weight,
+      _price: c.price,
+      _turnover: c.turnover,
+      _pe: c.pe,
+      _pb: c.pb,
+    }));
+
+    // 先移除旧的 click handler（在 setOption 之前，避免影响新 option 的事件绑定）
+    chart.off('click');
+
+    chart.setOption({
+      tooltip: {
+        formatter: p => {
+          const d = p.data;
+          if (!d) return '';
+          return `<div style="font-weight:700;font-size:14px">${d.name}</div>
+            <div style="font-size:12px;margin-top:4px">代码: ${d._code || '—'}</div>
+            <div style="font-size:12px">权重: ${d._weight != null ? d._weight.toFixed(2) + '%' : '—'}</div>
+            <div style="font-size:12px;color:${d._change >= 0 ? '#E85050' : '#3DBB6E'}">涨跌幅: ${d._change != null ? (d._change >= 0 ? '+' : '') + d._change.toFixed(2) + '%' : '—'}</div>
+            <div style="font-size:12px">最新价: ${d._price != null ? d._price.toFixed(2) : '—'}</div>
+            <div style="font-size:12px">换手率: ${d._turnover != null ? d._turnover.toFixed(2) + '%' : '—'}</div>
+            <div style="font-size:12px">PE: ${d._pe != null ? d._pe.toFixed(1) : '—'}  PB: ${d._pb != null ? d._pb.toFixed(2) : '—'}</div>
+            <div style="font-size:11px;color:#D4A853;margin-top:4px">点击查看个股分析</div>`;
+        },
+        backgroundColor: 'rgba(26,47,42,0.95)',
+        borderColor: 'rgba(212,168,83,0.2)',
+        textStyle: { color: '#CBC0B0' },
+        extraCssText: 'border-radius:8px;padding:10px 14px;',
+      },
+      series: [{
+        type: 'treemap',
+        data,
+        roam: false,
+        nodeClick: false, // 禁用 zoom，但 click 事件仍会触发
+        breadcrumb: { show: false },
+        label: {
+          show: true,
+          formatter: p => {
+            const d = p.data;
+            return `${d.name}\n${d._weight != null ? d._weight.toFixed(1) + '%' : ''}`;
+          },
+          fontSize: 14,
+          color: '#141414',
+          fontWeight: 600,
+        },
+        upperLabel: { show: false },
+        itemStyle: { borderColor: 'rgba(212,168,83,0.15)', borderWidth: 1, gapWidth: 2 },
+      }],
+    }, { notMerge: true });
+
+    // setOption 之后再绑定 click 事件
+    chart.on('click', (params) => {
+      const code = params?.data?._code;
+      console.log('[ConstituentDrilldown] treemap click:', params?.data?.name, 'code:', code);
+      if (code) {
+        const store = useAppStore.getState();
+        // 先设置 store 状态，再通过 navigate 切换路由
+        // 必须调用 navigate，否则 URL 仍是 /meso，StockPanel 不会挂载
+        store.setActiveMicroSub('stock');
+        store.setStockSearchKeyword(code);
+        store.setActiveTab('micro');
+        navigate('/micro');
+        console.log('[ConstituentDrilldown] 已触发跳转:', code);
+      }
+    });
+
+    return () => {
+      // cleanup 时移除所有 click handler
+      if (treemapRef.current) {
+        const ch = echarts.getInstanceByDom(treemapRef.current);
+        if (ch) ch.off('click');
+      }
+    };
+  }, [treemapData]);
+
+  // 组件卸载时 dispose
+  useEffect(() => {
+    return () => {
+      if (treemapRef.current) {
+        const chart = echarts.getInstanceByDom(treemapRef.current);
+        if (chart) chart.dispose();
+      }
+    };
+  }, []);
 
   return (
     <div>
@@ -388,67 +470,23 @@ function ConstituentDrilldown({ target, onBack }) {
           color: 'var(--accent-gold)', cursor: 'pointer',
         }}>← 返回二级行业</button>
         <span style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>{target.industry_name}</span>
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· 成分股当日行情</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>· 成分股权重分布</span>
         {constituents.length > 0 && (
           <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 'auto',
             color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)'
           }}>
-            均涨 {avgChange.toFixed(2)}% · {constituents.length} 只
+            均涨 {avgChange.toFixed(2)}% · {constituents.length} 只 · 权重≥2% {treemapData.length} 只
+            {smallWeightCount > 0 ? ` · <2% ${smallWeightCount}只已忽略` : ''}
           </span>
         )}
       </div>
       {isLoading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
-      ) : sorted.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-sm)', minWidth: 580 }}>
-            <thead>
-              <tr>
-                <SortTh label="代码" field="code" align="left" />
-                <SortTh label="名称" field="name" align="left" />
-                <SortTh label="权重" field="weight" />
-                <SortTh label="涨跌幅" field="change_pct" />
-                <SortTh label="最新价" field="price" />
-                <SortTh label="换手率" field="turnover" />
-                <SortTh label="PE" field="pe" />
-                <SortTh label="PB" field="pb" />
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((c, idx) => (
-                <tr key={c.code} style={idx === 0 ? { background: 'var(--shadow-glow)' } : {}}>
-                  <td style={{ padding: '5px 8px', fontWeight: 600, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{c.code}</td>
-                  <td style={{ padding: '5px 8px', fontWeight: 600, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>{c.name}</td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-                    {c.weight != null ? c.weight.toFixed(2) : '—'}
-                  </td>
-                  <td style={{
-                    padding: '5px 8px', textAlign: 'right', fontWeight: 700,
-                    color: c.change_pct != null ? (c.change_pct >= 0 ? 'var(--accent-red)' : 'var(--accent-green)') : 'var(--text-muted)',
-                    borderBottom: '1px solid rgba(212,168,83,0.04)',
-                  }}>
-                    {c.change_pct != null ? `${c.change_pct >= 0 ? '+' : ''}${c.change_pct.toFixed(2)}%` : '—'}
-                  </td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-                    {c.price != null ? c.price.toFixed(2) : '—'}
-                  </td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-                    {c.turnover != null ? c.turnover.toFixed(2) : '—'}
-                  </td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-                    {c.pe != null ? c.pe.toFixed(1) : '—'}
-                  </td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
-                    {c.pb != null ? c.pb.toFixed(2) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : treemapData.length > 0 ? (
+        <div ref={treemapRef} style={{ width: '100%', height: Math.max(300, treemapData.length * 18 + 60) }} />
       ) : (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          暂无成分股数据
+          暂无成分股数据（权重≥2%）
         </div>
       )}
     </div>

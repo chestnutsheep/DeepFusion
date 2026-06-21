@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
+import {useAppStore} from '../../store/index.js';
 import DataGrid from '../common/DataGrid.jsx';
 import DataChart from '../common/DataChart.jsx';
 import {STOCK_FINANCE_CONFIG} from '../../configs/stockFinance.js';
@@ -89,6 +90,19 @@ export default function StockPanel() {
   const [market, setMarket] = useState('sh');
   const [showAntiFraud, setShowAntiFraud] = useState(false);
   const debounceRef = useRef(null);
+
+  // 从 store 读取跨页面跳转的搜索关键词
+  const storeKeyword = useAppStore((s) => s.stockSearchKeyword);
+  useEffect(() => {
+    if (storeKeyword) {
+      console.log('[StockPanel] 接收到跳转关键词:', storeKeyword);
+      setKeyword(storeKeyword);
+      setSymbol(storeKeyword);
+      setMarket(guessMarket(storeKeyword));
+      // 清空 store 中的关键词，避免重复触发
+      useAppStore.getState().setStockSearchKeyword('');
+    }
+  }, [storeKeyword]);
 
   // 搜索：仅 keyword 非空且不是纯代码时触发
   const isCode = isStockCode(keyword);

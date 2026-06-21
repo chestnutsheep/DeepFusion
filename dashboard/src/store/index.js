@@ -9,6 +9,8 @@ export const useAppStore = create((set) => ({
   activeGlobalSub: 'stress',
   historyMode: null,
   theme: 'matin',
+  sidebarCollapsed: false,
+  stockSearchKeyword: '',
   setActiveTab: (tab) => set({ activeTab: tab }),
   setActiveMacroSub: (sub) => set({ activeMacroSub: sub }),
   setActiveMesoSub: (sub) => set({ activeMesoSub: sub }),
@@ -17,4 +19,11 @@ export const useAppStore = create((set) => ({
   setActiveGlobalSub: (sub) => set({ activeGlobalSub: sub }),
   setHistoryMode: (mode) => set({ historyMode: mode }),
   setTheme: (theme) => set({ theme }),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setStockSearchKeyword: (kw) => set({ stockSearchKeyword: kw }),
 }));
+
+// 暴露到 window 便于调试和端到端测试
+if (typeof window !== 'undefined') {
+  window.__APP_STORE__ = useAppStore;
+}
