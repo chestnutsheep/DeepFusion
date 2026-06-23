@@ -1,7 +1,11 @@
 """Cycle indicator cache layer — SQLite-backed, permanent storage.
 
-Data collected once stays forever. Manual/scheduled re-collect replaces rows.
-No "expiry" — historical macro data doesn't change.
+原始数据(Actual)永不过期，入库后持久保存，手动/定时重采追加新行。
+处理数据(Derived)由 freshness 模块管理版本号和 TTL。
+
+DB-first 路径改进：
+  - 原始数据：永不过期，但检查是否有新数据可追加（增量更新）
+  - get_latest_date() 提供最新日期，供 freshness.needs_incremental_update() 判断
 """
 from __future__ import annotations
 
@@ -116,7 +120,7 @@ def _ensure_schema(conn: sqlite3.Connection):
 
 
 def get(indicator: str) -> pd.DataFrame | None:
-    """读 DB，有数据直接返回，不过期概念。"""
+    """读 DB，有数据直接返回。原始数据永不过期。"""
     conn = _connect()
     df = pd.read_sql(
         "SELECT date, value FROM cycle_data WHERE indicator=? ORDER BY date",
@@ -124,6 +128,48 @@ def get(indicator: str) -> pd.DataFrame | None:
     )
     conn.close()
     return df if not df.empty else None
+
+
+def get_latest_date(indicator: str) -> str | None:
+    """获取 DB 中某指标的最新日期（用于增量更新检查）。"""
+    conn = _connect()
+    cursor = conn.execute(
+        "SELECT MAX(date) FROM cycle_data WHERE indicator=?",
+        (indicator,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row and row[0] else None
+
+
+def append(indicator: str, dates: list[str], values: list[float]) -> int:
+    """增量追加新数据行（仅插入 DB 中不存在的新日期，不覆盖已有行）。
+
+    返回实际新增行数。
+    """
+    conn = _connect()
+    existing = set(
+        r[0] for r in conn.execute(
+            "SELECT date FROM cycle_data WHERE indicator=?",
+            (indicator,),
+        ).fetchall()
+    )
+    new_pairs = [
+        (indicator, d, v) for d, v in zip(dates, values)
+        if v is not None and d not in existing
+    ]
+    if new_pairs:
+        conn.executemany(
+            "INSERT OR REPLACE INTO cycle_data (indicator, date, value) VALUES (?, ?, ?)",
+            new_pairs,
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO cycle_cache (indicator, cached_at) VALUES (?, ?)",
+            (indicator, datetime.now().isoformat()),
+        )
+        conn.commit()
+    conn.close()
+    return len(new_pairs)
 
 
 def set(indicator: str, dates: list[str], values: list[float]):

@@ -120,7 +120,7 @@ for _cid in ["kitchin", "juglar", "kuznets"]:
     description="获取基钦周期（库存周期）各阶段定位数据（JSON数组）",
 )
 def data_kitchin() -> str:
-    _ck = CacheKey.init("cycles_data_kitchin", ttl=604800, ttl2=2592000)
+    _ck = CacheKey.init("cycles_data_kitchin_v2", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -141,7 +141,7 @@ def data_kitchin() -> str:
     description="获取朱格拉周期（固定资本投资周期）各阶段定位数据（JSON数组）",
 )
 def data_juglar() -> str:
-    _ck = CacheKey.init("cycles_data_juglar", ttl=604800, ttl2=2592000)
+    _ck = CacheKey.init("cycles_data_juglar_v2", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -162,7 +162,7 @@ def data_juglar() -> str:
     description="获取库兹涅茨周期（房地产周期）各阶段定位数据（JSON数组）",
 )
 def data_kuznets() -> str:
-    _ck = CacheKey.init("cycles_data_kuznets", ttl=604800, ttl2=2592000)
+    _ck = CacheKey.init("cycles_data_kuznets_v2", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -407,9 +407,9 @@ def cycle_collect() -> str:
     # ── 高级缓存器：预热各周期分析计算结果 ──
     lines.append("")
     lines.append("=== 计算结果预热 ===")
-    for cid, ckey in [("kitchin", "cycles_data_kitchin"),
-                      ("juglar", "cycles_data_juglar"),
-                      ("kuznets", "cycles_data_kuznets")]:
+    for cid, ckey in [("kitchin", "cycles_data_kitchin_v2"),
+                      ("juglar", "cycles_data_juglar_v2"),
+                      ("kuznets", "cycles_data_kuznets_v2")]:
         try:
             _ck = CacheKey.init(ckey, ttl=604800, ttl2=2592000)
             if _ck.get() is None:

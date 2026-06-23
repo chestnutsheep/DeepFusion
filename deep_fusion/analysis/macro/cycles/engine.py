@@ -150,15 +150,36 @@ class IndicatorDef:
         if self.fetch_fn:
             self._cache = self.fetch_fn()
         elif self.akshare_fn:
-            # DB-first: 先查 cycle_data.db，有数据直接返回，不重复拉 akshare
+            # DB-first + 增量更新：
+            # 原始数据(Actual)永不过期，但检查是否有新数据可追加
             from ....shared.cycle_db import get as db_get, set as db_set
+            from ....shared.cycle_db import get_latest_date, append as db_append
+            from ....shared.freshness import needs_incremental_update
+
             db_data = db_get(self.key)
             if db_data is not None and not db_data.empty:
+                db_latest = get_latest_date(self.key)
+                # 检查是否需要增量更新
+                if needs_incremental_update(self.key, db_latest):
+                    try:
+                        df, col = _ak_safe(self.akshare_fn, self.akshare_col or "")
+                        new_periods, new_values = _parse_ak(df, col)
+                        if new_periods:
+                            added = db_append(self.key, new_periods, new_values)
+                            if added > 0:
+                                logger.info("IndicatorDef.fetch: %s 增量追加 %d 行 (DB最新=%s)",
+                                            self.key, added, db_latest)
+                                # 重新读取更新后的 DB 数据
+                                db_data = db_get(self.key)
+                    except Exception as e:
+                        logger.warning("IndicatorDef.fetch: %s 增量更新失败: %s, 使用DB旧数据",
+                                       self.key, e)
+                # 返回 DB 数据（可能已增量更新）
                 dates = db_data["date"].astype(str).tolist()
                 vals = [float(v) if v is not None else None for v in db_data["value"]]
                 self._cache = dates, vals
                 return self._cache
-            # DB 无数据，走 akshare
+            # DB 无数据，走 akshare 全量拉取
             df, col = _ak_safe(self.akshare_fn, self.akshare_col or "")
             periods, values = _parse_ak(df, col)
             if periods:

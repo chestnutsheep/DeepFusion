@@ -1,3 +1,5 @@
+import logging
+
 import akshare as ak
 import pandas as pd
 from pydantic import Field
@@ -5,6 +7,8 @@ from pydantic import Field
 from .. import data_lake
 from ..server import mcp
 from ..shared.utils import ak_cache
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_ascending(df):
@@ -60,14 +64,40 @@ def _fetch_with_priority(
         akshare_ttl=604800,
         akshare_ttl2=1209600,
 ):
-    """优先从 data_lake SQLite 取数据（永不过期），无数据时才从 akshare 拉取并入库。"""
+    """优先从 data_lake SQLite 取数据（原始数据永不过期），检查增量更新。
+
+    新鲜度策略：
+    1. DB 有数据 → 检查是否需要增量更新（基于 freshness 模块的频率分级）
+    2. 需要更新 → 从 akshare 拉取新数据，追加到 data_lake（INSERT OR REPLACE）
+    3. 不需要更新 → 直接返回 DB 数据
+    4. DB 无数据 → 全量拉取并入库
+    5. akshare 也失败 → 降级返回 DB 旧数据（data_lake_stale）
+    """
+    from .shared.freshness import needs_incremental_update
+
     df = None
     source = None
 
     if data_lake.has_data(indicator):
-        df = data_lake.query(indicator, limit=0)  # 取全量再本地裁剪，避免 SQL LIMIT 顺序问题
-        df = _restore_from_data_lake(df)  # 从 data_lake 内部结构恢复为原始多列格式
-        source = "data_lake"
+        # 检查是否需要增量更新
+        db_latest = data_lake.get_latest_period(indicator)
+        if needs_incremental_update(indicator, db_latest):
+            try:
+                if akshare_fn:
+                    raw = ak_cache(akshare_fn, ttl=akshare_ttl, ttl2=akshare_ttl2, force=True)
+                    if raw is not None and not raw.empty:
+                        data_lake.store(indicator, raw, source="akshare_incremental")
+                        df = data_lake.query(indicator, limit=0)
+                        df = _restore_from_data_lake(df)
+                        source = "data_lake_incremental"
+            except Exception as e:
+                logger.warning("_fetch_with_priority: %s 增量更新失败: %s", indicator, e)
+
+        # 如果增量更新失败或不需要更新，使用 DB 数据
+        if df is None or df.empty:
+            df = data_lake.query(indicator, limit=0)
+            df = _restore_from_data_lake(df)
+            source = "data_lake"
 
     if df is None or df.empty:
         try:

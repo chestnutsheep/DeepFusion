@@ -6,14 +6,16 @@
 - 测试：14 个测试文件，128 个用例
 
 ## 缓存策略
-- 行业模块（industry_sw.py）所有函数统一 ttl=86400（24h 长期缓存），包括 get_daily_analysis（2026-06-13 从 3600 改为 86400）
-- 康波缓存键含版本号，改算法须 +1 版本号
-- 其它周期暂无版本锁定
+- 行业模块（industry_sw.py）所有函数统一 ttl=86400（24h 长期缓存），包括 get_daily_analysis
+- **所有周期缓存键含版本号**（2026-06-24）：基钦v2/朱格拉v2/库兹涅茨v2/康波v5/嵌套v3，改算法须+1版本号
 - `data_lake.db` 在 `~/.cache/deep_fusion/`，永不过期
 - `cycle_data.db` 在 `~/output/data/`，永不过期，NBS/akshare 数据的持久层
-- **ak_cache key 生成**：`ttl`/`ttl2`/`force` 在拼 key 前被 pop，不污染缓存键（2026-06-15 修复）
-- **ak_cache force 参数**：`ak_cache(..., force=True)` 绕过缓存直接调 API（2026-06-15 新增）
-- **行业采集增量**：collect_all_industry_daily 检查 DB 新鲜度，DB 最新则跳过，有旧数据则从最后日期增量拉取（2026-06-15 新增）
+- **数据分类与新鲜度机制**（2026-06-24）：原始数据(Actual)永不过期+增量追加；处理数据(Derived)版本号锁定+TTL分级
+- 管理模块：`deep_fusion/shared/freshness.py`（99项注册表）
+- **DB-first增量更新**：`IndicatorDef.fetch()` 和 `_fetch_with_priority()` 检查 `needs_incremental_update()`，按频率分级检查间隔
+- **ak_cache key 生成**：`ttl`/`ttl2`/`force` 在拼 key 前被 pop，不污染缓存键
+- **ak_cache force 参数**：`ak_cache(..., force=True)` 绕过缓存直接调 API
+- **行业采集增量**：collect_all_industry_daily 检查 DB 新鲜度，增量拉取
 
 ## akshare 列名对照（易错！）
 - `macro_china_pmi` → 制造业指数列名是 `制造业-指数`（不是 `制造业采购经理人指数`）

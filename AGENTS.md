@@ -51,8 +51,50 @@ This project uses Git. See .gitignore for excluded files.
 
 **不要直接改这些缓存键**。以后如果改 `compute_kondratiev()` 的算法逻辑，记得在 `cycles.py` 里把对应的版本号 +1，否则前端会一直看到旧数据。
 
-### 其它周期
-基钦/朱格拉/库兹涅茨沿用各自的缓存策略，暂无需版本锁定。如有重大算法调整，参照康波的做法加版本号。
+### 所有周期：缓存版本锁定 (2026-06-24)
+
+基钦/朱格拉/库兹涅茨也已加版本号，与康波一致：
+
+| 函数 | 缓存键格式 | 当前版本 |
+|------|-----------|---------|
+| `data_kitchin()` | `cycles_data_kitchin_v{N}` | v2 |
+| `data_juglar()` | `cycles_data_juglar_v{N}` | v2 |
+| `data_kuznets()` | `cycles_data_kuznets_v{N}` | v2 |
+| `data_kitchin_extended()` | `cycles_data_kitchin_extended_v{N}` | v1 |
+| `data_juglar_extended()` | `cycles_data_juglar_extended_v{N}` | v1 |
+| `data_kuznets_extended()` | `cycles_data_kuznets_extended_v{N}` | v1 |
+| `cycle_nesting()` | `cycles_nesting_v{N}` | v3 |
+
+**修改算法逻辑时，必须 +1 版本号**。版本号变更记录在 `deep_fusion/shared/freshness.py` 的 `DATA_CLASSIFICATION` 注册表中。
+
+### 数据分类与新鲜度机制 (2026-06-24)
+
+核心原则：**原始数据(Actual)永不过期，处理/信号数据(Derived)需新鲜度机制**。
+
+管理模块：`deep_fusion/shared/freshness.py`
+
+#### 原始数据 (Actual) — 永不过期，增量追加
+
+- PMI、CPI、GDP、行业K线等历史事实数据 → 入永久库（cycle_cache.db / data_lake.db / industry_data.db）
+- DB-first 路径改进：不再"有数据就返回不拉取"，而是检查 `needs_incremental_update()`
+- 增量检查间隔按数据频率分级：实时5分钟、日频4小时、月频3天、季频15天、年频60天
+- 增量追加用 `INSERT OR REPLACE`，只追加新日期，不删旧行
+
+#### 处理/信号数据 (Derived) — 版本号锁定 + TTL 分级
+
+- 相位判定、zscore、技术指标、聚类结果 → 版本号锁定缓存键
+- TTL 按计算量分级：轻量1h/1d、中量7d/30d、重量1d/7d
+- 修改算法时 +1 版本号，旧缓存自动失效
+
+#### 关键代码修改
+
+| 文件 | 修改内容 |
+|------|---------|
+| `shared/freshness.py` | 新增：数据分类注册表 + 新鲜度判定函数 |
+| `shared/cycle_db.py` | 新增：`get_latest_date()` + `append()` 增量追加 |
+| `analysis/macro/cycles/engine.py` | `IndicatorDef.fetch()` 从"DB-first永不过期"改为"DB-first+增量更新" |
+| `tools/cycles.py` | 基钦/朱格拉/库兹涅茨缓存键加版本号(v2) |
+| `tools/macro.py` | `_fetch_with_priority()` 加入增量更新检查 |
 
 ### 代码架构：去重与共享模块 (2026-06-12)
 
