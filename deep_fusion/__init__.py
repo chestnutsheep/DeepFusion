@@ -34,8 +34,10 @@ from .tools import (
     market,
     portfolio,
     precious_metals,
+    spectral,
     stock_reports,
     stocks,
+    tech_indicators,
 )
 
 __all__ = [
@@ -56,8 +58,10 @@ __all__ = [
     "precious_metals",
     "prompts",
     "resources",
+    "spectral",
     "stock_reports",
     "stocks",
+    "tech_indicators",
 ]
 
 

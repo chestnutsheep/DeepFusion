@@ -191,7 +191,9 @@ def data_kitchin_extended() -> str:
     from ..analysis.macro.cycles.kondratiev import compute_kitchin_extended
     _, rows = compute_kitchin_extended()
     text = json.dumps(rows, ensure_ascii=False)
-    _ck.set(text)
+    # 仅在非空时缓存，避免数据加载临时失败导致空结果被长期缓存
+    if rows:
+        _ck.set(text)
     return text
 
 
@@ -207,7 +209,9 @@ def data_juglar_extended() -> str:
     from ..analysis.macro.cycles.kondratiev import compute_juglar_extended
     _, rows = compute_juglar_extended()
     text = json.dumps(rows, ensure_ascii=False)
-    _ck.set(text)
+    # 仅在非空时缓存，避免数据加载临时失败导致空结果被长期缓存
+    if rows:
+        _ck.set(text)
     return text
 
 
@@ -223,7 +227,9 @@ def data_kuznets_extended() -> str:
     from ..analysis.macro.cycles.kondratiev import compute_kuznets_extended
     _, rows = compute_kuznets_extended()
     text = json.dumps(rows, ensure_ascii=False)
-    _ck.set(text)
+    # 仅在非空时缓存，避免数据加载临时失败导致空结果被长期缓存
+    if rows:
+        _ck.set(text)
     return text
 
 
@@ -741,5 +747,7 @@ def data_kondratiev(
         })
 
     text = json.dumps(rows, ensure_ascii=False)
-    _ck.set(text)
+    # 仅在非空时缓存，避免数据加载临时失败导致空结果被长期缓存
+    if rows:
+        _ck.set(text)
     return text

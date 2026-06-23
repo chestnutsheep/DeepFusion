@@ -1,13 +1,27 @@
-import { useMCP } from '../../hooks/useMCP.js';
-import { MACRO_SNAPSHOT_CONFIG } from '../../configs/macroSnapshot.js';
+import {useMCP} from '../../hooks/useMCP.js';
+import {MACRO_SNAPSHOT_CONFIG} from '../../configs/macroSnapshot.js';
 import DataGrid from '../common/DataGrid.jsx';
 
 function parseLatest(csv, colIdx = 1) {
   if (!csv) return null;
   const lines = csv.trim().split('\n');
+  if (lines.length < 2) return null;
   const last = lines[lines.length - 1];
   const parts = last.split(',');
   return parts[colIdx] || null;
+}
+
+// 按列名查找最新值（更稳健，避免列顺序变化导致取错）
+function parseLatestByHeader(csv, colName) {
+  if (!csv) return null;
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return null;
+  const headers = lines[0].split(',');
+  const idx = headers.findIndex(h => h === colName || h.includes(colName));
+  if (idx < 0) return null;
+  const last = lines[lines.length - 1];
+  const parts = last.split(',');
+  return parts[idx] || null;
 }
 
 export default function MacroSnapshot() {
@@ -17,9 +31,9 @@ export default function MacroSnapshot() {
   const inv = useMCP('macro_inventory_growth', { limit: 1 });
 
   const data = {
-    gdp: parseLatest(gdp.data, 2),  // col 2 = 同比增长, col 1 = 绝对值
-    cpi: parseLatest(cpi.data, 1),  // col 1 = value
-    pmi: parseLatest(pmi.data, 1),  // col 1 = value
+    gdp: parseLatestByHeader(gdp.data, '同比增长'),      // GDP 同比增长
+    cpi: parseLatestByHeader(cpi.data, '全国-同比增长'),  // CPI 当月同比
+    pmi: parseLatestByHeader(pmi.data, '制造业-指数'),    // 制造业 PMI 指数
     inventory: parseLatest(inv.data, 1),
   };
   return <DataGrid config={MACRO_SNAPSHOT_CONFIG} data={data} prevData={{}} columns={4} />;

@@ -97,6 +97,20 @@ def store(indicator: str, df: pd.DataFrame, source: str = "akshare"):
     conn = _get_conn()
     now = datetime.now().isoformat()
     rows = 0
+    # 识别时间列：优先第一列（akshare 惯例），其次匹配常见时间列名
+    time_col = None
+    if len(df.columns) > 0:
+        first_col = str(df.columns[0])
+        # 第一列通常是时间列（月份/季度/日期/年份等）
+        if any(kw in first_col for kw in ["月", "季", "日期", "年份", "date", "period", "time", "year"]):
+            time_col = df.columns[0]
+        else:
+            # 回退：在所有列中找第一个匹配的时间列
+            for col in df.columns:
+                col_str = str(col)
+                if any(kw in col_str for kw in ["月份", "季度", "日期", "年份"]) or col_str in ("date", "period", "time"):
+                    time_col = col
+                    break
     for _, row in df.iterrows():
         metadata = {}
         period = None
@@ -104,8 +118,9 @@ def store(indicator: str, df: pd.DataFrame, source: str = "akshare"):
             v = row[col]
             if v is None or (isinstance(v, float) and pd.isna(v)):
                 continue
-            if "月" in str(col) or col in ("日期", "period", "index"):
-                period = str(v)[:6] if v else None
+            if col == time_col:
+                # 时间列：保留完整值（不截断），用于排序和展示
+                period = str(v) if v else None
             else:
                 try:
                     float(v)

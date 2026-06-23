@@ -1,4 +1,6 @@
-"""Industry daily statistics pipeline: fetch THS K-lines, compute rolling stats, store in PG."""
+"""⚠️ DEPRECATED: 依赖 PostgreSQL，项目已迁移到 SQLite。
+7种衍生统计(波动率/回撤/量比/动量评分/胜率/排名分位/信号标签)尚未被 MCP 工具覆盖，待迁移后删除。
+保留此文件作为迁移参考。"""
 import sys
 import time
 from datetime import datetime, date

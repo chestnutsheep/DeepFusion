@@ -7,6 +7,52 @@ from ..server import mcp
 from ..shared.utils import ak_cache
 
 
+def _ensure_ascending(df):
+    """确保 DataFrame 按第一列（时间列）升序排列（最旧在前）。
+
+    akshare 各接口返回顺序不一致：
+      - GDP/CPI/PMI: 最新在前（降序）
+      - LPR: 最旧在前（升序）
+    统一转为升序，保证 tail(limit) 取到的是最新 N 条。
+    """
+    if df is None or df.empty or len(df) < 2:
+        return df
+    first_col = df.columns[0]
+    first_val = str(df[first_col].iloc[0])
+    last_val = str(df[first_col].iloc[-1])
+    # 如果第一个值比最后一个值大，说明是降序，需要反转
+    if first_val > last_val:
+        df = df.iloc[::-1].reset_index(drop=True)
+    return df
+
+
+def _restore_from_data_lake(df):
+    """从 data_lake 的内部结构 (period, value, metadata, source) 恢复为原始多列格式。
+
+    data_lake.store() 将 akshare 的多列数据压缩为 metadata JSON，
+    此函数将其解压回原始列结构，保证 macro_gdp/cpi/pmi 等工具输出格式一致。
+    """
+    if df is None or df.empty:
+        return df
+    # 检测是否为 data_lake 内部结构
+    if list(df.columns) != ['period', 'value', 'metadata', 'source']:
+        return df
+    import json
+    rows = []
+    for _, row in df.iterrows():
+        try:
+            meta = json.loads(row['metadata']) if isinstance(row['metadata'], str) else row['metadata']
+        except (json.JSONDecodeError, TypeError):
+            meta = {}
+        # period 作为第一列，metadata 中的字段作为后续列
+        restored = {'period': row['period']}
+        for k, v in meta.items():
+            restored[k] = v
+        rows.append(restored)
+    result = pd.DataFrame(rows)
+    return result
+
+
 def _fetch_with_priority(
         indicator: str,
         akshare_fn,
@@ -19,10 +65,11 @@ def _fetch_with_priority(
     source = None
 
     if data_lake.has_data(indicator):
-        df = data_lake.query(indicator, limit=limit)
+        df = data_lake.query(indicator, limit=0)  # 取全量再本地裁剪，避免 SQL LIMIT 顺序问题
+        df = _restore_from_data_lake(df)  # 从 data_lake 内部结构恢复为原始多列格式
         source = "data_lake"
 
-    if df is None:
+    if df is None or df.empty:
         try:
             if akshare_fn:
                 raw = ak_cache(akshare_fn, ttl=akshare_ttl, ttl2=akshare_ttl2)
@@ -33,10 +80,13 @@ def _fetch_with_priority(
         except Exception as e:
             pass
 
-    if df is None:
-        df = data_lake.query(indicator, limit=limit)
+    if (df is None or df.empty) and data_lake.has_data(indicator):
+        df = data_lake.query(indicator, limit=0)
+        df = _restore_from_data_lake(df)
         source = "data_lake_stale"
 
+    # 统一转为升序（最旧在前），再 tail(limit) 取最新 N 条
+    df = _ensure_ascending(df)
     if df is not None and limit > 0:
         df = df.tail(limit)
     return df, source
@@ -162,9 +212,16 @@ def macro_monetary(
         results["LPR利率"] = lpr.tail(limit).to_csv(index=False, float_format="%.2f")
         data_lake.store("LPR", lpr)
 
-    unemp, _ = _fetch_with_priority("UNEMPLOYMENT", None, limit=limit)
+    unemp, _ = _fetch_with_priority("UNEMPLOYMENT", ak.macro_china_urban_unemployment, limit=limit)
     if unemp is not None and not unemp.empty:
         results["城镇调查失业率"] = unemp.to_csv(index=False, float_format="%.2f")
+    else:
+        # akshare 接口有 bug，从 cycle_db 缓存取 NBS 数据
+        from ..shared.cycle_db import get as cycle_db_get
+        unemp_db = cycle_db_get("unemployment")
+        if unemp_db is not None and not unemp_db.empty:
+            unemp_db = unemp_db.tail(limit)
+            results["城镇调查失业率"] = unemp_db.to_csv(index=False, float_format="%.2f")
 
     fx = ak_cache(ak.macro_china_fx_reserves_yearly, ttl=604800, ttl2=1209600)
     if fx is not None and not fx.empty:
@@ -288,10 +345,17 @@ def macro_industrial_value_add(
 def macro_inventory_growth(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    # 优先从 NBS API 获取（已修复新接口 stream/esData）
     df, _ = _fetch_with_priority("INVENTORY", None, limit=limit)
-    if df is None or df.empty:
-        return ""
-    return df.to_csv(index=False, float_format="%.2f")
+    if df is not None and not df.empty:
+        return df.to_csv(index=False, float_format="%.2f")
+    # NBS API 失败时，从 cycle_db 缓存降级
+    from ..shared.cycle_db import get as cycle_db_get
+    inv_db = cycle_db_get("inventory_yoy")
+    if inv_db is not None and not inv_db.empty:
+        inv_db = inv_db.tail(limit)
+        return inv_db.to_csv(index=False, float_format="%.2f")
+    return ""
 
 
 @mcp.tool(
@@ -301,7 +365,7 @@ def macro_inventory_growth(
 def macro_fixed_investment(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
-    df, _ = _fetch_with_priority("FIXED_INVESTMENT", None,
+    df, _ = _fetch_with_priority("FIXED_INVESTMENT", ak.macro_china_gdzctz,
                                  limit=limit)
     if df is None or df.empty:
         return ""

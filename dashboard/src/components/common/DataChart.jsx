@@ -32,7 +32,8 @@ echarts.registerTheme('df-dark', {
  * @param {'value'|'log'} yAxisType  Y轴类型: value=线性, log=对数（初始值，可被切换按钮覆盖）
  * @param {boolean} normalize        是否归一化到基期100（多品种对比）
  * @param {'first'|'last'} normalizeBase 归一化基期: first=首个有效值, last=最后有效值
- * @param {boolean} showYAxisToggle  是否显示 Y轴 线性/对数 切换按钮
+ * @param {boolean} showYAxisToggle  是否显示 Y轴 线性/对数/收益率 切换按钮
+ * @param {boolean} enableReturnMode 是否启用对数收益率模式（突出每日变化方向）
  */
 export default function DataChart({
   data, series, dateKey = 'period', height = 400,
@@ -42,10 +43,28 @@ export default function DataChart({
   normalize = false,
   normalizeBase = 'first',
   showYAxisToggle = true,
+  enableReturnMode = true,
   onPointClick,
 }) {
-  const [activeYType, setActiveYType] = useState(yAxisType);
+  // 三种模式：value=线性原值, log=对数Y轴原值, return=对数收益率（突出变化方向）
+  const [chartMode, setChartMode] = useState(yAxisType === 'log' ? 'log' : 'value');
   const chartRef = useRef(null);
+
+  // 计算对数收益率序列：r_t = ln(v_t / v_{t-1}) * 100（百分比形式）
+  const computeReturnSeries = (rawVals) => {
+    const result = [null]; // 第一个点无前值
+    for (let i = 1; i < rawVals.length; i++) {
+      const prev = rawVals[i - 1];
+      const curr = rawVals[i];
+      if (prev != null && curr != null && !isNaN(prev) && !isNaN(curr) && prev > 0 && curr > 0) {
+        result.push(Math.log(curr / prev) * 100);
+      } else {
+        result.push(null);
+      }
+    }
+    return result;
+  };
+
   useEffect(() => {
     if (!chartRef.current || !data?.length) return;
     // 获取已有实例或创建新实例（不每次 dispose）
@@ -56,8 +75,13 @@ export default function DataChart({
     // 检测是否有 yAxisIndex > 0 的系列，有则启用双Y轴
     const hasDualY = series.some(s => s.yAxisIndex === 1);
 
+    // 根据模式处理数据
+    const isReturnMode = chartMode === 'return';
+    const isLogMode = chartMode === 'log';
+    const activeYType = isReturnMode ? 'value' : (isLogMode ? 'log' : 'value');
+
     // 归一化处理：将每个 series 的数据归一化为基期=100
-    const processedSeries = normalize
+    const processedSeries = normalize && !isReturnMode
       ? series.map(s => {
           const rawVals = data.map(r => r[s.key]);
           const validIdx = normalizeBase === 'last'
@@ -72,33 +96,57 @@ export default function DataChart({
       : series;
 
     const option = {
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        // 收益率模式下，tooltip 显示百分比
+        valueFormatter: isReturnMode
+          ? (v) => (v != null && !isNaN(v)) ? `${v.toFixed(2)}%` : '-'
+          : undefined,
+      },
       legend: { data: processedSeries.map(s => s.name), bottom: 0 },
       grid: { left: '8%', right: hasDualY ? '8%' : '5%', top: '10%', bottom: '15%', containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
       yAxis: hasDualY
         ? [
-            { type: activeYType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: activeYType, name: isReturnMode ? '对数收益率(%)' : '',
+              axisLabel: { color: '#CBC0B0', fontSize: 12,
+                formatter: isReturnMode ? (v) => v.toFixed(1) + '%' : undefined },
               splitLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } } },
-            { type: activeYType, name: '', axisLabel: { color: '#CBC0B0', fontSize: 12 },
+            { type: activeYType, name: '',
+              axisLabel: { color: '#CBC0B0', fontSize: 12,
+                formatter: isReturnMode ? (v) => v.toFixed(1) + '%' : undefined },
               splitLine: { show: false } },
           ]
-        : { type: activeYType },
+        : { type: activeYType,
+            axisLabel: { color: '#CBC0B0', fontSize: 12,
+              formatter: isReturnMode ? (v) => v.toFixed(1) + '%' : undefined },
+            name: isReturnMode ? '对数收益率(%)' : '' },
       series: processedSeries.map((s, sIdx) => {
+        // 根据模式选择数据源
+        let seriesData;
+        if (isReturnMode) {
+          // 对数收益率模式：计算 ln(v_t/v_{t-1})*100
+          const rawVals = data.map(r => r[s.key]);
+          seriesData = computeReturnSeries(rawVals);
+        } else if (normalize && s._normData) {
+          seriesData = s._normData;
+        } else {
+          seriesData = data.map(r => r[s.key]);
+        }
         const entry = {
           name: s.name,
           type: s.type || 'line',
-          data: normalize ? s._normData : data.map(r => r[s.key]),
-          smooth: true,
-          connectNulls: true,
-          lineStyle: { color: s.color, width: 2 },
-          areaStyle: s.type !== 'bar'
+          data: seriesData,
+          smooth: !isReturnMode, // 收益率模式不平滑，保留波动细节
+          connectNulls: !isReturnMode, // 收益率模式不连接 null（首个点）
+          lineStyle: { color: s.color, width: isReturnMode ? 1.2 : 2 },
+          areaStyle: s.type !== 'bar' && !isReturnMode
             ? { opacity: 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
               ]) }
-            : undefined,
+            : (isReturnMode ? { opacity: 0.04 } : undefined),
           itemStyle: s.type === 'bar' ? { color: s.color } : undefined,
-          symbol: 'none',
+          symbol: isReturnMode ? 'none' : 'none',
           ...(s.yAxisIndex != null ? { yAxisIndex: s.yAxisIndex } : {}),
         };
         // 只在第一个系列上添加拐点标注
@@ -209,7 +257,7 @@ export default function DataChart({
         }
       });
     }
-  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, activeYType, normalize, normalizeBase, onPointClick]);
+  }, [data, series, dateKey, zoom, zoomStart, zoomEnd, annotations, chartMode, normalize, normalizeBase, onPointClick]);
 
   // 组件卸载时 dispose
   useEffect(() => {
@@ -224,18 +272,26 @@ export default function DataChart({
     <div style={{ position: 'relative', width: '100%', height }}>
       {showYAxisToggle && (
         <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4, zIndex: 10 }}>
-          <button onClick={() => setActiveYType('value')} style={{
+          <button onClick={() => setChartMode('value')} style={{
             padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
-            background: activeYType === 'value' ? 'rgba(212,168,83,0.35)' : 'transparent',
-            color: activeYType === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
-            fontWeight: activeYType === 'value' ? 700 : 400,
+            background: chartMode === 'value' ? 'rgba(212,168,83,0.35)' : 'transparent',
+            color: chartMode === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
+            fontWeight: chartMode === 'value' ? 700 : 400,
           }}>线性</button>
-          <button onClick={() => setActiveYType('log')} style={{
+          <button onClick={() => setChartMode('log')} style={{
             padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
-            background: activeYType === 'log' ? 'rgba(212,168,83,0.35)' : 'transparent',
-            color: activeYType === 'log' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
-            fontWeight: activeYType === 'log' ? 700 : 400,
+            background: chartMode === 'log' ? 'rgba(212,168,83,0.35)' : 'transparent',
+            color: chartMode === 'log' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
+            fontWeight: chartMode === 'log' ? 700 : 400,
           }}>对数</button>
+          {enableReturnMode && (
+            <button onClick={() => setChartMode('return')} style={{
+              padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
+              background: chartMode === 'return' ? 'rgba(212,168,83,0.35)' : 'transparent',
+              color: chartMode === 'return' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
+              fontWeight: chartMode === 'return' ? 700 : 400,
+            }} title="对数收益率：突出每日涨跌方向，小波动也清晰可见">收益率</button>
+          )}
         </div>
       )}
       <div ref={chartRef} style={{ width: '100%', height }} />

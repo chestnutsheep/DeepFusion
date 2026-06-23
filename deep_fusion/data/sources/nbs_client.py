@@ -44,6 +44,8 @@ class _NbsClient:
             "Accept": "application/json",
         })
         self._session.trust_env = False
+        # 清除可能从环境继承的代理配置，NBS 网站不支持代理访问
+        self._session.proxies = {"http": None, "https": None}
         self._last_request = 0.0
         self._cid_index: list[dict] | None = None
         self._cid_dir = Path(cid_dir) if cid_dir else (
@@ -191,19 +193,27 @@ class _NbsClient:
             "cid": cid,
             "indicatorIds": indicator_ids,
             "das": region,
-            "dts": [dt_range],
+            "dts": "",
             "showType": "1",
             "rootId": root_id,
         }
         self._rate_limit()
-        resp = self._session.post(
-            f"{_NBS_BASE_URL}/getEsDataByCidAndDt",
-            json=payload,
-            timeout=30,
-        )
-        data = resp.json()
+        try:
+            resp = self._session.post(
+                f"{_NBS_BASE_URL}/stream/esData",
+                json=payload,
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"NBS fetch_data HTTP {resp.status_code}, 返回空 DataFrame")
+                return pd.DataFrame()
+            data = resp.json()
+        except (requests.exceptions.JSONDecodeError, ValueError) as e:
+            logger.warning(f"NBS fetch_data JSON 解析失败: {e}, 返回空 DataFrame")
+            return pd.DataFrame()
         if not data.get("success"):
-            raise Exception(f"NBS API 失败: {data.get('message', '未知错误')}")
+            logger.warning(f"NBS API 失败: {data.get('message', '未知错误')}, 返回空 DataFrame")
+            return pd.DataFrame()
         records = data.get("data", [])
         if not records:
             return pd.DataFrame()

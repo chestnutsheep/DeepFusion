@@ -173,6 +173,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
               zoomStart={DEFAULT_WINDOW.start}
               zoomEnd={DEFAULT_WINDOW.end}
               annotations={config.turningPoints}
+              enableReturnMode={false}
             />
           </CardWrapper>
         );

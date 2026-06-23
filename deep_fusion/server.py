@@ -16,6 +16,7 @@ INSTRUCTIONS = """
 ### 1. 个股分析场景
 - **基础信息** → `individual_info`（档案/十大股东/分红/管理层）
 - **历史行情** → `individual_hist`（K线/分钟/分笔）或 `market_prices`（含技术指标）
+- **技术指标快照** → `stock_tech_indicators`（15种指标最新值JSON：MACD/KDJ/RSI/BOLL/均线/ADX/CCI/OBV/SAR/WR/ROC/PSY/BIAS/MTM）
 - **财务数据** → `financial_indicators`（86项指标）→ 追加 `financial_statements`（三大报表）
 - **同行业对比** → `industry_classify` → `peer_comparison`
 - **消息面** → `sentiment_side`（新闻/股东/高管变动）
@@ -39,6 +40,7 @@ INSTRUCTIONS = """
 - **景气** → `macro_business`（PMI）
 - **货币** → `macro_monetary`（M2/社融/LPR/失业率/进出口）
 - 如需要细粒度数据 → 使用 `macro_gdp`/`macro_cpi`/`macro_pmi`/`macro_interest_rate`/`macro_money_supply` 等
+- **自定义频谱分析** → `cycle_detect`（8种检测+三级投票+相位）或 `cycle_phase`（CF带通+相位），CSV输入
 
 ### 4. 行业分析场景
 - **行业分类** → `industry_classify`

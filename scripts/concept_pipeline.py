@@ -1,4 +1,6 @@
-"""Concept board data pipeline: fetch THS concept K-lines, compute returns, store in PG."""
+"""⚠️ DEPRECATED: 依赖 PostgreSQL，项目已迁移到 SQLite。
+概念板块K线+收益率功能尚未被SQLite接替，待迁移为 MCP 工具后删除。
+保留此文件作为迁移参考。"""
 import sys
 import time
 from datetime import datetime
