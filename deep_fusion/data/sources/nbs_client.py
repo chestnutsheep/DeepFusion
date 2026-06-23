@@ -193,7 +193,7 @@ class _NbsClient:
             "cid": cid,
             "indicatorIds": indicator_ids,
             "das": region,
-            "dts": "",
+            "dts": [dt_range],
             "showType": "1",
             "rootId": root_id,
         }

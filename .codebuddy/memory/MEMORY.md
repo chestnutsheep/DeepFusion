@@ -24,7 +24,7 @@
 - PMI/M2 通过 `_nbs("fetch_pmi", "pmi")` → `_fetch_with_priority("PMI", ...)` 获取，走 data_lake-first
 - NBS 指标通过 `_nbs("fetch_xxx", key)` → cycle_data.db-first 路径
 - `IndicatorDef(akshare_fn=...)` 也支持 DB-first（2026-06-13 新增）
-- **NBS API 变化（2026-06-23）**：旧接口 `POST /getEsDataByCidAndDt` 失效（404），**新接口 `POST /stream/esData`**，`dts` 从 `[dt_range]` 改为空字符串 `""`。`nbs_client.py` 已切换到新接口，所有 NBS 数据恢复正常获取。`cycle_db` 作为备用降级。
+- **NBS API 变化（2026-06-23）**：旧接口 `POST /getEsDataByCidAndDt` 失效（404），**新接口 `POST /stream/esData`**。`dts` 仍用 `[dt_range]` 格式（空字符串 `""` 只返回13行近期数据，必须指定时间范围才能拉到起始年份）。`nbs_client.py` 已切换到新接口+保留 `[dt_range]` 格式。
 
 ## 代码架构
 - 共享模块：chart_helpers / phase_utils / nbs_client / **correlation / dcc_garch / causality / network_analysis**（修改需确认所有消费方不受影响）
