@@ -21,7 +21,7 @@ export default function MainLayout() {
         <main
           id="main-panel"
           style={{
-            maxWidth: '80%',
+            maxWidth: '96%',
             margin: '0 auto',
             padding: '20px 0',
           }}

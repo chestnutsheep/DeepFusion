@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {autoUpdate, offset, shift, useFloating, useHover, useInteractions} from '@floating-ui/react';
+import {autoUpdate, flip, offset, shift, useFloating, useHover, useInteractions} from '@floating-ui/react';
 import TooltipIcon from './TooltipIcon.jsx';
 import CardWrapper from './CardWrapper.jsx';
 
@@ -28,7 +28,7 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
-    middleware: [offset(8), shift()],
+    middleware: [offset(8), flip(), shift()],
     whileElementsMounted: autoUpdate,
   });
   const hover = useHover(context);
@@ -61,7 +61,7 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         </div>
       </CardWrapper>
       {isOpen && detail && (
-        <div ref={refs.setFloating} style={{ ...floatingStyles, background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius)', padding: 'var(--sp-md) var(--sp-lg)', maxWidth: 280, fontSize: 'var(--fs-sm)', lineHeight: 1.5, color: 'var(--text-secondary)', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }} {...getFloatingProps()}>
+        <div ref={refs.setFloating} style={{ ...floatingStyles, background: 'var(--bg-sidebar)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius)', padding: 'var(--sp-md) var(--sp-lg)', maxWidth: 360, fontSize: 'var(--fs-sm)', lineHeight: 1.5, color: 'var(--text-secondary)', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }} {...getFloatingProps()}>
           {detail}
         </div>
       )}

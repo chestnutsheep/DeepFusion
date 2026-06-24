@@ -73,7 +73,7 @@ def _fetch_with_priority(
     4. DB 无数据 → 全量拉取并入库
     5. akshare 也失败 → 降级返回 DB 旧数据（data_lake_stale）
     """
-    from .shared.freshness import needs_incremental_update
+    from deep_fusion.shared.freshness import needs_incremental_update
 
     df = None
     source = None

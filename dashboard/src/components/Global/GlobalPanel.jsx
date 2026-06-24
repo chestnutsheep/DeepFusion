@@ -70,13 +70,13 @@ function SectionHeader({ badge, title, highlight, desc }) {
       <span style={{
         display: 'inline-flex', padding: '4px 12px',
         background: 'rgba(123,94,123,0.12)', border: '1px solid rgba(123,94,123,0.2)',
-        borderRadius: 16, fontSize: 10, fontWeight: 600,
+        borderRadius: 16, fontSize: 'var(--fs-2xs)', fontWeight: 600,
         color: 'var(--accent-rose)', marginBottom: 6,
       }}>{badge}</span>
       <h2 style={{ fontSize: 18, fontWeight: 700 }}>
         {title} <span style={{ color: 'var(--accent-gold)' }}>{highlight}</span>
       </h2>
-      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>{desc}</p>}
+      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 2 }}>{desc}</p>}
     </div>
   );
 }
@@ -106,13 +106,13 @@ function StressSection() {
         border: `2px solid ${stressColor(overall_stress_level)}`,
         background: stressBg(overall_stress_level),
       }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 4 }}>
           全球金融压力指数 · {stress.timestamp}
         </div>
         <div style={{ fontSize: 42, fontWeight: 800, color: stressColor(overall_stress_level), lineHeight: 1 }}>
           {stress_score ?? '—'}
         </div>
-        <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginTop: 2 }}>
           0=无压力 10=系统性危机
         </div>
         <div style={{
@@ -131,50 +131,50 @@ function StressSection() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
         {/* 收益率曲线 */}
         <CardWrapper style={{ padding: 14, borderLeft: `3px solid ${yc.value < 0 ? '#f85149' : '#3fb950'}` }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>收益率曲线 10Y-2Y</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>收益率曲线 10Y-2Y</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: yc.value < 0 ? '#f85149' : '#3fb950' }}>
             {yc.value ?? '—'}%
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-secondary)', marginTop: 4 }}>
             状态: <span style={{ color: stressColor(yc.status), fontWeight: 600 }}>{yc.status}</span>
             {yc.duration_months > 0 && ` · 倒挂${yc.duration_months}月`}
           </div>
-          {yc.signal && <div style={{ fontSize: 10, color: '#d29922', marginTop: 4 }}>{yc.signal}</div>}
+          {yc.signal && <div style={{ fontSize: 'var(--fs-2xs)', color: '#d29922', marginTop: 4 }}>{yc.signal}</div>}
         </CardWrapper>
 
         {/* TED利差 */}
         <CardWrapper style={{ padding: 14, borderLeft: `3px solid ${ted.value > 1 ? '#d29922' : '#3fb950'}` }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>TED 利差</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>TED 利差</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: ted.value > 1 ? '#d85149' : '#D4A853' }}>
             {ted.value ?? '—'}%
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-secondary)', marginTop: 4 }}>
             状态: <span style={{ color: stressColor(ted.status), fontWeight: 600 }}>{ted.status}</span>
           </div>
-          {ted.signal && <div style={{ fontSize: 10, color: '#d29922', marginTop: 4 }}>{ted.signal}</div>}
+          {ted.signal && <div style={{ fontSize: 'var(--fs-2xs)', color: '#d29922', marginTop: 4 }}>{ted.signal}</div>}
         </CardWrapper>
 
         {/* BAA信用利差 */}
         <CardWrapper style={{ padding: 14, borderLeft: `3px solid ${cs.value > 2 ? '#d29922' : '#3fb950'}` }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>BAA 信用利差</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>BAA 信用利差</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: cs.value > 3 ? '#f85149' : '#D4A853' }}>
             {cs.value ?? '—'}%
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-secondary)', marginTop: 4 }}>
             状态: <span style={{ color: stressColor(cs.status), fontWeight: 600 }}>{cs.status}</span>
             {cs.direction && ` · ${cs.direction}`}
           </div>
-          {cs.signal && <div style={{ fontSize: 10, color: '#d29922', marginTop: 4 }}>{cs.signal}</div>}
+          {cs.signal && <div style={{ fontSize: 'var(--fs-2xs)', color: '#d29922', marginTop: 4 }}>{cs.signal}</div>}
         </CardWrapper>
 
         {/* 亚太汇率 */}
         <CardWrapper style={{ padding: 14, borderLeft: '3px solid var(--accent-blue)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>亚太汇率 30日变动</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>亚太汇率 30日变动</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
             {Object.entries(fx).map(([pair, info]) => (
               <div key={pair} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{pair}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: info['30d_change_pct'] > 2 ? '#f85149' : '#D4A853' }}>
+                <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>{pair}</span>
+                <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: info['30d_change_pct'] > 2 ? '#f85149' : '#D4A853' }}>
                   {info.value ?? '—'} {info['30d_change_pct'] != null ? `(${info['30d_change_pct'] > 0 ? '+' : ''}${info['30d_change_pct']}%)` : ''}
                 </span>
               </div>
@@ -191,12 +191,12 @@ function StressSection() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 15, fontWeight: 700 }}>{a.region}</span>
                 <span style={{
-                  padding: '3px 10px', borderRadius: 3, fontSize: 11, fontWeight: 700,
+                  padding: '3px 10px', borderRadius: 3, fontSize: 'var(--fs-xs)', fontWeight: 700,
                   color: stressColor(a.level), background: `${stressColor(a.level)}18`,
                   border: `1px solid ${stressColor(a.level)}33`,
                 }}>{a.level}</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>{a.reason}</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', marginTop: 6 }}>{a.reason}</div>
             </CardWrapper>
           ))}
         </div>
@@ -208,8 +208,8 @@ function StressSection() {
           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>⚡ 跨域传导信号</h3>
           {cross_border_signals.map((s, i) => (
             <div key={i} style={{ padding: '8px 0', borderBottom: i < cross_border_signals.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.signal}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>置信度: {(s.confidence * 100).toFixed(0)}%</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{s.signal}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginTop: 2 }}>置信度: {(s.confidence * 100).toFixed(0)}%</div>
             </div>
           ))}
         </CardWrapper>
@@ -248,31 +248,31 @@ function DebtSection() {
                 }}>{r.sustainability_grade}</span>
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: gradeColor, marginTop: 8 }}>
-                {r.sustainability_score ?? '—'} <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>可持续性评分</span>
+                {r.sustainability_score ?? '—'} <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>可持续性评分</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
                 {r.gov_debt_gdp_pct != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>政府债务/GDP</span>
                     <span style={{ fontWeight: 600, color: r.gov_debt_gdp_pct > 120 ? '#f85149' : '#D4A853' }}>
-                      {r.gov_debt_gdp_pct}% <span style={{ color: stressColor(r.debt_risk), fontSize: 9 }}>{r.debt_risk}</span>
+                      {r.gov_debt_gdp_pct}% <span style={{ color: stressColor(r.debt_risk), fontSize: 'var(--fs-2xs)' }}>{r.debt_risk}</span>
                     </span>
                   </div>
                 )}
                 {r.fx_reserves_months_import != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>外汇储备/月进口</span>
-                    <span style={{ fontWeight: 600 }}>{r.fx_reserves_months_import}月 <span style={{ fontSize: 9 }}>{r.reserve_sufficiency}</span></span>
+                    <span style={{ fontWeight: 600 }}>{r.fx_reserves_months_import}月 <span style={{ fontSize: 'var(--fs-2xs)' }}>{r.reserve_sufficiency}</span></span>
                   </div>
                 )}
                 {r.gdp_growth_pct != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>GDP增长率</span>
                     <span style={{ fontWeight: 600 }}>{r.gdp_growth_pct}%</span>
                   </div>
                 )}
                 {r.inflation_pct != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>通胀率</span>
                     <span style={{ fontWeight: 600 }}>{r.inflation_pct}%</span>
                   </div>
@@ -322,7 +322,7 @@ function CapitalSection() {
       <CardWrapper style={{ padding: 16, marginBottom: 16, textAlign: 'center',
         border: `2px solid ${assessmentColor}`, background: `${assessmentColor}18`,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>亚太资本流动总体判断</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>亚太资本流动总体判断</div>
         <div style={{ fontSize: 24, fontWeight: 800, color: assessmentColor }}>{overall_assessment}</div>
       </CardWrapper>
 
@@ -345,7 +345,7 @@ function CapitalSection() {
           <CardWrapper style={{ padding: 14, borderLeft: '3px solid #D4A853' }}>
             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>中国外汇储备</h3>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{cnReserves.latest} 亿美元</div>
-            <div style={{ fontSize: 11, color: cnReserves.direction === '↓' ? '#f85149' : '#3fb950', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: cnReserves.direction === '↓' ? '#f85149' : '#3fb950', marginTop: 4 }}>
               {cnReserves.direction} {cnReserves.change_pct != null ? `${cnReserves.change_pct}%` : ''}
             </div>
           </CardWrapper>
@@ -355,7 +355,7 @@ function CapitalSection() {
           <CardWrapper style={{ padding: 14, borderLeft: '3px solid #5B8FA8' }}>
             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>美债10Y收益率</h3>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{usYield.latest}%</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-secondary)', marginTop: 4 }}>
               {usYield.direction} · {usYield.signal || ''}
             </div>
           </CardWrapper>
@@ -365,7 +365,7 @@ function CapitalSection() {
           <CardWrapper style={{ padding: 14, borderLeft: '3px solid var(--accent-rose)' }}>
             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>联邦基金利率</h3>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{fedFunds.latest}%</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-secondary)', marginTop: 4 }}>
               {fedFunds.direction} · {fedFunds.signal || ''}
             </div>
           </CardWrapper>
@@ -377,7 +377,7 @@ function CapitalSection() {
         <CardWrapper style={{ padding: 14, borderLeft: '3px solid var(--accent-rose)' }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>流动信号</h3>
           {flow_signals.map((s, i) => (
-            <div key={i} style={{ fontSize: 12, color: s.includes('⚠️') ? '#d29922' : 'var(--text-secondary)', padding: '4px 0' }}>{s}</div>
+            <div key={i} style={{ fontSize: 'var(--fs-sm)', color: s.includes('⚠️') ? '#d29922' : 'var(--text-secondary)', padding: '4px 0' }}>{s}</div>
           ))}
         </CardWrapper>
       )}
@@ -406,7 +406,7 @@ function BubbleSection() {
       <CardWrapper style={{ padding: 16, marginBottom: 16, textAlign: 'center',
         border: `2px solid ${overallColor}`, background: `${overallColor}18`,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>综合泡沫风险</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>综合泡沫风险</div>
         <div style={{ fontSize: 24, fontWeight: 800, color: overallColor }}>{overall_risk}</div>
       </CardWrapper>
 
@@ -419,32 +419,32 @@ function BubbleSection() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{b.region} · {b.asset}</span>
                 <span style={{
-                  padding: '3px 10px', borderRadius: 3, fontSize: 11, fontWeight: 700,
+                  padding: '3px 10px', borderRadius: 3, fontSize: 'var(--fs-xs)', fontWeight: 700,
                   color: riskColor, background: `${riskColor}18`,
                 }}>{b.bubble_risk}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {b.house_price_yoy != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>房价同比</span>
                     <span style={{ fontWeight: 600, color: b.house_price_yoy < 0 ? '#f85149' : '#D4A853' }}>{b.house_price_yoy}%</span>
                   </div>
                 )}
                 {b.price_signal && (
-                  <div style={{ fontSize: 10, color: b.price_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.price_signal}</div>
+                  <div style={{ fontSize: 'var(--fs-2xs)', color: b.price_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.price_signal}</div>
                 )}
                 {b.volume_signal && (
-                  <div style={{ fontSize: 10, color: b.volume_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.volume_signal}</div>
+                  <div style={{ fontSize: 'var(--fs-2xs)', color: b.volume_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.volume_signal}</div>
                 )}
                 {b.usdjpy_latest != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>USDJPY</span>
                     <span style={{ fontWeight: 600, color: b.usdjpy_latest > 160 ? '#f85149' : '#D4A853' }}>{b.usdjpy_latest}</span>
                   </div>
                 )}
-                {b.fx_signal && <div style={{ fontSize: 10, color: b.fx_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.fx_signal}</div>}
+                {b.fx_signal && <div style={{ fontSize: 'var(--fs-2xs)', color: b.fx_signal.includes('⚠️') ? '#d29922' : 'var(--text-secondary)' }}>{b.fx_signal}</div>}
                 {b.usdkrw_latest != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>USDKRW</span>
                     <span style={{ fontWeight: 600, color: b.usdkrw_latest > 1400 ? '#f85149' : '#D4A853' }}>{b.usdkrw_latest}</span>
                   </div>
@@ -490,7 +490,7 @@ function FuturesSection() {
         {commonSymbols.map(s => (
           <button key={s.name} onClick={() => setSymbol(s.name)}
             style={{
-              padding: '4px 12px', borderRadius: 2, fontSize: 11,
+              padding: '4px 12px', borderRadius: 2, fontSize: 'var(--fs-xs)',
               fontWeight: symbol === s.name ? 700 : 500,
               background: symbol === s.name ? 'var(--accent-gold)' : 'transparent',
               color: symbol === s.name ? '#000' : 'var(--text-secondary)',
@@ -520,7 +520,7 @@ function FuturesSection() {
       {basisRaw && (
         <CardWrapper style={{ padding: 14, marginTop: 14 }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>📋 期现基差</h3>
-          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{basisRaw}</pre>
+          <pre style={{ fontSize: 'var(--fs-xs)', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{basisRaw}</pre>
         </CardWrapper>
       )}
     </div>
@@ -564,7 +564,7 @@ function MetalsSection() {
           <DataCard label="金银比" value={ratio} unit="" decimals={1} higherBetter={null} />
         </div>
         <button onClick={() => setShowNorm(!showNorm)} style={{
-          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          padding: '4px 12px', borderRadius: 4, fontSize: 'var(--fs-xs)', fontWeight: 600,
           background: showNorm ? 'var(--accent-gold)' : 'transparent',
           color: showNorm ? '#000' : 'var(--text-secondary)',
           border: '1px solid var(--border-subtle)', cursor: 'pointer',
@@ -639,7 +639,7 @@ function CryptoSection() {
           <DataCard label="Ξ ETH" value={ethLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
         </div>
         <button onClick={() => setShowNorm(!showNorm)} style={{
-          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          padding: '4px 12px', borderRadius: 4, fontSize: 'var(--fs-xs)', fontWeight: 600,
           background: showNorm ? 'var(--accent-gold)' : 'transparent',
           color: showNorm ? '#000' : 'var(--text-secondary)',
           border: '1px solid var(--border-subtle)', cursor: 'pointer',
@@ -647,7 +647,7 @@ function CryptoSection() {
       </div>
       <CardWrapper style={{ padding: 12, marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 BTC 合约</span>
-        <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{fundingRaw || '暂无'}</pre>
+        <pre style={{ fontSize: 'var(--fs-xs)', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{fundingRaw || '暂无'}</pre>
       </CardWrapper>
 
       {showNorm ? (
@@ -673,7 +673,7 @@ function CryptoSection() {
       {sentimentRaw && (
         <CardWrapper style={{ padding: 14, marginTop: 14, borderLeft: '3px solid var(--accent-red)' }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>📊 市场情绪指标</h3>
-          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{sentimentRaw}</pre>
+          <pre style={{ fontSize: 'var(--fs-xs)', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{sentimentRaw}</pre>
         </CardWrapper>
       )}
     </div>
@@ -706,7 +706,7 @@ function ForexSection() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
         <button onClick={() => setShowNorm(!showNorm)} style={{
-          padding: '4px 12px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+          padding: '4px 12px', borderRadius: 4, fontSize: 'var(--fs-xs)', fontWeight: 600,
           background: showNorm ? 'var(--accent-gold)' : 'transparent',
           color: showNorm ? '#000' : 'var(--text-secondary)',
           border: '1px solid var(--border-subtle)', cursor: 'pointer',
@@ -769,7 +769,7 @@ export default function GlobalPanel() {
           <span style={{
             display: 'inline-block', padding: '4px 14px',
             background: 'var(--shadow-glow)', border: '1px solid var(--border-subtle)',
-            borderRadius: 20, fontSize: 11, fontWeight: 600,
+            borderRadius: 20, fontSize: 'var(--fs-xs)', fontWeight: 600,
             color: 'var(--accent-gold)', marginBottom: 10,
           }}>✦ DeepFusion · 国际</span>
           <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>
@@ -817,7 +817,7 @@ export default function GlobalPanel() {
         {marketTabs.map(t => (
           <button key={t.key} onClick={() => setMarketTab(t.key)}
             style={{
-              padding: '6px 16px', borderRadius: 2, fontSize: 12,
+              padding: '6px 16px', borderRadius: 2, fontSize: 'var(--fs-sm)',
               fontWeight: marketTab === t.key ? 700 : 500,
               background: marketTab === t.key ? 'var(--accent-gold)' : 'transparent',
               color: marketTab === t.key ? '#000' : 'var(--text-secondary)',

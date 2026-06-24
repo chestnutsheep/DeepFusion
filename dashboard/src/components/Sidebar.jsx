@@ -314,7 +314,7 @@ function SidebarContent() {
 
           {/* 资产配置环形图 */}
           <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:9,fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
+            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
             <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               <AssetDonut assetAlloc={assetAlloc} collapsed={sidebarCollapsed} />
             </div>
@@ -345,10 +345,10 @@ function SidebarContent() {
               <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
               <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
                 {policyBriefs.length>0 ? policyBriefs.map((b,i)=>(
-                  <div key={i} style={{ fontSize:11,color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
+                  <div key={i} style={{ fontSize:'var(--fs-xs)',color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
                     {b.length>35?b.slice(0,35)+'...':b}
                   </div>
-                )) : <div style={{fontSize:11,color:'var(--text-muted)'}}>加载中...</div>}
+                )) : <div style={{fontSize:'var(--fs-xs)',color:'var(--text-muted)'}}>加载中...</div>}
               </div>
             </div>
           )}

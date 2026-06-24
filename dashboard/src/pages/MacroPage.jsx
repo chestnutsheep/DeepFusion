@@ -148,8 +148,8 @@ function CoverageGrid() {
     >
       {rows.map((r, i) => (
         <div key={i}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: r.color }}>{r.label}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+          <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, marginBottom: 8, color: r.color }}>{r.label}</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', lineHeight: 1.8 }}>
             <div>相位: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.phase}</span></div>
             {r.confidence != null && (
               <div>置信度: <span style={{ color: 'var(--accent-gold)' }}>{r.confidence}</span></div>
@@ -243,7 +243,7 @@ function CycleNesting() {
             if (v > -2) return '衰退';
             return '萧条';
           },
-          fontSize: 11,
+          fontSize: 'var(--fs-xs)',
         },
       },
       dataZoom: [
@@ -286,7 +286,7 @@ function CycleNesting() {
     <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表5：四周期合成Z值嵌套对比</h3>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
+        <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
       </div>
       <div ref={chartRef} style={{ width: '100%', height: 400 }} />
     </CardWrapper>
@@ -481,7 +481,7 @@ function CycleGantt() {
     <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表6：四周期相位演进甘特图</h3>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
+        <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
       </div>
       <div ref={chartRef} style={{ width: '100%', height: 220 }} />
     </CardWrapper>
@@ -508,7 +508,7 @@ export default function MacroPage() {
       <hr className="section-divider" />
       <div id="coverage">
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>周期覆盖</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
           四周期当前相位一览
         </p>
         <ErrorBoundary><CoverageGrid /></ErrorBoundary>
@@ -518,7 +518,7 @@ export default function MacroPage() {
       <hr className="section-divider" />
       <div id="nesting">
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>周期嵌套</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
           四周期合成Z值（composite_z）波动对比：零线以上扩张，以下收缩
         </p>
         <ErrorBoundary><CycleNesting /></ErrorBoundary>
@@ -528,7 +528,7 @@ export default function MacroPage() {
       <hr className="section-divider" />
       <div id="gantt">
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>相位分布</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
           四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
         </p>
         <ErrorBoundary><CycleGantt /></ErrorBoundary>
