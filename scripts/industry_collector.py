@@ -11,7 +11,7 @@ from typing import Any
 
 import requests
 
-MCP_URL = os.getenv("MCP_URL", "http://localhost:8002/mcp")
+MCP_URL = os.getenv("MCP_URL", "http://localhost:8080/mcp")
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "industry_data.db")
 
 TIMEOUT = 60

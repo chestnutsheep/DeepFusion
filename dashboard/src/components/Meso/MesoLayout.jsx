@@ -1,6 +1,8 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {useQueryClient} from '@tanstack/react-query';
 import {useMCP} from '../../hooks/useMCP';
+import {mcp} from '../../services/mcp.js';
 import {useAppStore} from '../../store/index.js';
 import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
@@ -1211,6 +1213,11 @@ function EnergySection() {
 // ── 主组件 ──
 
 export default function MesoLayout() {
+  const queryClient = useQueryClient();
+  // ── 行情数据刷新状态 ──
+  const [dataRefreshing, setDataRefreshing] = useState(false);  // 正在采集+刷新
+  const [collectStatus, setCollectStatus] = useState(null);     // 采集结果提示
+
   // 请求最近 20 个交易日的数据，让热力图有足够列
   const today = new Date();
   const startDay = new Date(today.getTime() - 30 * 86400000); // 30自然日≈20交易日
@@ -1218,6 +1225,30 @@ export default function MesoLayout() {
   const endStr = today.toISOString().slice(0, 10).replace(/-/g, '');
   const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', start_date: startStr, end_date: endStr, limit: 800 });
   const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
+
+  // ── 刷新行情数据：先采集入库，再刷新热力图 ──
+  const handleDataRefresh = useCallback(async () => {
+    setDataRefreshing(true);
+    setCollectStatus('⏳ 正在采集行业日线入库...');
+    try {
+      // Step 1: 调用 industry_daily_collect 采集最新数据入库
+      const collectResult = await mcp.call('industry_daily_collect', { start_date: '20200101', force: false });
+      setCollectStatus('✅ 采集完成，正在刷新热力图...');
+      // Step 2: invalidate 所有行业相关缓存，强制重新拉取
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['industry_sw_daily'] }),
+        queryClient.invalidateQueries({ queryKey: ['industry_daily_query'] }),
+        queryClient.invalidateQueries({ queryKey: ['industry_sw_tree'] }),
+        queryClient.invalidateQueries({ queryKey: ['industry_sw_constituents_detail'] }),
+      ]);
+      setCollectStatus('✅ 行情数据已刷新！');
+    } catch (e) {
+      setCollectStatus(`❌ 刷新失败: ${e.message}`);
+    }
+    setDataRefreshing(false);
+    // 5秒后清除提示
+    setTimeout(() => setCollectStatus(null), 5000);
+  }, [queryClient]);
   const [activeInd, setActiveInd] = useState('');
 
   // 热力图控制状态（提升到父组件，控制栏渲染在 CardWrapper 外部）
@@ -1373,6 +1404,29 @@ export default function MesoLayout() {
 
         {/* 控制栏 — 在卡片外部，水平排列 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          {/* 刷新行情数据按钮 */}
+          <button
+            onClick={handleDataRefresh}
+            disabled={dataRefreshing}
+            style={{
+              padding: '6px 16px', borderRadius: 8, fontSize: 'var(--fs-sm)', fontWeight: 700,
+              background: dataRefreshing ? 'rgba(212,168,83,0.08)' : 'rgba(212,168,83,0.15)',
+              border: `1.5px solid ${dataRefreshing ? 'var(--border-subtle)' : 'rgba(212,168,83,0.4)'}`,
+              color: dataRefreshing ? 'var(--text-muted)' : 'var(--accent-gold)',
+              cursor: dataRefreshing ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {dataRefreshing ? '⏳ 采集中...' : '🔄 刷新行情'}
+          </button>
+          {collectStatus && !dataRefreshing && (
+            <span style={{ fontSize: 'var(--fs-xs)', color: collectStatus.startsWith('✅') ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+              {collectStatus}
+            </span>
+          )}
+
+          {/* 分类按钮 */}
           {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
             <button key={key} onClick={() => { setHeatmapCategory(key); setDrillTarget(null); }}
               style={{

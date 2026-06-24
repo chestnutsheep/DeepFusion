@@ -147,6 +147,9 @@ def get_daily_analysis(
 ) -> pd.DataFrame:
     """申万指数分析日报表。
 
+    优先从 akshare 获取，若 akshare 最新日期滞后于本地 DB，
+    则从 DB 补充最新日期的数据行，确保前端热力图不会显示过期数据。
+
     Args:
         symbol: "市场表征" / "一级行业" / "二级行业" / "风格指数"
         start_date: YYYYMMDD, 默认30天前
@@ -168,8 +171,63 @@ def get_daily_analysis(
         end_date=end_date,
         ttl=300,  # 5min — 日行情收盘后更新，与前端 staleTime 对齐
     )
-    if df is None or df.empty:
-        return pd.DataFrame()
+    if df.empty:
+        df = pd.DataFrame()
+
+    # ── DB 补充：若 akshare 最新日期滞后于本地 DB，补上 DB 的最新日期行 ──
+    # 当 akshare 有数据时，比较最新日期；当 akshare 无数据时，全部从 DB 取
+    ak_max_date = df["发布日期"].max() if "发布日期" in df.columns and not df.empty else None
+    conn = db._connect()
+    db_max_row = conn.execute(
+        "SELECT MAX(trade_date) FROM meso_industry_daily"
+    ).fetchone()
+    db_max_date = db_max_row[0] if db_max_row else None
+    conn.close()
+
+    need_db_supplement = False
+    if db_max_date:
+        if ak_max_date is None:
+            # akshare 无数据，全部从 DB 取
+            need_db_supplement = True
+        elif str(db_max_date) > str(ak_max_date):
+            # DB 有更新的数据
+            need_db_supplement = True
+
+    if need_db_supplement:
+        # 从 DB 补充最新日期的所有行业行
+        conn = db._connect()
+        rows = conn.execute("""
+            SELECT d.industry_code, c.industry_name, d.trade_date AS 发布日期,
+                   d.close AS 收盘指数, d.volume AS 成交量, d.change_pct AS 涨跌幅,
+                   d.turnover_rate AS 换手率,
+                   NULL AS 市盈率, NULL AS 市净率, NULL AS 均价,
+                   NULL AS 成交额占比, NULL AS 流通市值, NULL AS 平均流通市值,
+                   NULL AS 股息率
+            FROM meso_industry_daily d
+            LEFT JOIN meso_industry_classify c ON d.industry_code = c.industry_code
+            WHERE d.trade_date = ?
+        """, (db_max_date,)).fetchall()
+        conn.close()
+
+        if rows:
+            db_cols = ["指数代码", "指数名称", "发布日期", "收盘指数", "成交量",
+                       "涨跌幅", "换手率", "市盈率", "市净率", "均价",
+                       "成交额占比", "流通市值", "平均流通市值", "股息率"]
+            db_df = pd.DataFrame(rows, columns=db_cols)
+            # 日期格式统一：DB 返回 str，akshare 返回 datetime.date
+            from datetime import date as _date
+            db_df["发布日期"] = db_df["发布日期"].apply(
+                lambda s: _date(*map(int, str(s).split("-"))) if isinstance(s, str) and "-" in str(s) else s
+            )
+            if ak_max_date is not None:
+                # 去掉 akshare 中已有的该日期行（如果有），避免重复
+                ak_max_as_str = str(ak_max_date)
+                df = df[df["发布日期"].astype(str) != ak_max_as_str]
+            else:
+                # akshare 无数据，DB 补充就是全部数据
+                df = pd.DataFrame()
+            df = pd.concat([df, db_df], ignore_index=True)
+
     return df
 
 

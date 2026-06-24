@@ -4,7 +4,8 @@
  * 数据驱动设计：行业名称从 MCP 接口动态获取，不硬编码。
  * 阈值参数从 mesoConfig.js 读取。
  */
-import {useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
 import {useMCP} from '../../hooks/useMCP';
 import CardWrapper from '../common/CardWrapper';
 import {
@@ -684,12 +685,39 @@ export function WarningBar({ l1Industries, l1Matrix, l1Dates }) {
 // ═══════════════════════════════════════════════════════
 
 export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, l2Dates, l1Matrix, l2Matrix }) {
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+
   // 请求因果检验数据
-  const { data: causalityRaw } = useMCP('industry_themes_causality', { window: 120, max_lag: 5 });
+  const { data: causalityRaw, isFetching: causalityFetching } = useMCP('industry_themes_causality', { window: 120, max_lag: 5 });
   // 请求主题聚类数据
-  const { data: themesRaw } = useMCP('industry_themes', { window: 120, n_clusters: 5, corr_method: 'pearson' });
+  const { data: themesRaw, isFetching: themesFetching } = useMCP('industry_themes', { window: 120, n_clusters: 5, corr_method: 'pearson' });
   // 请求 DCC-GARCH 数据
-  const { data: dccRaw } = useMCP('industry_themes_dcc', { window: 120 });
+  const { data: dccRaw, isFetching: dccFetching } = useMCP('industry_themes_dcc', { window: 120 });
+
+  // 刷新分析：invalidate 三个工具的缓存，触发重新请求
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['industry_themes_causality'] }),
+        queryClient.invalidateQueries({ queryKey: ['industry_themes'] }),
+        queryClient.invalidateQueries({ queryKey: ['industry_themes_dcc'] }),
+      ]);
+    } catch (e) {
+      console.error('刷新分析数据失败:', e);
+    }
+    // 等 isFetching 结束后清除 refreshing 状态
+  }, [queryClient]);
+
+  // 任一正在加载时显示加载状态
+  const anyFetching = causalityFetching || themesFetching || dccFetching;
+  // 当刷新触发且数据仍在加载时显示 refreshing
+  const showRefreshing = refreshing && anyFetching;
+  // 加载完成后清除 refreshing 状态（用 useEffect 避免渲染期间 setState）
+  useEffect(() => {
+    if (refreshing && !anyFetching) setRefreshing(false);
+  }, [refreshing, anyFetching]);
 
   // ── 晴雨表卡片数据（数据驱动：从因果检验动态获取领先/滞后行业） ──
   const barometerData = useMemo(() => {
@@ -731,6 +759,30 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
   // ── 渲染 ──
   return (
     <div>
+      {/* 关联性分析刷新按钮 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <button
+          onClick={handleRefresh}
+          disabled={anyFetching}
+          style={{
+            padding: '6px 16px', borderRadius: 8, fontSize: 'var(--fs-sm)', fontWeight: 700,
+            background: anyFetching ? 'rgba(212,168,83,0.08)' : 'rgba(212,168,83,0.15)',
+            border: `1.5px solid ${anyFetching ? 'var(--border-subtle)' : 'rgba(212,168,83,0.4)'}`,
+            color: anyFetching ? 'var(--text-muted)' : 'var(--accent-gold)',
+            cursor: anyFetching ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          {anyFetching ? '⏳ 分析中...' : '🔄 刷新关联性分析'}
+        </button>
+        {showRefreshing && (
+          <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+            正在重新计算因果检验、主题聚类、DCC-GARCH...
+          </span>
+        )}
+      </div>
+
       {/* 晴雨表卡片行 */}
       <div style={{
         display: 'flex', gap: 14, alignItems: 'stretch',
