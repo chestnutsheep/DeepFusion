@@ -46,8 +46,8 @@ export default function DataChart({
   enableReturnMode = true,
   onPointClick,
 }) {
-  // 三种模式：value=线性原值, log=对数Y轴原值, return=对数收益率（突出变化方向）
-  const [chartMode, setChartMode] = useState(yAxisType === 'log' ? 'log' : 'value');
+  // 两种模式：value=线性原值, return=对数收益率（突出变化方向）
+  const [chartMode, setChartMode] = useState('value');
   const chartRef = useRef(null);
 
   // 计算对数收益率序列：r_t = ln(v_t / v_{t-1}) * 100（百分比形式）
@@ -77,8 +77,7 @@ export default function DataChart({
 
     // 根据模式处理数据
     const isReturnMode = chartMode === 'return';
-    const isLogMode = chartMode === 'log';
-    const activeYType = isReturnMode ? 'value' : (isLogMode ? 'log' : 'value');
+    const activeYType = 'value';
 
     // 归一化处理：将每个 series 的数据归一化为基期=100
     const processedSeries = normalize && !isReturnMode
@@ -278,12 +277,6 @@ export default function DataChart({
             color: chartMode === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
             fontWeight: chartMode === 'value' ? 700 : 400,
           }}>线性</button>
-          <button onClick={() => setChartMode('log')} style={{
-            padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
-            background: chartMode === 'log' ? 'rgba(212,168,83,0.35)' : 'transparent',
-            color: chartMode === 'log' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
-            fontWeight: chartMode === 'log' ? 700 : 400,
-          }}>对数</button>
           {enableReturnMode && (
             <button onClick={() => setChartMode('return')} style={{
               padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',

@@ -156,15 +156,16 @@ body::after {
 .glass-card, .snapshot-card, .block-card,
 [class*="card"]:not(.echarts-for-react):not(.chart) {
   background: var(--bg-panel) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgb(212 168 83 / 0.45) !important;
-  box-shadow: 0 4px 24px rgba(212,168,83,0.04), inset 0 1px 0 rgba(212,168,83,0.06) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1.5px solid rgb(212 168 83 / 0.50) !important;
+  box-shadow: 0 6px 28px rgba(212,168,83,0.06), inset 0 1px 0 rgba(212,168,83,0.08) !important;
   transition: all var(--transition);
+  margin-bottom: 4px !important;
 }
 [class*="card"]:hover {
   border-color: rgb(233 186 96 / 0.73) !important;
-  box-shadow: 0 6px 32px rgba(212,168,83,0.08), inset 0 1px 0 rgba(212,168,83,0.10) !important;
+  box-shadow: 0 8px 36px rgba(212,168,83,0.10), inset 0 1px 0 rgba(212,168,83,0.12) !important;
 }
 
 /* 主内容区 — 配合固定侧边栏 */

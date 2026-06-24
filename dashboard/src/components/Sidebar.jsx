@@ -103,6 +103,8 @@ function AssetDonut({ assetAlloc, collapsed }) {
     const option = {
       tooltip: {
         trigger: 'item',
+        confine: true,
+        position: ['50%', '50%'],
         formatter: (params) => {
           const label = params.name;
           const detail = ASSET_DETAIL[label];
@@ -125,7 +127,21 @@ function AssetDonut({ assetAlloc, collapsed }) {
         radius: ['45%', '70%'],
         center: ['50%', '50%'],
         avoidLabelOverlap: false,
-        label: { show: false },
+        label: {
+          show: true,
+          position: 'outside',
+          formatter: '{b}\n{d}%',
+          fontSize: 12,
+          fontWeight: 600,
+          color: '#CBC0B0',
+          lineHeight: 16,
+        },
+        labelLine: {
+          show: true,
+          length: 8,
+          length2: 12,
+          lineStyle: { color: 'rgba(212,168,83,0.3)', width: 1 },
+        },
         emphasis: {
           label: { show: true, fontSize: 14, fontWeight: 700, color: '#D4A853' },
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' },
@@ -314,27 +330,30 @@ function SidebarContent() {
 
           {/* 资产配置环形图 */}
           <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议</span></div>
+            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议 · {dateStr}</span></div>
             <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               <AssetDonut assetAlloc={assetAlloc} collapsed={sidebarCollapsed} />
             </div>
           </div>
 
-          {/* 四周期方向指示器 */}
+          {/* 四周期方向指示器 — 横排4方块 */}
           <div style={{ margin:'0 16px 12px' }}>
             <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>🔄 基于周期大概方向</div>
-            <div style={{ padding:16, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
-              {cyclePhases.length > 0 ? cyclePhases.map(c => (
-                <div key={c.name} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
-                  <span style={{ fontSize:13,color:'var(--text-muted)',width:32 }}>{c.name}</span>
-                  <span style={{ fontSize:16,color:c.color,fontWeight:700 }}>{c.dir}</span>
-                  <span style={{ fontSize:14 }}>{c.phase}</span>
-                </div>
-              )) : [['基钦','—','→','#888'],['朱格拉','—','→','#888'],['库兹涅茨','—','→','#888'],['康波','—','→','#888']].map(([n,p,d,c]) => (
-                <div key={n} style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
-                  <span style={{ fontSize:13,color:'var(--text-muted)',width:32 }}>{n}</span>
-                  <span style={{ fontSize:16,color:c,fontWeight:700 }}>{d}</span>
-                  <span style={{ fontSize:14 }}>{p}</span>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {(cyclePhases.length > 0 ? cyclePhases : [
+                { name:'基钦', phase:'—', dir:'→', color:'#888' },
+                { name:'朱格拉', phase:'—', dir:'→', color:'#888' },
+                { name:'库兹涅茨', phase:'—', dir:'→', color:'#888' },
+                { name:'康波', phase:'—', dir:'→', color:'#888' },
+              ]).map(c => (
+                <div key={c.name} style={{
+                  padding:'8px 10px', background:'rgba(0,0,0,0.2)',
+                  borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)',
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+                }}>
+                  <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>{c.name}</span>
+                  <span style={{ fontSize:18, color:c.color, fontWeight:800 }}>{c.dir}</span>
+                  <span style={{ fontSize:11, color:'var(--text-secondary)', textAlign:'center', lineHeight:1.3 }}>{c.phase}</span>
                 </div>
               ))}
             </div>

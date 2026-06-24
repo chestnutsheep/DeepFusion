@@ -134,7 +134,7 @@ function fuzzyMatchIndustry(thName, swIndustries) {
 // ═══════════════════════════════════════════════════════
 
 /** 单张晴雨表卡片 */
-function BarometerCard({ name, thName, role, close, change, prevChange, score }) {
+function BarometerCard({ name, thName, role, close, change, prevChange, score, date }) {
   const isPositive = change != null && change >= 0;
   const arrow = change != null ? (isPositive ? '▲' : '▼') : '';
   const changeColor = isPositive ? 'var(--accent-red)' : 'var(--accent-green)';
@@ -144,33 +144,44 @@ function BarometerCard({ name, thName, role, close, change, prevChange, score })
   const roleBg = role === '先行' ? 'rgba(91,186,87,0.12)' : 'rgba(248,81,73,0.12)';
   const nameMismatch = thName && thName !== name;
 
+  // 主显示值：优先涨跌幅，其次收盘价，不显示得分
+  const mainDisplay = change != null
+    ? `${isPositive ? '+' : ''}${change.toFixed(2)}%`
+    : close != null
+      ? close.toFixed(2)
+      : '—';
+
   return (
-    <CardWrapper style={{ padding: '14px 18px', minWidth: 0, flex: '1 1 0' }}>
-      {/* 第一行：行业名称(14px) + 右侧角色标签 */}
+    <CardWrapper style={{ padding: '16px 20px', minWidth: 0, flex: '1 1 0' }}>
+      {/* 第一行：行业名称 + 右侧角色标签 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {name}
-          {nameMismatch && <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', lineHeight: 1.2 }}>({thName})</span>}
+          {nameMismatch && <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', lineHeight: 1.2 }}>({thName})</span>}
         </span>
         <span style={{
-          fontSize: 11, fontWeight: 700, color: roleColor,
-          background: roleBg, padding: '2px 8px', borderRadius: 10,
+          fontSize: 12, fontWeight: 700, color: roleColor,
+          background: roleBg, padding: '3px 10px', borderRadius: 10,
           border: `1px solid ${roleColor}33`, flexShrink: 0, marginLeft: 6,
         }}>
           {role}
         </span>
       </div>
-      {/* 第二行：实时行情(20px加粗) + 红/绿箭头±X% */}
+      {/* 第二行：主数值(22px加粗) + 箭头 */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
-          {close != null ? close.toFixed(2) : score != null ? `得分 ${score.toFixed(0)}` : '—'}
+        <span style={{ fontSize: 22, fontWeight: 800, color: change != null ? changeColor : 'var(--text-primary)' }}>
+          {mainDisplay}
         </span>
-        {change != null && (
-          <span style={{ fontSize: 13, fontWeight: 700, color: changeColor, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-            {arrow} {isPositive ? '+' : ''}{change.toFixed(2)}%
+        {change != null && close != null && (
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
+            {close.toFixed(2)}
           </span>
         )}
       </div>
+      {/* 第三行：日期 */}
+      {date && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{date}</div>
+      )}
     </CardWrapper>
   );
 }
@@ -179,8 +190,9 @@ function BarometerCard({ name, thName, role, close, change, prevChange, score })
 //  验证球（Checkpoint）
 // ═══════════════════════════════════════════════════════
 
-/** 种植业与林业方向验证球 */
+/** 种植业方向验证球 */
 function CheckpointIndicator({ name, dates, matrix }) {
+  const latestDate = dates.length > 0 ? [...dates].sort()[dates.length - 1] : null;
   const result = useMemo(() => {
     if (!dates.length || !matrix[name]) return { status: 'nodata', desc: '无数据' };
     const sortedDates = [...dates].sort();
@@ -212,8 +224,8 @@ function CheckpointIndicator({ name, dates, matrix }) {
   const glowSize = 12;
 
   return (
-    <CardWrapper style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 100, gap: 4 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2 }}>
+    <CardWrapper style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 100, gap: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2 }}>
         {name}
       </div>
       <div style={{
@@ -227,9 +239,12 @@ function CheckpointIndicator({ name, dates, matrix }) {
           {result.status === 'continuation' ? '→' : result.status === 'reversal' ? '↺' : result.status === 'recovery' ? '↑' : result.status === 'pause' ? '⏸' : '?'}
         </span>
       </div>
-      <span style={{ fontSize: 10, fontWeight: 700, color: dotColor, textAlign: 'center' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: dotColor, textAlign: 'center' }}>
         {result.desc}
       </span>
+      {latestDate && (
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>{latestDate}</span>
+      )}
     </CardWrapper>
   );
 }
@@ -240,6 +255,9 @@ function CheckpointIndicator({ name, dates, matrix }) {
 
 function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Dates }) {
   const parsed = useMemo(() => parseCausality(causalityData), [causalityData]);
+
+  // 数据日期
+  const causalDate = parsed?.meta?.date_range?.[1] || (l1Dates.length > 0 ? [...l1Dates].sort()[l1Dates.length - 1] : null);
 
   // 计算传导状态
   const conductionStatus = useMemo(() => {
@@ -294,61 +312,67 @@ function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Da
         {/* 传导状态灯 */}
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700,
+          padding: '3px 10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
           background: `${conductionStatus.color}18`, color: conductionStatus.color,
           border: `1px solid ${conductionStatus.color}33`,
         }}>
           {conductionStatus.icon} {conductionStatus.label}
         </span>
+        {/* 数据日期 */}
+        {causalDate && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+            数据截至 {causalDate}
+          </span>
+        )}
       </div>
 
       {/* 传导链列表 */}
       {topPairs.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {topPairs.slice(0, 5).map((pair, idx) => (
             <div key={idx} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 10px', borderRadius: 6, fontSize: 'var(--fs-xs)',
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 12px', borderRadius: 6, fontSize: 'var(--fs-sm)',
               background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-subtle)',
             }}>
-              <span style={{ fontWeight: 700, color: '#5bba57' }}>
+              <span style={{ fontWeight: 700, color: '#5bba57', fontSize: 14 }}>
                 {CAUSAL_ROLE.leading.icon} {pair.source}
               </span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                 ──({pair.lag}日)──→
               </span>
-              <span style={{ fontWeight: 700, color: '#f85149' }}>
+              <span style={{ fontWeight: 700, color: '#f85149', fontSize: 14 }}>
                 {pair.target} {CAUSAL_ROLE.lagging.icon}
               </span>
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', padding: '8px 0' }}>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', padding: '8px 0' }}>
           暂无因果传导数据，请运行 industry_themes_causality
         </div>
       )}
 
       {/* 领先/滞后行业摘要 */}
       {leading.length > 0 && (
-        <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(91,186,87,0.06)', border: '1px solid rgba(91,186,87,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#5bba57', marginBottom: 4 }}>
+        <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 6, background: 'rgba(91,186,87,0.06)', border: '1px solid rgba(91,186,87,0.15)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#5bba57', marginBottom: 4 }}>
               {CAUSAL_ROLE.leading.icon} 领先行业
             </div>
             {leading.slice(0, 5).map((i, idx) => (
-              <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <div key={idx} style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
                 <span>{i.industry}</span>
                 <span style={{ fontWeight: 700, color: '#5bba57' }}>+{i.score}</span>
               </div>
             ))}
           </div>
-          <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(248,81,73,0.06)', border: '1px solid rgba(248,81,73,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#f85149', marginBottom: 4 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 6, background: 'rgba(248,81,73,0.06)', border: '1px solid rgba(248,81,73,0.15)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f85149', marginBottom: 4 }}>
               {CAUSAL_ROLE.lagging.icon} 滞后行业
             </div>
             {lagging.slice(0, 5).map((i, idx) => (
-              <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <div key={idx} style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
                 <span>{i.industry}</span>
                 <span style={{ fontWeight: 700, color: '#f85149' }}>{i.score}</span>
               </div>
@@ -366,6 +390,7 @@ function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Da
 
 function CommunityComparisonSection({ themesData }) {
   const parsed = useMemo(() => parseThemes(themesData), [themesData]);
+  const themesDate = parsed?.meta?.date_range?.[1] || null;
 
   const communities = useMemo(() => {
     if (!parsed?.themes) return [];
@@ -393,19 +418,24 @@ function CommunityComparisonSection({ themesData }) {
 
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
         ⚔️ 阵营对比
+        {themesDate && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
+            数据截至 {themesDate}
+          </span>
+        )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         {communities.map((c, idx) => (
-          <CardWrapper key={idx} style={{ padding: '12px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: c.dominant ? '#D4A853' : 'var(--text-secondary)' }}>
+          <CardWrapper key={idx} style={{ padding: '14px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: c.dominant ? '#D4A853' : 'var(--text-secondary)' }}>
                 {c.representative} 等{c.nMembers}行业
               </span>
               <span style={{
-                fontSize: 10, fontWeight: 700,
-                padding: '2px 8px', borderRadius: 10,
+                fontSize: 11, fontWeight: 700,
+                padding: '3px 10px', borderRadius: 10,
                 background: c.dominant ? 'rgba(212,168,83,0.15)' : 'rgba(91,139,168,0.15)',
                 color: c.dominant ? '#D4A853' : '#5B8FA8',
                 border: `1px solid ${c.dominant ? 'rgba(212,168,83,0.3)' : 'rgba(91,139,168,0.3)'}`,
@@ -413,7 +443,7 @@ function CommunityComparisonSection({ themesData }) {
                 {c.dominant ? '🔥主导' : '跟随'}
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
               <div>内聚 <b style={{ color: 'var(--text-primary)' }}>{c.avgCorr?.toFixed(3) ?? '—'}</b></div>
               <div>5日动量 <b style={{ color: (c.momentum?.avg_5d || 0) >= 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
                 {c.momentum?.avg_5d != null ? `${c.momentum.avg_5d >= 0 ? '+' : ''}${(c.momentum.avg_5d * 100).toFixed(2)}%` : '—'}
@@ -436,6 +466,7 @@ function CommunityComparisonSection({ themesData }) {
 
 function LinkageMonitorSection({ dccData }) {
   const parsed = useMemo(() => parseDCC(dccData), [dccData]);
+  const dccDate = parsed?.meta?.date_range?.[1] || null;
 
   const changes = parsed?.corr_change_top || [];
   const increased = changes.filter(c => c.direction === 'up').slice(0, THRESHOLDS.linkageChangeTopK);
@@ -453,13 +484,18 @@ function LinkageMonitorSection({ dccData }) {
 
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
         🔗 联动关系变化
+        {dccDate && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
+            数据截至 {dccDate}
+          </span>
+        )}
       </div>
 
       {increased.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#5bba57', marginBottom: 4 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#5bba57', marginBottom: 4 }}>
             {LINKAGE_TYPE.increase.icon} 增强
           </div>
           {increased.map((item, idx) => {
@@ -467,9 +503,9 @@ function LinkageMonitorSection({ dccData }) {
             const interp = interpret(pair, item.change || 0);
             return (
               <div key={idx} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '4px 8px', marginBottom: 2, borderRadius: 4,
-                fontSize: 11, background: 'rgba(91,186,87,0.06)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', marginBottom: 3, borderRadius: 4,
+                fontSize: 13, background: 'rgba(91,186,87,0.06)',
               }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{pair.join(' ↔ ')}</span>
                 <span style={{ color: '#5bba57', fontWeight: 700 }}>+{(item.change || 0).toFixed(4)}</span>
@@ -482,7 +518,7 @@ function LinkageMonitorSection({ dccData }) {
 
       {decreased.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#f85149', marginBottom: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#f85149', marginBottom: 4 }}>
             {LINKAGE_TYPE.decrease.icon} 减弱
           </div>
           {decreased.map((item, idx) => {
@@ -490,9 +526,9 @@ function LinkageMonitorSection({ dccData }) {
             const interp = interpret(pair, item.change || 0);
             return (
               <div key={idx} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '4px 8px', marginBottom: 2, borderRadius: 4,
-                fontSize: 11, background: 'rgba(248,81,73,0.06)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', marginBottom: 3, borderRadius: 4,
+                fontSize: 13, background: 'rgba(248,81,73,0.06)',
               }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{pair.join(' ↔ ')}</span>
                 <span style={{ color: '#f85149', fontWeight: 700 }}>{(item.change || 0).toFixed(4)}</span>
@@ -668,7 +704,7 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
       // 模糊匹配 THS 行业名 → SW 行情数据
       const match = fuzzyMatchIndustry(thName, l1Industries) || fuzzyMatchIndustry(thName, l2Industries);
 
-      let close = null, change = null, prevChange = null, matchedName = thName;
+      let close = null, change = null, prevChange = null, matchedName = thName, date = null;
       if (match) {
         const useL1 = l1Industries.some(i => i.name === match.name);
         const srcDates = useL1 ? l1Dates : l2Dates;
@@ -676,13 +712,14 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
         close = match.close;
         change = match.change;
         matchedName = match.name;
+        date = match.date;
         const sortedDates = [...srcDates].sort();
         const lastIdx = sortedDates.indexOf(match.date);
         const prevDate = lastIdx > 0 ? sortedDates[lastIdx - 1] : null;
         prevChange = prevDate ? srcMatrix[match.name]?.[prevDate] : null;
       }
 
-      return { name: matchedName, thName, role, close, change, prevChange, score: ind.score };
+      return { name: matchedName, thName, role, close, change, prevChange, score: ind.score, date };
     };
 
     return {
@@ -696,8 +733,8 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
     <div>
       {/* 晴雨表卡片行 */}
       <div style={{
-        display: 'flex', gap: 10, alignItems: 'stretch',
-        marginBottom: 16,
+        display: 'flex', gap: 14, alignItems: 'stretch',
+        marginBottom: 20,
       }}>
         {/* 先行组 */}
         {barometerData.leadingCards.map(card => (

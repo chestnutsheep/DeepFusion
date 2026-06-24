@@ -124,35 +124,48 @@ function parseDaily(csv) {
 
 // ── 区块组件 ──
 
-/** 英雄区 */
-function Hero({ industries }) {
+/** 英雄区 — 只展示实际数据信息，不堆砌废话 */
+function Hero({ industries, dates }) {
   const topInd = industries.length > 0
     ? [...industries].sort((a, b) => (b.change || 0) - (a.change || 0))[0]
     : null;
+  const bottomInd = industries.length > 0
+    ? [...industries].sort((a, b) => (a.change || 0) - (b.change || 0))[0]
+    : null;
+  const latestDate = dates.length > 0 ? dates[dates.length - 1] : '—';
+  const avgChange = industries.length > 0
+    ? industries.reduce((s, i) => s + (i.change || 0), 0) / industries.length
+    : null;
   return (
     <div style={{
-      padding: '32px 0 20px',
+      padding: '28px 0 16px',
       borderBottom: '1px solid var(--border-subtle)',
       marginBottom: 24,
     }}>
-      <span style={{
-        display: 'inline-block', padding: '4px 14px',
-        background: 'var(--shadow-glow)', border: '1px solid var(--border-subtle)',
-        borderRadius: 20, fontSize: 'var(--fs-sm)', fontWeight: 600,
-        color: 'var(--accent-gold)', marginBottom: 10,
-      }}>✦ DeepFusion · 中观产业</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span style={{
+          display: 'inline-block', padding: '4px 14px',
+          background: 'var(--shadow-glow)', border: '1px solid var(--border-subtle)',
+          borderRadius: 20, fontSize: 'var(--fs-sm)', fontWeight: 600,
+          color: 'var(--accent-gold)',
+        }}>✦ 中观产业</span>
+        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', background: 'rgba(212,168,83,0.1)', padding: '3px 10px', borderRadius: 12 }}>
+          {latestDate}
+        </span>
+      </div>
       <h1 style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700, letterSpacing: 0.5 }}>
         行业景气与 <span style={{ color: 'var(--accent-gold)' }}>产业链定位</span>
       </h1>
-      <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', maxWidth: 640, marginTop: 4 }}>
-        行业热度追踪 · 产业链结构拆解 · 景气轮动信号 · 与宏观/微观联动
-      </p>
-      <div style={{ display: 'flex', gap: 18, marginTop: 10, fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
-        <span>◈ 数据源: akshare · 申万行业</span>
-        <span>◈ 覆盖: {industries.length} 申万一级行业</span>
-        <span>◈ 更新: 日频</span>
+      <div style={{ display: 'flex', gap: 20, marginTop: 8, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', alignItems: 'center' }}>
+        <span>覆盖 <b style={{ color: 'var(--text-primary)' }}>{industries.length}</b> 行业</span>
+        {avgChange != null && (
+          <span>均涨 <b style={{ color: avgChange >= 0 ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>{avgChange >= 0 ? '+' : ''}{avgChange.toFixed(2)}%</b></span>
+        )}
         {topInd && topInd.change != null && (
-          <span>◈ 领涨: <span style={{ color: 'var(--accent-red)' }}>{topInd.name} {topInd.change >= 0 ? '+' : ''}{topInd.change.toFixed(2)}%</span></span>
+          <span>领涨 <b style={{ color: 'var(--accent-red)' }}>{topInd.name} {topInd.change >= 0 ? '+' : ''}{topInd.change.toFixed(2)}%</b></span>
+        )}
+        {bottomInd && bottomInd.change != null && (
+          <span>领跌 <b style={{ color: 'var(--accent-green)' }}>{bottomInd.name} {bottomInd.change >= 0 ? '+' : ''}{bottomInd.change.toFixed(2)}%</b></span>
         )}
       </div>
     </div>
@@ -1063,7 +1076,7 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
   return (
     <div style={{ marginTop: 4 }}>
       <SectionHeader badge="🔍 行业详情" title="当前选中" highlight={sel.name} desc="点击行业名称切换" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 20 }}>
         {/* 行业概况 */}
         <CardWrapper style={{ padding: 'var(--sp-lg)' }}>
           <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent-gold)', marginBottom: 8 }}>📊 行业概况</div>
@@ -1093,14 +1106,14 @@ function IndustryDetail({ sel, chartData, latest, prev }) {
         ))}
       </div>
       {/* 图表区 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20 }}>
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>📈 行业指数走势 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>· 近 1 年</span></h3>
-          <DataChart data={chartData} series={[{ key: 'close', name: `${sel.name}指数`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} />
+          <DataChart data={chartData} series={[{ key: 'close', name: `${sel.name}指数`, color: '#D4A853', type: 'line' }]} dateKey="period" height={260} showYAxisToggle={false} />
         </CardWrapper>
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>📊 涨跌幅走势 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 400 }}>· 近期</span></h3>
-          <DataChart data={chartData} series={[{ key: 'change', name: '涨跌幅', color: '#6abbdb', type: 'bar' }]} dateKey="period" height={260} />
+          <DataChart data={chartData} series={[{ key: 'change', name: '涨跌幅', color: '#6abbdb', type: 'bar' }]} dateKey="period" height={260} showYAxisToggle={false} />
         </CardWrapper>
       </div>
     </div>
@@ -1139,7 +1152,7 @@ function ChainView({ industries }) {
   return (
     <div>
       <SectionHeader badge="⛓️ 产业链穿透" title="从宏观到微观的" highlight="传导路径" desc="上游原材料 → 中游制造 → 下游消费，每一环节的关键变量" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
         <ChainCard title="上游 · 原材料" icon="⬆" items={upstream} borderColor="var(--accent-gold)" />
         <ChainCard title="中游 · 制造" icon="➡" items={midstream} borderColor="var(--accent-blue)" />
         <ChainCard title="下游 · 消费" icon="⬇" items={downstream} borderColor="var(--accent-green)" />
@@ -1175,13 +1188,13 @@ function EnergySection() {
   return (
     <div>
       <SectionHeader badge="⚡ 能源监测" title="能源价格与" highlight="产量追踪" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 16 }}>
         <DataCard label="🛢️ 原油" value={oilLatest} unit="元/桶" decimals={1} higherBetter={null}
           detail="INE主力合约" />
         <DataCard label="⚡ 动力煤" value={coalLatest} unit="元/吨" decimals={0} higherBetter={null}
           detail="郑商所主力合约" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20 }}>
         <CardWrapper style={{ padding: 'var(--sp-xl)' }}>
           <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 600, marginBottom: 10 }}>原油价格走势</h3>
           <DataChart data={oilData} series={[{ key: 'close', name: '原油', color: '#C47B7B', type: 'line' }]} dateKey="period" height={240} />
@@ -1328,7 +1341,7 @@ export default function MesoLayout() {
   return (
     <div>
       {/* 英雄区 */}
-      <ErrorBoundary><Hero industries={industries} /></ErrorBoundary>
+      <ErrorBoundary><Hero industries={industries} dates={dates} /></ErrorBoundary>
 
       {/* 动态警告条 */}
       <ErrorBoundary>
@@ -1529,7 +1542,7 @@ export default function MesoLayout() {
       {/* ═══ 区块三：排名详情 ═══ */}
       <section id="ranking" style={{ paddingBottom: 24 }}>
         <SectionHeader badge="📊 行业排名" title="当期" highlight="TOP / BOTTOM" desc="各维度排名前 5 / 后 5 行业" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20, marginBottom: 20 }}>
           <RankingTable title="🔥 涨幅 TOP 5" subtitle="· 今日" items={top5} colorKey="up" />
           <RankingTable title="❄️ 跌幅 TOP 5" subtitle="· 今日" items={bottom5} colorKey="down" />
         </div>

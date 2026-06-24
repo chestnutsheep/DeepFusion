@@ -31,15 +31,15 @@ export default function CardWrapper({
     WebkitBackdropFilter: 'blur(16px) saturate(1.15)',
     border: hovered && hoverable
       ? '1.5px solid rgba(212,168,83,0.85)'
-      : '1px solid rgba(212,168,83,0.5)',
+      : '1.5px solid rgba(212,168,83,0.50)',
     borderRadius: 'var(--radius)',
     padding: 'var(--sp-lg)',
     position: 'relative',
     transition: 'all var(--transition, 0.25s ease)',
     overflow: truncate ? 'hidden' : undefined,
     boxShadow: hovered && hoverable
-      ? 'inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.3), 0 0 18px rgba(212,168,83,0.1)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.22), 0 0 6px rgba(212,168,83,0.03)',
+      ? 'inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 32px rgba(0,0,0,0.35), 0 0 20px rgba(212,168,83,0.12)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 24px rgba(0,0,0,0.28), 0 0 8px rgba(212,168,83,0.05)',
     transform: hovered && hoverable ? 'translateY(-1px)' : 'none',
   };
 
