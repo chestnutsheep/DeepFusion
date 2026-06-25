@@ -138,9 +138,9 @@ export default function DataChart({
           data: seriesData,
           smooth: !isReturnMode, // 收益率模式不平滑，保留波动细节
           connectNulls: !isReturnMode, // 收益率模式不连接 null（首个点）
-          lineStyle: { color: s.color, width: isReturnMode ? 1.2 : 2 },
+          lineStyle: { color: s.color, width: isReturnMode ? 1.2 : (s.lineWidth || 2), ...(s.lineStyle || {}) },
           areaStyle: s.type !== 'bar' && !isReturnMode
-            ? { opacity: 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            ? { opacity: s.areaOpacity ?? 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
               ]) }
             : (isReturnMode ? { opacity: 0.04 } : undefined),

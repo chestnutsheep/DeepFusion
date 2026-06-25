@@ -55,25 +55,38 @@ function MethodCards() {
   const methods = [
     { ...KONDRATIEV_CONFIG.methodMetrics[0], value: pca.confidence != null ? pca.confidence : null, phase: pca.phase || 0, phaseName: pca.phase_name || '—',
       globalPhase: pca.global_phase || 0, globalPhaseName: pca.global_phase_name || '',
-      chinaPhase: pca.china_phase || 0, chinaPhaseName: pca.china_phase_name || '' },
+      chinaPhase: pca.china_phase || 0, chinaPhaseName: pca.china_phase_name || '',
+      pcaVar: pca.pca_variance_ratio },
     { ...KONDRATIEV_CONFIG.methodMetrics[1], value: wavelet.confidence != null ? wavelet.confidence : null, phase: wavelet.phase || 0, phaseName: wavelet.phase_name || '—',
       globalPhase: wavelet.global_phase || 0, globalPhaseName: wavelet.global_phase_name || '',
-      chinaPhase: wavelet.china_phase || 0, chinaPhaseName: wavelet.china_phase_name || '' },
+      chinaPhase: wavelet.china_phase || 0, chinaPhaseName: wavelet.china_phase_name || '',
+      pcaVar: wavelet.pca_variance_ratio },
     { ...KONDRATIEV_CONFIG.methodMetrics[2], value: bandpass.confidence != null ? bandpass.confidence : null, phase: bandpass.phase || 0, phaseName: bandpass.phase_name || '—',
       globalPhase: bandpass.global_phase || 0, globalPhaseName: bandpass.global_phase_name || '',
-      chinaPhase: bandpass.china_phase || 0, chinaPhaseName: bandpass.china_phase_name || '' },
+      chinaPhase: bandpass.china_phase || 0, chinaPhaseName: bandpass.china_phase_name || '',
+      pcaVar: bandpass.pca_variance_ratio },
   ];
 
   return (
     <div style={{ marginTop: 16 }}>
       <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: 'var(--accent-gold)' }}>
-        🔬 三种计算方法对比
+        三种计算方法对比
       </h3>
+      <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+        三种方法从不同数学视角提取同一组数据的40-70年长波成分，结果应互相印证。
+        <b style={{ color: 'var(--text-primary)' }}>PCA频谱法</b>用主成分分析降维后做带通滤波（覆盖度=PCA第一主成分解释的方差比例）；
+        <b style={{ color: 'var(--text-primary)' }}>小波分析法</b>用Morlet变换在时频域定位周期位置；
+        <b style={{ color: 'var(--text-primary)' }}>带通滤波法</b>用Butterworth滤波器直接提取长波。
+        三者置信度含义不同，不可直接横向比较数值大小。
+      </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {methods.map((m) => {
           const ps = PHASE_STYLE[m.phase] || PHASE_STYLE[0];
           const gps = PHASE_STYLE[m.globalPhase] || PHASE_STYLE[0];
           const cps = PHASE_STYLE[m.chinaPhase] || PHASE_STYLE[0];
+          const phaseTag = m.phaseName && m.phaseName !== '—'
+            ? <span style={{ background: ps.bg, border: `1px solid ${ps.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 'var(--fs-xs)', fontWeight: 700, color: ps.border }}>{ps.arrow} {m.phaseName}</span>
+            : null;
           return (
             <DataCard
               key={m.method}
@@ -488,6 +501,105 @@ function CycleGantt() {
   );
 }
 
+/**
+ * 四周期互验互斥标签：判断当前四周期相位是否互相印证或矛盾，
+ * 帮助用户理解综合结论的可信度。
+ *
+ * 规则：
+ *   - 全部扩张(1/2) → "共振扩张" (强看多信号)
+ *   - 全部收缩(3/4) → "共振收缩" (强看空信号)
+ *   - 扩张+收缩混合 → "相位分歧" (信号矛盾，需谨慎)
+ *   - 3同+1异 → "弱分歧" (主流方向明确但有一周期逆行)
+ */
+function PhaseConsistency() {
+  const { data: rawData } = useMCP('cycle_nesting', {});
+
+  const rows = useMemo(() => {
+    if (!rawData) return [];
+    try {
+      const parsed = JSON.parse(rawData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }, [rawData]);
+
+  const analysis = useMemo(() => {
+    if (!rows.length) return null;
+    const latest = rows[rows.length - 1];
+    const cycleIds = ['kondratiev', 'kuznets', 'juglar', 'kitchin'];
+    const phases = cycleIds.map(cid => latest?.[`${cid}_phase`] ?? 0);
+    const names = cycleIds.map(cid => latest?.[`${cid}_name`] ?? '—');
+
+    // 扩张相位(1,2) vs 收缩相位(3,4)
+    const expanding = phases.filter(p => p === 1 || p === 2).length;
+    const contracting = phases.filter(p => p === 3 || p === 4).length;
+    const unknown = phases.filter(p => p === 0).length;
+
+    let verdict, verdictColor, verdictIcon;
+    if (unknown >= 2) {
+      verdict = '数据不足'; verdictColor = '#888'; verdictIcon = '⚠';
+    } else if (expanding === 4) {
+      verdict = '共振扩张'; verdictColor = '#5bba57'; verdictIcon = '⬆';
+    } else if (contracting === 4) {
+      verdict = '共振收缩'; verdictColor = '#f85149'; verdictIcon = '⬇';
+    } else if (expanding === 3 && contracting === 1) {
+      verdict = '弱分歧(3扩1缩)'; verdictColor = '#D4A853'; verdictIcon = '↗';
+    } else if (contracting === 3 && expanding === 1) {
+      verdict = '弱分歧(3缩1扩)'; verdictColor = '#D4A853'; verdictIcon = '↘';
+    } else {
+      verdict = '相位分歧'; verdictColor = '#cc4842'; verdictIcon = '⚡';
+    }
+
+    // 各周期简要标签
+    const tags = cycleIds.map((cid, i) => {
+      const p = phases[i];
+      const isExpand = p === 1 || p === 2;
+      const style = PHASE_STYLE[p] || PHASE_STYLE[0];
+      return { id: cid, label: NEST_LABELS[cid], phase: p, name: names[i], isExpand, style };
+    });
+
+    return { verdict, verdictColor, verdictIcon, expanding, contracting, unknown, tags };
+  }, [rows]);
+
+  if (!analysis) return null;
+
+  return (
+    <CardWrapper style={{ padding: 'var(--sp-lg) var(--sp-xl)', marginTop: 'var(--sp-lg)' }}>
+      <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 10 }}>
+        互验互斥判断
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: `${analysis.verdictColor}18`, border: `1.5px solid ${analysis.verdictColor}`,
+          borderRadius: 'var(--radius-sm)', padding: '6px 16px',
+          fontSize: 'var(--fs-md)', fontWeight: 700, color: analysis.verdictColor,
+        }}>
+          {analysis.verdictIcon} {analysis.verdict}
+        </span>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+          {analysis.expanding}个扩张 · {analysis.contracting}个收缩 · {analysis.unknown}个未知
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {analysis.tags.map(t => (
+          <span key={t.id} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: t.style.bg, border: `1px solid ${t.style.border}`,
+            borderRadius: 4, padding: '3px 10px',
+            fontSize: 'var(--fs-sm)', fontWeight: 600, color: t.style.border,
+          }}>
+            {t.label}: {t.style.arrow} {t.name}
+          </span>
+        ))}
+      </div>
+      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+        共振扩张=四周期同处扩张半周期(复苏/繁荣)，经济上行信号最强；共振收缩=四周期同处收缩半周期(衰退/萧条)，下行风险最大；
+        相位分歧=多周期方向矛盾，综合信号弱化，需等待分歧收敛后再做判断。
+      </div>
+    </CardWrapper>
+  );
+}
+
 export default function MacroPage() {
   return (
     <ErrorBoundary>
@@ -532,6 +644,7 @@ export default function MacroPage() {
           四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
         </p>
         <ErrorBoundary><CycleGantt /></ErrorBoundary>
+        <ErrorBoundary><PhaseConsistency /></ErrorBoundary>
       </div>
     </div>
     </ErrorBoundary>

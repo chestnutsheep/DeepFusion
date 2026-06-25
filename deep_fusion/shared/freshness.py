@@ -125,7 +125,7 @@ DATA_CLASSIFICATION: dict[str, dict] = {
     "cycles_data_kitchin_extended_v1": {"kind": "derived", "version": "v1",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
     "cycles_data_juglar_extended_v1":  {"kind": "derived", "version": "v1",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
     "cycles_data_kuznets_extended_v1": {"kind": "derived", "version": "v1",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
-    "cycles_nesting_v3":               {"kind": "derived", "version": "v3",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
+    "cycles_nesting_v4":               {"kind": "derived", "version": "v4",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
     "cycles_report_kondratiev_pca_v3": {"kind": "derived", "version": "v3",  "weight": "中量", "ttl": 604800,  "ttl2": 2592000},
     "cycles_report_kondratiev_wavelet_v3": {"kind": "derived", "version": "v3", "weight": "中量", "ttl": 604800, "ttl2": 2592000},
     "cycles_report_kondratiev_bandpass_v3": {"kind": "derived", "version": "v3", "weight": "中量", "ttl": 604800, "ttl2": 2592000},

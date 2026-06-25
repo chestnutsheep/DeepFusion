@@ -4,6 +4,7 @@
 """
 import json
 import logging
+import math
 from typing import Any
 
 from pydantic import Field
@@ -115,6 +116,23 @@ for _cid in ["kitchin", "juglar", "kuznets"]:
 
 
 # ── data_* 工具（返回 JSON 数据） ──────────────────────────
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="data_kitchin",
     description="获取基钦周期（库存周期）各阶段定位数据（JSON数组）",
@@ -136,6 +154,23 @@ def data_kitchin() -> str:
     return text
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="data_juglar",
     description="获取朱格拉周期（固定资本投资周期）各阶段定位数据（JSON数组）",
@@ -155,6 +190,23 @@ def data_juglar() -> str:
     text = json.dumps(results, ensure_ascii=False)
     _ck.set(text)
     return text
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -179,6 +231,23 @@ def data_kuznets() -> str:
 
 
 # ── FRED 扩展周期工具 ─────────────────────────────────────
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="data_kitchin_extended",
     description="基钦周期 FRED 扩展版（1919~），工业生产+制造商库存+M2，年频JSON数组",
@@ -195,6 +264,23 @@ def data_kitchin_extended() -> str:
     if rows:
         _ck.set(text)
     return text
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -215,6 +301,23 @@ def data_juglar_extended() -> str:
     return text
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="data_kuznets_extended",
     description="库兹涅茨周期 FRED 扩展版（1947~），美国房价+新屋开工+住宅投资，年频JSON数组",
@@ -231,6 +334,40 @@ def data_kuznets_extended() -> str:
     if rows:
         _ck.set(text)
     return text
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -255,7 +392,7 @@ def cycle_nesting() -> str:
         compute_kuznets_extended,
     )
 
-    _ck_nest = CacheKey.init("cycles_nesting_v3", ttl=604800, ttl2=2592000)
+    _ck_nest = CacheKey.init("cycles_nesting_v4", ttl=604800, ttl2=2592000)
     cached = _ck_nest.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -267,37 +404,47 @@ def cycle_nesting() -> str:
     kondratiev_result, _ = _compute_kondratiev("pca")
 
     # ── 2. 构建康波逐行数据 ──
+    # 康波是40-70年超长周期，CF带通滤波后的zscore在近年有大幅年际波动
+    # （端点效应 + 噪声），导致逐点 level+momentum 判定在5年内走完完整四相位循环。
+    # 解决方案：先对zscore做9年滚动均值平滑（消除年际噪声），
+    # 再用相位角转换（mom_window=15 ≈ 周期1/4）映射为离散相位。
     k_years = kondratiev_result.get("years", [])
     k_zscore = kondratiev_result.get("zscore", [])
 
-    # 保留相位角转换逻辑（参考备用），但主绘图使用原始 zscore
     k_zscore_vals = [z if z is not None else 0.0 for z in k_zscore] if k_zscore else []
-    k_angles = zscore_to_phase_angle(k_zscore_vals)
+
+    # 9年滚动均值平滑（康波周期≈50年，9年MA消除短周期噪声）
+    k_zscore_smooth = _rolling_mean(k_zscore_vals, window=9)
+
+    # 康波：mom_window=15（≈周期1/4），避免短窗口噪声翻转
+    k_angles = zscore_to_phase_angle(k_zscore_smooth, mom_window=15)
     k_cont_signal = phase_angle_to_signal(k_angles)
+
+    # 从相位角映射为离散相位：θ∈[0,π/2)→1(复苏), [π/2,π)→2(繁荣),
+    #                         [π,3π/2)→3(衰退), [3π/2,2π)→4(萧条)
+    def _angle_to_phase(theta):
+        theta = theta % (2 * math.pi)
+        if theta < math.pi / 2:
+            return 1
+        elif theta < math.pi:
+            return 2
+        elif theta < 3 * math.pi / 2:
+            return 3
+        else:
+            return 4
 
     k_rows = []
     for i, year in enumerate(k_years):
         row = {"period": str(year)}
         if i < len(k_zscore):
-            z = k_zscore[i]
-            mom = k_zscore[i] - k_zscore[i - 1] if i > 0 else 0
-            if abs(mom) < 0.005 and i > 0:
-                mom = k_zscore[i - 1] - k_zscore[max(0, i - 5)]
-            if mom > 0 and z < 0:
-                phase = 1
-            elif mom > 0 and z >= 0:
-                phase = 2
-            elif mom < 0 and z >= 0:
-                phase = 3
-            elif mom < 0 and z < 0:
-                phase = 4
-            else:
-                phase = kondratiev_result.get("phase", 0)
+            # 使用相位角→离散相位，而非逐点 level+momentum
+            phase = _angle_to_phase(k_angles[i]) if i < len(k_angles) else kondratiev_result.get("phase", 0)
             row["phase"] = phase
             row["phase_name"] = MACRO_PHASE_NAMES.get(phase, "未知")
         row["composite_z"] = round(k_zscore_vals[i], 4) if i < len(k_zscore_vals) else None
         row["cont_signal"] = round(k_cont_signal[i], 4) if i < len(k_cont_signal) else None
         k_rows.append(row)
+    # 最后一年用 compute_kondratiev 的融合判定结果（更权威）
     if k_rows:
         k_rows[-1]["phase"] = kondratiev_result.get("phase", 0)
         k_rows[-1]["phase_name"] = kondratiev_result.get("phase_name", "未知")
@@ -389,6 +536,23 @@ def cycle_nesting() -> str:
 #  周期数据缓存工具
 # ============================================================
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="cycle_collect",
     description="预采集全部周期指标数据到本地 SQLite 缓存，避免每次分析重新拉取",
@@ -435,6 +599,23 @@ def cycle_collect() -> str:
     return "\n".join(lines)
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="fred_data",
     description="FRED 数据查询。传注册名(fred_ppiaco)或任意 series_id(GDPC1/UNRATE/...)",
@@ -459,6 +640,23 @@ def fred_data(
     return "\n".join(out)
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="fred_list",
     description="列出所有可采集的 FRED 数据集（共8个）",
@@ -470,6 +668,23 @@ def fred_list() -> str:
     for i in items:
         lines.append(f"  {i['key']:20s}  {i['series_id']:10s}  {i['desc']}")
     return "\n".join(lines)
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -502,6 +717,23 @@ def wb_data(
     return "\n".join(out)
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="wb_list",
     description="列出所有可采集的世界银行数据集（共7个）",
@@ -513,6 +745,23 @@ def wb_list() -> str:
     for i in items:
         lines.append(f"  {i['key']:25s}  {i['indicator']:25s}  {i['desc']}")
     return "\n".join(lines)
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -533,6 +782,23 @@ def cycle_cache_status() -> str:
 # ============================================================
 #  康波周期（单独注册，参数更多）
 # ============================================================
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="kondratiev_cycle",
     description="判断当前长波周期（康德拉季耶夫周期）阶段。可选方法: pca(默认, 8谱法+相位映射), wavelet(Morlet小波功率谱), bandpass(40-60年带通滤波)",
@@ -621,6 +887,23 @@ def kondratiev_cycle(
     return text
 
 
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
+
+
 @mcp.tool(
     name="chart_kondratiev_cycle",
     description="生成康波周期分析图（PCA合成指数+主周期标注），保存为PNG。可选方法: pca/wavelet/bandpass",
@@ -633,6 +916,23 @@ def chart_kondratiev_cycle(
     if not vals:
         return "数据不足"
     return _gen_kondratiev_chart(result, vals, output_path)
+
+
+def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
+    """滚动均值平滑，消除年际噪声。
+
+    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
+    保证输出与输入等长。
+    """
+    n = len(vals)
+    if n == 0:
+        return []
+    result = []
+    for i in range(n):
+        start = max(0, i - window + 1)
+        segment = vals[start:i + 1]
+        result.append(sum(segment) / len(segment))
+    return result
 
 
 @mcp.tool(
@@ -665,20 +965,36 @@ def data_kondratiev(
     )
 
     # 预计算连续相位角和强度 — 融合线
+    # 康波使用9年滚动均值+15年动量窗口，避免短窗口噪声翻转
     zscore_vals = [z if z is not None else 0.0 for z in zscore] if zscore else []
-    angles = zscore_to_phase_angle(zscore_vals)
+    zscore_smooth = _rolling_mean(zscore_vals, window=9)
+    angles = zscore_to_phase_angle(zscore_smooth, mom_window=15)
     intensity = phase_angle_to_intensity(angles)
     cont_signal = phase_angle_to_signal(angles)
 
     # 全球线相位角
     g_zs_vals = [z if z is not None else 0.0 for z in global_zscore] if global_zscore else []
-    g_angles = zscore_to_phase_angle(g_zs_vals)
+    g_zs_smooth = _rolling_mean(g_zs_vals, window=9)
+    g_angles = zscore_to_phase_angle(g_zs_smooth, mom_window=15)
     g_intensity = phase_angle_to_intensity(g_angles)
 
     # 中国线相位角
     c_zs_vals = [z if z is not None else 0.0 for z in china_zscore] if china_zscore else []
-    c_angles = zscore_to_phase_angle(c_zs_vals)
+    c_zs_smooth = _rolling_mean(c_zs_vals, window=9)
+    c_angles = zscore_to_phase_angle(c_zs_smooth, mom_window=15)
     c_intensity = phase_angle_to_intensity(c_angles)
+
+    # 从相位角映射为离散相位
+    def _angle_to_phase(theta):
+        theta = theta % (2 * math.pi)
+        if theta < math.pi / 2:
+            return 1
+        elif theta < math.pi:
+            return 2
+        elif theta < 3 * math.pi / 2:
+            return 3
+        else:
+            return 4
 
     rows = []
     for i, year in enumerate(years):
@@ -688,20 +1004,8 @@ def data_kondratiev(
         # ── 融合线 ──
         if i < len(zscore):
             row["zscore"] = zscore[i]
-            z = zscore[i]
-            mom = zscore[i] - zscore[i - 1] if i > 0 else 0
-            if abs(mom) < 0.005 and i > 0:
-                mom = zscore[i - 1] - zscore[max(0, i - 5)]
-            if mom > 0 and z < 0:
-                phase = 1
-            elif mom > 0 and z >= 0:
-                phase = 2
-            elif mom < 0 and z >= 0:
-                phase = 3
-            elif mom < 0 and z < 0:
-                phase = 4
-            else:
-                phase = result.get("phase", 0)
+            # 使用相位角→离散相位，而非逐点 level+momentum
+            phase = _angle_to_phase(angles[i]) if i < len(angles) else result.get("phase", 0)
             row["phase"] = phase
             row["phase_name"] = MACRO_PHASE_NAMES.get(phase, "未知")
             row["cycle_signal"] = get_phase_signal(phase)

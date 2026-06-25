@@ -7,18 +7,21 @@ export const KONDRATIEV_CONFIG = {
   params: { method: 'pca' },
   dataSource: '世界银行 / FRED; PCA+带通滤波+手动计算',
   chartSeries: [
-    { key: 'global_intensity', name: '全球周期', color: '#42a2dc', type: 'line', yAxisIndex: 0 },
-    { key: 'china_intensity', name: '中国周期', color: '#e74c3c', type: 'line', yAxisIndex: 0 },
-    { key: 'intensity', name: '融合强度', color: '#D4A853', type: 'line', yAxisIndex: 1 },
+    { key: 'global_intensity', name: '全球周期', color: '#42a2dc', type: 'line', yAxisIndex: 0,
+      lineWidth: 1.2, lineStyle: { opacity: 0.45 }, areaOpacity: 0.02 },
+    { key: 'china_intensity', name: '中国周期', color: '#e74c3c', type: 'line', yAxisIndex: 0,
+      lineWidth: 1.2, lineStyle: { opacity: 0.45 }, areaOpacity: 0.02 },
+    { key: 'intensity', name: '融合强度', color: '#D4A853', type: 'line', yAxisIndex: 1,
+      lineWidth: 2.5, areaOpacity: 0.06 },
   ],
   // 三种计算方法逐一对比，detail 填充悬浮解释文本
   methodMetrics: [
     { method: 'pca', label: 'PCA频谱法', decimals: 1, higherBetter: true,
-      detail: '通过带通滤波(40-70年)提取PCA合成指数主成分，结合历史拐点加权判定当前康波相位。置信度基于指标内一致性评分。' },
+      detail: 'PCA(主成分分析)将全球PPI+利率+GDP等多指标降维为一条合成线，再对合成线做CF带通滤波(40-70年)提取长波。置信度=指标间一致性评分（多指标同方向运动时更高）。覆盖度=PCA第一主成分解释的方差比例，反映"这条线代表多少原始信息"。' },
     { method: 'wavelet', label: '小波分析法', decimals: 1, higherBetter: true,
-      detail: '对PCA主成分序列进行Morlet连续小波变换，通过时频能量谱的相位角确定康波周期位置,置信度基于小波功率谱密度。' },
+      detail: '对PCA合成线做Morlet连续小波变换，在时频域中定位40-70年周期的能量峰值位置。优势：可同时看到周期在不同时段的强弱变化。置信度=小波功率谱密度在目标频段的集中度。注意：小波法与PCA法共享同一条输入线，不是独立数据源。' },
     { method: 'bandpass', label: '带通滤波法', decimals: 1, higherBetter: true,
-      detail: '采用Butterworth带通滤波器(40-70年)从PCA序列中提取长波成分,通过波形零交叉点和极值确定相位,置信度基于滤波残差。' },
+      detail: '用Butterworth带通滤波器(40-70年)从PCA合成线中直接提取长波成分，通过波形零交叉点和极值确定相位。置信度=滤波残差占比（残差越少，提取越干净）。三种方法的输入数据相同（全球+中国双线PCA），差异仅在于提取长波的数学工具。' },
   ],
   metrics: [
     { key: 'phase_name', label: '融合相位', unit: '', dir: false, card: true, decimals: 0, higherBetter: null },

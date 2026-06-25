@@ -63,7 +63,7 @@ This project uses Git. See .gitignore for excluded files.
 | `data_kitchin_extended()` | `cycles_data_kitchin_extended_v{N}` | v1 |
 | `data_juglar_extended()` | `cycles_data_juglar_extended_v{N}` | v1 |
 | `data_kuznets_extended()` | `cycles_data_kuznets_extended_v{N}` | v1 |
-| `cycle_nesting()` | `cycles_nesting_v{N}` | v3 |
+| `cycle_nesting()` | `cycles_nesting_v{N}` | v4 |
 
 **修改算法逻辑时，必须 +1 版本号**。版本号变更记录在 `deep_fusion/shared/freshness.py` 的 `DATA_CLASSIFICATION` 注册表中。
 

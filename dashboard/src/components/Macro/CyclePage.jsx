@@ -183,8 +183,8 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         }
 
         // 统一布局：图表全宽 + 指标卡下方网格
-        // 列数：≤4张用4列，5-6张用3列，>6张用4列
-        const gridCols = N <= 4 ? N : N <= 6 ? 3 : 4;
+        // 列数：≤6张用6列，>6张用4列（卡片已调大，6个一行更紧凑）
+        const gridCols = N <= 6 ? N : 4;
 
         return (
           <div style={{ marginBottom: 'var(--sp-2xl)' }}>
@@ -208,6 +208,25 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
             <p style={{ margin: `0 0 var(--sp-xs)` }}><b style={{ color: 'var(--text-primary)' }}>周期分量：</b>{config.explanation.cycleComponent}</p>
             <p style={{ margin: 0 }}><b style={{ color: 'var(--text-primary)' }}>可靠性：</b>{config.explanation.reliability}</p>
           </div>
+          {/* 当前相位配置建议 */}
+          {phaseValue > 0 && (
+            <div style={{ marginTop: 'var(--sp-md)', padding: 'var(--sp-md)', background: badge.bg, border: `1px solid ${badge.border}30`, borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: badge.color, marginBottom: 6 }}>
+                当前{phaseName}阶段的配置参考
+              </div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                {phaseValue === 1 && '复苏期：经济从谷底回升，先行指标转正但滞后指标仍弱。配置倾向：逐步加仓权益类资产，债券仍可持有但需警惕收益率上行。'}
+                {phaseValue === 2 && '繁荣期：经济全面扩张，多数指标强势。配置倾向：权益类资产为主，商品受益于需求旺盛，债券承压。注意繁荣末期拐点信号。'}
+                {phaseValue === 3 && '衰退期：经济从顶峰回落，先行指标转弱但滞后指标仍高。配置倾向：减仓权益，增配防御性资产（债券、黄金），规避周期性商品。'}
+                {phaseValue === 4 && '萧条期：经济深度收缩，多数指标低迷。配置倾向：债券+黄金为主，等待复苏信号。先行指标触底回升是拐点前兆。'}
+              </div>
+              {latest.confidence != null && (
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
+                  置信度 {(latest.confidence * 100).toFixed(0)}% — {latest.confidence >= 0.7 ? '信号较强，可参考配置' : latest.confidence >= 0.5 ? '信号中等，谨慎参考' : '信号偏弱，建议等待确认'}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
