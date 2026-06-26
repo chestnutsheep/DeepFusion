@@ -74,12 +74,33 @@ def _extract_detail(entry: dict) -> dict:
         if not entry.get("title"):
             entry["title"] = "(标题提取失败)"
 
-        # 日期
-        for el in soup.find_all(["span", "time", "p", "div"]):
-            m = _DATE_RE.search(el.get_text(strip=True))
-            if m:
-                entry["publish_date"] = m.group(1)
-                break
+        # 日期 — 多策略：URL路径 > meta > 正文元素
+        date_found = ""
+        # 策略1: 从 URL 路径提取（如 /202606/ 或 /2026/06/02/）
+        url_date_m = re.search(r"/(\d{4})[-_/]?(\d{2})[-_/]?(\d{2})?/", entry["url"])
+        if url_date_m:
+            y, mo = url_date_m.group(1), url_date_m.group(2)
+            d = url_date_m.group(3) or "01"
+            if 2000 <= int(y) <= 2100 and 1 <= int(mo) <= 12:
+                date_found = f"{y}-{mo}-{d}"
+        # 策略2: meta 标签（发布日期最可靠来源）
+        if not date_found:
+            for meta_attr in ["article:published_time", "publishdate", "pubdate", "datePublished"]:
+                meta_el = soup.find("meta", attrs={"property": meta_attr}) or soup.find("meta", attrs={"name": meta_attr})
+                if meta_el and meta_el.get("content"):
+                    date_found = meta_el["content"][:10]  # ISO 格式前10位
+                    break
+        # 策略3: 正文元素中的日期
+        if not date_found:
+            for el in soup.find_all(["span", "time", "p", "div"]):
+                m = _DATE_RE.search(el.get_text(strip=True))
+                if m:
+                    date_found = m.group(1)
+                    break
+        if date_found:
+            # 标准化为 ISO 格式
+            from ...shared.policy_db import _normalize_date
+            entry["publish_date"] = _normalize_date(date_found)
 
         # 机构 — 从 URL 推断比正文可靠
         if not entry.get("organization"):

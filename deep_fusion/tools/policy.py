@@ -1,6 +1,8 @@
 """Policy tracking MCP tools — 国务院政策文件抓取与检索。"""
 import json
+import re
 from collections import defaultdict
+from datetime import datetime
 
 from pydantic import Field
 
@@ -123,14 +125,15 @@ def policy_timeline(year: int | None = None) -> str:
     """
     from ..shared.policy_db import PolicyDB
     db = PolicyDB()
-    now_year = year or __import__("datetime").datetime.now().year
+    now_year = year or datetime.now().year
 
     # ── 按月聚合 ──
     monthly: dict[int, list[dict]] = defaultdict(list)
     results = db.search(limit=500, year=now_year)
     for r in results:
         date_str = r.get("publish_date", "") or ""
-        m = __import__("re").match(r"(\d{4})[-/年](\d{1,2})", date_str)
+        # 兼容 ISO 和中文日期格式提取月份
+        m = re.match(r"(\d{4})[-/年](\d{1,2})", date_str)
         if m:
             month_idx = int(m.group(2)) - 1
             if 0 <= month_idx < 12:

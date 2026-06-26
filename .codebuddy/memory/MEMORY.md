@@ -36,6 +36,7 @@
 - **MCP工具**: industry_themes / industry_themes_dcc / industry_themes_causality（在 industry.py）
 - **_val() 解包**：industry.py 工具参数用 `_val(param)` 解包 FieldInfo，兼容 MCP 框架和直接 Python 调用
 - **A股交易日注意**：行业日行情数据仅交易日有，周末/节假日无数据；数据截止差异属数据源更新时差，非代码 bug
+- **政策区日期标准化**（2026-06-26）：`policy_db.py` 的 `save()` 自动标准化日期为 ISO 格式；`search()` year 过滤兼容 ISO+中文（STRFTIME + LIKE 双条件）；爬虫 `_extract_detail()` 优先从 URL 路径/meta 标签提取日期；已入库数据用 `normalize_all_dates()` + 标题年份提取修正
 - 主线评分: 0.4×簇内相关 + 0.35×动量 + 0.25×资金流，趋势由rolling_corr变化判定
 - DCC-GARCH 用 arch 包做单变量GARCH(Step1)，自写Engle两步法(Step2)
 - Granger因果依赖 statsmodels，不可用时降级互相关（causality.py 自动处理）
