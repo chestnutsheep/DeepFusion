@@ -24,8 +24,9 @@
   --radius-lg: 6px;
   --font-sans: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', 'Inter', 'Fira Sans', sans-serif;
   --font-mono: 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
-  --nav-width: 270px;
+  --nav-width: 24%;
   --transition: 0.25s ease;
+  --sidebar-slide-duration: 0.35s;
 
   /* ── 响应式字体阶梯 clamp(min, preferred, max) ── */
   --fs-2xs:  clamp(11px,  0.2vw + 7px,  13px);
@@ -123,8 +124,8 @@ body::before {
   position: fixed;
   inset: 0;
   background: var(--bg-img, url('../assets/matin.JPEG')) bottom center / 100% auto no-repeat;
-  max-height: 100vh;
-  opacity: 0.30;
+  max-height: 80vh;
+  opacity: 0.25;
   z-index: -1;
   pointer-events: none;
 }
@@ -158,13 +159,13 @@ body::after {
   background: var(--bg-panel) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
-  border: 1.5px solid rgb(212 168 83 / 0.50) !important;
+  border: 2px solid rgb(212 168 83 / 0.50) !important;
   box-shadow: 0 6px 28px rgba(212,168,83,0.06), inset 0 1px 0 rgba(212,168,83,0.08) !important;
   transition: all var(--transition);
   margin-bottom: 4px !important;
 }
 [class*="card"]:hover {
-  border-color: rgb(233 186 96 / 0.73) !important;
+  border-color: rgb(233 186 96 / 0.75) !important;
   box-shadow: 0 8px 36px rgba(212,168,83,0.10), inset 0 1px 0 rgba(212,168,83,0.12) !important;
 }
 
@@ -176,6 +177,52 @@ body::after {
 #main-panel {
   position: relative;
   z-index: 2;
+  max-width: 80%;
+  margin: 0 auto;
+}
+
+/* ── 侧边栏滑入动画 ── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(3px);
+  z-index: 99;
+  opacity: 0;
+  transition: opacity var(--sidebar-slide-duration) ease;
+  pointer-events: none;
+}
+.sidebar-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-slide-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--nav-width);
+  max-width: 420px;
+  min-width: 260px;
+  z-index: 100;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  transform: translateX(-100%);
+  transition: transform var(--sidebar-slide-duration) cubic-bezier(0.22, 1, 0.36, 1),
+              width var(--sidebar-slide-duration) ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 4px 0 24px rgba(212,168,83,0.08);
+}
+.sidebar-slide-panel.open {
+  transform: translateX(0);
+}
+.sidebar-slide-panel.collapsed-mode {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  transform: translateX(0);
 }
 
 /* 子标签页 — 由 Sidebar 子导航替代，保留样式以防其他组件引用 */
@@ -184,13 +231,13 @@ body::after {
 /* 子模块分界线 */
 .section-divider {
   border: none;
-  border-top: 1.5px solid var(--accent-gold);
+  border-top: 2px solid var(--accent-gold);
   margin: 24px 0;
   opacity: 0.5;
 }
 .section-divider-thin {
   border: none;
-  border-top: 1.0px solid var(--accent-gold);
+  border-top: 1px solid var(--accent-gold);
   margin: 12px 0;
   opacity: 0.3;
 }
@@ -201,7 +248,7 @@ body::after {
   inset: 0;
   background: rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
-  z-index: 998;
+  z-index: 1;
 }
 .modal-box {
   position: fixed;

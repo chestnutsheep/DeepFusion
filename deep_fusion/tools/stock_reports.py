@@ -1,8 +1,10 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import akshare as ak  # pyright: ignore[reportMissingImports]
 from pydantic import Field
 
+from ..cache import ak_cache_async
 from ..server import mcp
 from ..shared.utils import ak_cache
 
@@ -137,22 +139,25 @@ def financial_statements(
     title="同业比较",
     description="获取行业内成长性、估值、杜邦分析、公司规模等四个维度的同业对比数据",
 )
-def peer_comparison(
+async def peer_comparison(
         symbol: str = Field(description="6位股票代码，如 600519"),
         market: str = Field("sh", description="市场标识: sh, sz, bj"),
 ) -> str:
     stock_code = f"{market.upper()}{symbol}"
+    # 4 个独立维度并发
+    growth, valuation, dupont, scale = await asyncio.gather(
+        ak_cache_async(ak.stock_zh_growth_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800),
+        ak_cache_async(ak.stock_zh_valuation_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800),
+        ak_cache_async(ak.stock_zh_dupont_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800),
+        ak_cache_async(ak.stock_zh_scale_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800),
+    )
     results = {}
-    growth = ak_cache(ak.stock_zh_growth_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800)
     if growth is not None and not growth.empty:
         results["成长性比较"] = growth.to_csv(index=False, float_format="%.3f")
-    valuation = ak_cache(ak.stock_zh_valuation_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800)
     if valuation is not None and not valuation.empty:
         results["估值比较"] = valuation.to_csv(index=False, float_format="%.3f")
-    dupont = ak_cache(ak.stock_zh_dupont_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800)
     if dupont is not None and not dupont.empty:
         results["杜邦分析比较"] = dupont.to_csv(index=False, float_format="%.3f")
-    scale = ak_cache(ak.stock_zh_scale_comparison_em, symbol=stock_code, ttl=86400, ttl2=172800)
     if scale is not None and not scale.empty:
         results["公司规模比较"] = scale.to_csv(index=False, float_format="%.3f")
     output = []

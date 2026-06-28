@@ -2,6 +2,7 @@
 核心思路：一个 CycleEngine + 4 份配置表 → 4 套 @mcp.tool
 分析层驻在 deep_fusion/analysis/macro/cycles/，tools/cycles.py 只做注册+胶水。
 """
+import asyncio
 import json
 import logging
 import math
@@ -803,14 +804,16 @@ def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
     name="kondratiev_cycle",
     description="判断当前长波周期（康德拉季耶夫周期）阶段。可选方法: pca(默认, 8谱法+相位映射), wavelet(Morlet小波功率谱), bandpass(40-60年带通滤波)",
 )
-def kondratiev_cycle(
+async def kondratiev_cycle(
         method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
 ) -> str:
     _ck = CacheKey.init(f"cycles_report_kondratiev_{method}_v3", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
-    result, vals = _compute_kondratiev(method)
+    # CPU 密集计算丢入 executor，避免阻塞事件循环
+    loop = asyncio.get_event_loop()
+    result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
     if not vals:
         return "数据不足（需要至少 20 年序列）"
     dp = result.get("dominant_period")
@@ -908,14 +911,15 @@ def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
     name="chart_kondratiev_cycle",
     description="生成康波周期分析图（PCA合成指数+主周期标注），保存为PNG。可选方法: pca/wavelet/bandpass",
 )
-def chart_kondratiev_cycle(
+async def chart_kondratiev_cycle(
         method: str = Field("pca", description="计算方法: pca/wavelet/bandpass"),
         output_path: str = Field("kondratiev_cycle.png", description="图表保存路径"),
 ) -> str:
-    result, vals = _compute_kondratiev(method)
+    loop = asyncio.get_event_loop()
+    result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
     if not vals:
         return "数据不足"
-    return _gen_kondratiev_chart(result, vals, output_path)
+    return await loop.run_in_executor(None, _gen_kondratiev_chart, result, vals, output_path)
 
 
 def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:

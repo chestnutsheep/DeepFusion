@@ -24,9 +24,14 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
 
 from deep_fusion import mcp
+from deep_fusion.logging_config import configure_logging, get_logger
+from deep_fusion.metrics import metrics_app
+
+configure_logging(os.getenv('DF_LOG_LEVEL', 'WARNING'))
+_LOGGER = get_logger(__name__)
 
 
 async def call_tool(request: Request) -> JSONResponse:
@@ -47,6 +52,7 @@ async def list_tools(request: Request) -> JSONResponse:
 app = Starlette(routes=[
     Route('/api/tools/call', call_tool, methods=['POST']),
     Route('/api/tools/list', list_tools, methods=['GET']),
+    Mount('/metrics', metrics_app),
 ], middleware=[
     Middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['*'], allow_headers=['*']),
 ])

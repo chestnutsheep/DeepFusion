@@ -11,18 +11,14 @@ export default function MainLayout() {
       <div
         className="mn"
         style={{
-          marginLeft: sidebarCollapsed ? '60px' : '270px',
-          position: 'relative',
-          zIndex: 2,
+          marginLeft: sidebarCollapsed ? '60px' : 'var(--nav-width)',
           minHeight: '100vh',
-          transition: 'margin-left 0.3s ease',
+          transition: 'margin-left var(--sidebar-slide-duration) cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
         <main
           id="main-panel"
           style={{
-            maxWidth: '96%',
-            margin: '0 auto',
             padding: '20px 0',
           }}
         >

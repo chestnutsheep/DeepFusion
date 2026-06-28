@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import akshare as ak
@@ -5,6 +6,7 @@ import pandas as pd
 from pydantic import Field
 
 from .. import data_lake
+from ..cache import ak_cache_async
 from ..server import mcp
 from ..shared.utils import ak_cache
 
@@ -223,28 +225,35 @@ def macro_business(
     title="货币与外贸数据",
     description="获取M2、社会融资规模、LPR、失业率、外汇储备、进出口等综合货币与外贸数据",
 )
-def macro_monetary(
+async def macro_monetary(
         limit: int = Field(24, description="返回期数"),
 ) -> str:
-    results = {}
+    loop = asyncio.get_event_loop()
+    # 8 个独立 akshare 调用 + 1 个 _fetch_with_priority 并发
+    m2, shrzgm, lpr, unemp, fx, export, imp, trade = await asyncio.gather(
+        ak_cache_async(ak.macro_china_m2_yearly, ttl=604800, ttl2=1209600),
+        ak_cache_async(ak.macro_china_shrzgm, ttl=604800, ttl2=1209600),
+        ak_cache_async(ak.macro_china_lpr, ttl=604800, ttl2=1209600),
+        loop.run_in_executor(None, _fetch_with_priority, "UNEMPLOYMENT", ak.macro_china_urban_unemployment, limit),
+        ak_cache_async(ak.macro_china_fx_reserves_yearly, ttl=604800, ttl2=1209600),
+        ak_cache_async(ak.macro_china_exports_yoy, ttl=604800, ttl2=1209600),
+        ak_cache_async(ak.macro_china_imports_yoy, ttl=604800, ttl2=1209600),
+        ak_cache_async(ak.macro_china_trade_balance, ttl=604800, ttl2=1209600),
+    )
+    # _fetch_with_priority 返回 (df, _) 元组
+    unemp_df = unemp[0] if isinstance(unemp, tuple) else unemp
 
-    m2 = ak_cache(ak.macro_china_m2_yearly, ttl=604800, ttl2=1209600)
+    results = {}
     if m2 is not None and not m2.empty:
         results["M2货币供应年率"] = m2.tail(limit).to_csv(index=False, float_format="%.2f")
         data_lake.store("M2", m2)
-
-    shrzgm = ak_cache(ak.macro_china_shrzgm, ttl=604800, ttl2=1209600)
     if shrzgm is not None and not shrzgm.empty:
         results["社会融资规模"] = shrzgm.tail(limit).to_csv(index=False, float_format="%.2f")
-
-    lpr = ak_cache(ak.macro_china_lpr, ttl=604800, ttl2=1209600)
     if lpr is not None and not lpr.empty:
         results["LPR利率"] = lpr.tail(limit).to_csv(index=False, float_format="%.2f")
         data_lake.store("LPR", lpr)
-
-    unemp, _ = _fetch_with_priority("UNEMPLOYMENT", ak.macro_china_urban_unemployment, limit=limit)
-    if unemp is not None and not unemp.empty:
-        results["城镇调查失业率"] = unemp.to_csv(index=False, float_format="%.2f")
+    if unemp_df is not None and not unemp_df.empty:
+        results["城镇调查失业率"] = unemp_df.to_csv(index=False, float_format="%.2f")
     else:
         # akshare 接口有 bug，从 cycle_db 缓存取 NBS 数据
         from ..shared.cycle_db import get as cycle_db_get
@@ -252,20 +261,12 @@ def macro_monetary(
         if unemp_db is not None and not unemp_db.empty:
             unemp_db = unemp_db.tail(limit)
             results["城镇调查失业率"] = unemp_db.to_csv(index=False, float_format="%.2f")
-
-    fx = ak_cache(ak.macro_china_fx_reserves_yearly, ttl=604800, ttl2=1209600)
     if fx is not None and not fx.empty:
         results["外汇储备"] = fx.tail(limit).to_csv(index=False, float_format="%.2f")
-
-    export = ak_cache(ak.macro_china_exports_yoy, ttl=604800, ttl2=1209600)
     if export is not None and not export.empty:
         results["出口年率"] = export.tail(limit).to_csv(index=False, float_format="%.2f")
-
-    imp = ak_cache(ak.macro_china_imports_yoy, ttl=604800, ttl2=1209600)
     if imp is not None and not imp.empty:
         results["进口年率"] = imp.tail(limit).to_csv(index=False, float_format="%.2f")
-
-    trade = ak_cache(ak.macro_china_trade_balance, ttl=604800, ttl2=1209600)
     if trade is not None and not trade.empty:
         results["贸易帐"] = trade.tail(limit).to_csv(index=False, float_format="%.2f")
 

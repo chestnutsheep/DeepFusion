@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 from io import StringIO
 from typing import Any
 
@@ -170,7 +171,7 @@ def _phase(
     name="cycle_detect",
     description="频谱周期检测：对输入时间序列运行 FFT/ACF/小波/MUSIC 等频谱分析+三级投票，输出检测到的周期、置信度和当前相位",
 )
-def cycle_detect(
+async def cycle_detect(
         data_csv: str = Field(
             description="CSV，至少两列: period(时间), value(数值)。示例:\nperiod,value\n2000,100\n2001,102"
         ),
@@ -198,7 +199,9 @@ def cycle_detect(
     if not ms:
         ms = ["fft", "acf", "wavelet", "music"]
 
-    res = _detect(values, methods=ms, target_band=(target_low, target_high))
+    # CPU 密集的频谱分析丢入 executor
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(None, _detect, values, ms, (target_low, target_high))
 
     lines = [
         "=== 频谱周期检测报告 ===",
@@ -246,7 +249,7 @@ def cycle_detect(
     name="cycle_phase",
     description="周期相位判断：对输入时间序列运行 CF 带通滤波 + 相位推断",
 )
-def cycle_phase(
+async def cycle_phase(
         data_csv: str = Field(description="CSV，包含 period,value 两列"),
         low_yr: float = Field(40, description="带通滤波低端（年）"),
         high_yr: float = Field(70, description="带通滤波高端（年）"),
@@ -264,7 +267,9 @@ def cycle_phase(
     if len(values) < 20:
         return f"数据太少 ({len(values)}个)"
 
-    res = _phase(values, low_yr, high_yr)
+    # CPU 密集的 CF 带通滤波丢入 executor
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(None, _phase, values, low_yr, high_yr)
     ph = res["phase"]
 
     return (

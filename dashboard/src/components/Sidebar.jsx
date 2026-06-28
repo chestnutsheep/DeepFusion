@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {Menu, MenuItem, Sidebar} from 'react-pro-sidebar';
+import {Menu, MenuItem} from 'react-pro-sidebar';
 import {useAppStore} from '../store/index.js';
 import {mcp} from '../services/mcp.js';
 import * as echarts from 'echarts';
@@ -16,7 +16,7 @@ const SUB_LABELS = {
   macro: { kitchin:'📉 基钦', juglar:'📈 朱格拉', kuznets:'🏠 库兹涅茨', kondratiev:'🌊 康波', coverage:'📊 宏观覆盖', nesting:'🔗 周期嵌套', gantt:'📅 相位分布' },
   meso: { signals:'📡 趋势与信号', heatmap:'🔥 行业热力图', ranking:'📊 排名详情', chain:'⛓️ 产业链' },
   micro: { stock:'📈 个股', fund:'📦 基金', futures:'⛽ 期货', bond:'📜 债券', option:'🎯 期权' },
-  global: { stress:'⚡ 金融压力', debt:'🏛️ 债务可持续', capital:'💸 赠本流动', bubble:'🫧 泡沫监视', markets:'📊 衍生品市场' },
+  global: { stress:'⚡ 金融压力', debt:'🏛️ 债务可持续', capital:'💸 资本流动', bubble:'🫧 泡沫监视', markets:'📊 衍生品市场' },
 };
 const SUB_SETTERS = {
   policy: 'setActivePolicySub', macro: 'setActiveMacroSub', meso: 'setActiveMesoSub',
@@ -35,13 +35,85 @@ const ASSET_NAV_MAP = {
   '现金': { tab: 'global', sub: 'markets' },
 };
 
-// ── 资产类别提示卡片数据 ──
-const ASSET_DETAIL = {
-  '权益': { cycleDirection: '顺周期做多', attitude: '积极配置', subAlloc: { '大盘蓝筹': 50, '中小盘': 30, '行业主题': 20 } },
-  '债券': { cycleDirection: '逆周期防御', attitude: '稳健持有', subAlloc: { '国债/利率债': 40, '信用债': 35, '可转债': 25 } },
-  '基金': { cycleDirection: '均衡配置', attitude: '分散风险', subAlloc: { '指数基金': 40, '混合基金': 35, 'QDII': 25 } },
-  '现金': { cycleDirection: '流动性储备', attitude: '防御观望', subAlloc: { '货币基金': 60, '短期理财': 30, '外币存款': 10 } },
-};
+// ── 基于周期数据动态计算资产类别提示卡片 ──
+// cycleDirection / attitude / subAlloc 全部由周期 zscore + phase 动态推导
+function computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash) {
+  const kz = kit?.composite_z ?? 0;
+  const jz = jug?.composite_z ?? 0;
+  const kp = kon?.phase ?? 0;
+
+  // ── 权益方向 ──
+  let equityDir, equityAttitude;
+  if (kz > 0.5 && jz > 0.3) { equityDir = '强顺周期做多'; equityAttitude = '激进进攻'; }
+  else if (kz > 0.3 || jz > 0.2) { equityDir = '顺周期做多'; equityAttitude = '积极配置'; }
+  else if (kz < -0.3 && jz < -0.2) { equityDir = '逆周期减仓'; equityAttitude = '防御减配'; }
+  else if (kz < -0.3 || jz < -0.2) { equityDir = '谨慎观望'; equityAttitude = '适度减配'; }
+  else { equityDir = '震荡均衡'; equityAttitude = '标配持有'; }
+
+  // ── 债券方向 ──
+  let bondDir, bondAttitude;
+  if (kz < -0.3 && kp >= 3) { bondDir = '强逆周期防御'; bondAttitude = '超配避险'; }
+  else if (kz < -0.3 || kp >= 3) { bondDir = '逆周期防御'; bondAttitude = '稳健持有'; }
+  else if (kz > 0.3) { bondDir = '顺周期减配'; bondAttitude = '适度减配'; }
+  else { bondDir = '均衡配置'; bondAttitude = '标配持有'; }
+
+  // ── 基金方向 ──
+  let fundDir, fundAttitude;
+  if (kz > 0.3 && jz > 0.2) { fundDir = '顺周期偏股'; fundAttitude = '偏股型为主'; }
+  else if (kz < -0.3) { fundDir = '逆周期偏债'; fundAttitude = '偏债型为主'; }
+  else { fundDir = '均衡配置'; fundAttitude = '分散风险'; }
+
+  // ── 现金方向 ──
+  let cashDir, cashAttitude;
+  if (kz < -0.5 || (kp >= 3 && jz < -0.2)) { cashDir = '流动性优先'; cashAttitude = '大幅增持'; }
+  else if (kz < -0.3 || kp >= 3) { cashDir = '流动性储备'; cashAttitude = '防御增持'; }
+  else if (kz > 0.3) { cashDir = '降低现金'; cashAttitude = '适度释放'; }
+  else { cashDir = '适度储备'; cashAttitude = '标配持有'; }
+
+  // ── 细分配比（基于大类占比等比例缩放） ──
+  // 权益细分：根据周期强度调整大盘/中小盘/主题比例
+  let eqLarge, eqMid, eqTheme;
+  if (kz > 0.3) { eqLarge = 35; eqMid = 35; eqTheme = 30; }
+  else if (kz < -0.3) { eqLarge = 55; eqMid = 25; eqTheme = 20; }
+  else { eqLarge = 45; eqMid = 30; eqTheme = 25; }
+  // 归一化到100
+  const eqSum = eqLarge + eqMid + eqTheme;
+  eqLarge = Math.round(eqLarge / eqSum * 100);
+  eqMid = Math.round(eqMid / eqSum * 100);
+  eqTheme = 100 - eqLarge - eqMid;
+
+  // 债券细分：根据周期位置调整利率债/信用债/可转债
+  let bdRate, bdCredit, bdConv;
+  if (kz < -0.3) { bdRate = 50; bdCredit = 30; bdConv = 20; }
+  else if (kz > 0.3) { bdRate = 30; bdCredit = 35; bdConv = 35; }
+  else { bdRate = 40; bdCredit = 35; bdConv = 25; }
+  const bdSum = bdRate + bdCredit + bdConv;
+  bdRate = Math.round(bdRate / bdSum * 100);
+  bdCredit = Math.round(bdCredit / bdSum * 100);
+  bdConv = 100 - bdRate - bdCredit;
+
+  // 基金细分：根据周期偏股/偏债
+  let fdIndex, fdMixed, fdQdii;
+  if (kz > 0.3) { fdIndex = 45; fdMixed = 30; fdQdii = 25; }
+  else if (kz < -0.3) { fdIndex = 30; fdMixed = 40; fdQdii = 30; }
+  else { fdIndex = 40; fdMixed = 35; fdQdii = 25; }
+  const fdSum = fdIndex + fdMixed + fdQdii;
+  fdIndex = Math.round(fdIndex / fdSum * 100);
+  fdMixed = Math.round(fdMixed / fdSum * 100);
+  fdQdii = 100 - fdIndex - fdMixed;
+
+  // 现金细分
+  let csMoney, csShort, csFx;
+  if (cash > 20) { csMoney = 50; csShort = 35; csFx = 15; }
+  else { csMoney = 60; csShort = 30; csFx = 10; }
+
+  return {
+    '权益': { cycleDirection: equityDir, attitude: equityAttitude, subAlloc: { '大盘蓝筹': eqLarge, '中小盘': eqMid, '行业主题': eqTheme } },
+    '债券': { cycleDirection: bondDir, attitude: bondAttitude, subAlloc: { '国债/利率债': bdRate, '信用债': bdCredit, '可转债': bdConv } },
+    '基金': { cycleDirection: fundDir, attitude: fundAttitude, subAlloc: { '指数基金': fdIndex, '混合基金': fdMixed, 'QDII': fdQdii } },
+    '现金': { cycleDirection: cashDir, attitude: cashAttitude, subAlloc: { '货币基金': csMoney, '短期理财': csShort, '外币存款': csFx } },
+  };
+}
 
 // ── 市场状态计算 ──
 function getMarketStatus() {
@@ -90,7 +162,7 @@ function getMarketStatus() {
 }
 
 // ── 环形图组件 ──
-function AssetDonut({ assetAlloc, collapsed }) {
+function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -107,20 +179,21 @@ function AssetDonut({ assetAlloc, collapsed }) {
         position: ['50%', '50%'],
         formatter: (params) => {
           const label = params.name;
-          const detail = ASSET_DETAIL[label];
+          const detail = assetDetail?.[label];
           if (!detail) return `${label}: ${params.value}%`;
           const subAllocLines = Object.entries(detail.subAlloc)
             .map(([k, v]) => `  ${k}  ${v}%`).join('\n');
-          return `<div style="font-weight:700;margin-bottom:4px;font-size:14px">${label}  ${params.value}%</div>
-            <div style="font-size:12px;margin-bottom:2px">📈 顺周期方向：${detail.cycleDirection}</div>
-            <div style="font-size:12px;margin-bottom:4px">🎯 投资态度：${detail.attitude}</div>
-            <div style="font-size:12px;color:#CBC0B0">细分配比：</div>
-            <div style="font-size:11px;color:#CBC0B0;line-height:1.6">${subAllocLines}</div>`;
+          return `<div style="font-weight:800;margin-bottom:6px;font-size:22px;color:#D4A853">${label}</div>
+            <div style="font-weight:800;font-size:28px;color:#f2d89f;margin-bottom:8px">${params.value}%</div>
+            <div style="font-size:14px;margin-bottom:3px;font-weight:600">📈 ${detail.cycleDirection}</div>
+            <div style="font-size:14px;margin-bottom:8px;font-weight:600">🎯 ${detail.attitude}</div>
+            <div style="font-size:12px;color:#CBC0B0;border-top:1px solid rgba(212,168,83,0.2);padding-top:6px;margin-top:4px">细分配比</div>
+            <div style="font-size:13px;color:#CBC0B0;line-height:1.8">${subAllocLines}</div>`;
         },
-        backgroundColor: 'rgba(26,47,42,0.95)',
-        borderColor: 'rgba(212,168,83,0.2)',
+        backgroundColor: 'rgba(26,47,42,0.96)',
+        borderColor: 'rgba(212,168,83,0.3)',
         textStyle: { color: '#CBC0B0' },
-        extraCssText: 'border-radius:8px;padding:12px 16px;min-width:180px;',
+        extraCssText: 'border-radius:10px;padding:16px 20px;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,0.4);',
       },
       series: [{
         type: 'pie',
@@ -131,20 +204,20 @@ function AssetDonut({ assetAlloc, collapsed }) {
           show: true,
           position: 'outside',
           formatter: '{b}\n{d}%',
-          fontSize: 12,
-          fontWeight: 600,
+          fontSize: 13,
+          fontWeight: 700,
           color: '#CBC0B0',
-          lineHeight: 16,
+          lineHeight: 18,
         },
         labelLine: {
           show: true,
-          length: 8,
-          length2: 12,
+          length: 10,
+          length2: 14,
           lineStyle: { color: 'rgba(212,168,83,0.3)', width: 1 },
         },
         emphasis: {
-          label: { show: true, fontSize: 14, fontWeight: 700, color: '#D4A853' },
-          itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' },
+          label: { show: true, fontSize: 16, fontWeight: 800, color: '#D4A853' },
+          itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' },
         },
         data: assetAlloc.map(a => ({
           name: a.label,
@@ -158,8 +231,8 @@ function AssetDonut({ assetAlloc, collapsed }) {
         top: 'middle',
         style: {
           text: '配置',
-          fontSize: 13,
-          fontWeight: 600,
+          fontSize: 15,
+          fontWeight: 800,
           fill: '#D4A853',
           textAlign: 'center',
         },
@@ -182,7 +255,7 @@ function AssetDonut({ assetAlloc, collapsed }) {
     return () => {
       // 不 dispose，保留实例
     };
-  }, [assetAlloc, collapsed]);
+  }, [assetAlloc, assetDetail, collapsed]);
 
   // 组件卸载时 dispose
   useEffect(() => {
@@ -203,17 +276,11 @@ function SidebarContent() {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const activeTab = useAppStore((s) => s.activeTab);
-  const activeMacroSub = useAppStore((s) => s.activeMacroSub);
-  const activeMicroSub = useAppStore((s) => s.activeMicroSub);
-  const setActiveMacroSub = useAppStore((s) => s.setActiveMacroSub);
-  const setActiveMesoSub = useAppStore((s) => s.setActiveMesoSub);
-  const setActiveMicroSub = useAppStore((s) => s.setActiveMicroSub);
-  const setActivePolicySub = useAppStore((s) => s.setActivePolicySub);
-  const setActiveGlobalSub = useAppStore((s) => s.setActiveGlobalSub);
   const [policyCnt, setPolicyCnt] = useState('');
   const [policyBriefs, setPolicyBriefs] = useState([]);
   const [cyclePhases, setCyclePhases] = useState([]);
   const [assetAlloc, setAssetAlloc] = useState(null);
+  const [assetDetail, setAssetDetail] = useState(null);
   const [marketStatus, setMarketStatus] = useState(getMarketStatus());
 
   // 每分钟更新市场状态
@@ -268,6 +335,8 @@ function SidebarContent() {
           { label: '基金', ratio: fund, color: '#3E6B5C' },
           { label: '现金', ratio: cash, color: '#C49BA5' },
         ]);
+        // 基于周期数据动态计算提示卡片详情
+        setAssetDetail(computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash));
       } catch(e) { console.error('cycle data error', e); }
       try { const s=await mcp.call('policy_stats'); const m=s.match(/(\d+)\s*篇/); if(m) setPolicyCnt(m[1]); const r=await mcp.call('policy_search',{keyword:'',limit:5}); setPolicyBriefs(r.split('\n').slice(1,4).filter(Boolean)); } catch(e){}
     }
@@ -286,60 +355,63 @@ function SidebarContent() {
   const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
   return (
-    <Sidebar
-      width="270px"
-      collapsedWidth="60px"
-      collapsed={sidebarCollapsed}
-      backgroundColor="transparent"
-      rootStyles={{ borderRight: '1px solid var(--border-subtle)', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 100, transition: 'width 0.3s ease' }}
-    >
-      {/* 折叠/展开按钮 */}
-      <div style={{
-        position: 'absolute', bottom: 16, left: sidebarCollapsed ? 10 : 20,
-        zIndex: 200, cursor: 'pointer',
-        width: 32, height: 32, borderRadius: 16,
-        background: 'rgba(212,168,83,0.15)', border: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, color: 'var(--accent-gold)', transition: 'left 0.3s ease',
-      }} onClick={toggleSidebar}>
-        {sidebarCollapsed ? '☰' : '✕'}
-      </div>
+    <>
+      {/* 遮罩层 — 展开时点击关闭 */}
+      {!sidebarCollapsed && (
+        <div
+          className="sidebar-overlay visible"
+          onClick={toggleSidebar}
+        />
+      )}
 
-      {/* 标题 */}
-      <div style={{ padding: sidebarCollapsed ? '20px 10px' : '24px 20px 20px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 12, textAlign: sidebarCollapsed ? 'center' : 'left' }}>
-        <h1 style={{ fontSize: sidebarCollapsed ? 14 : 18, fontWeight: 800, color: 'var(--accent-gold)', letterSpacing: 1, margin: 0 }}>{sidebarCollapsed ? '◈' : '◈ Deep Fusion'}</h1>
-        {!sidebarCollapsed && <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>宏观·中观·微观·政策·国际</p>}
-      </div>
+      {/* 侧边栏滑入面板 */}
+      <nav
+        className={`sidebar-slide-panel ${sidebarCollapsed ? 'collapsed-mode' : 'open'}`}
+      >
+        {/* 折叠/展开按钮 */}
+        <div style={{
+          position: 'absolute', top: 24, right: 8,
+          zIndex: 100, cursor: 'pointer',
+          width: 30, height: 30, borderRadius: 14,
+          background: 'rgba(212,168,83,0.32)', border: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, color: 'var(--accent-gold)',
+        }} onClick={toggleSidebar}>
+          {sidebarCollapsed ? '☰' : '‹'}
+        </div>
 
+        {/* 标题 */}
+        <div style={{ padding: sidebarCollapsed ? '8px 4px' : '20px 16px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4, textAlign: sidebarCollapsed ? 'center' : 'left' }}>
+          <h1 style={{ fontSize: sidebarCollapsed ? 14 : 20, fontWeight: 800, color: 'var(--accent-gold)', letterSpacing: 1, margin: 0 }}>{sidebarCollapsed ? '◈' : 'Deep Fusion'}</h1>
+          {!sidebarCollapsed && <p style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 6 }}>多维分析系统</p>}
+        </div>
+
+      {/* ── 展开态信息区 ── */}
       {!sidebarCollapsed && (
         <>
-          {/* 日期/星期/时间/市场状态 — 替代旧的基钦相位日期区 */}
-          <div style={{ margin: '8px 16px 12px', padding: 14, background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          {/* 日期/星期/时间/市场状态 */}
+          <div style={{ margin: '4px 12px 8px', padding: 12, background: 'rgba(0,0,0,0.20)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width:8, height:8, background: marketStatus.color, borderRadius:'50%', display:'inline-block', boxShadow: `0 0 6px ${marketStatus.color}44` }} />
-              <span style={{ fontSize:18, fontWeight:700 }}>{dateStr}</span>
-            </div>
-            <div style={{ fontSize:13, color:'var(--text-secondary)', display:'flex', justifyContent:'space-between' }}>
-              <span>{weekDay}</span>
-              <span>{timeStr}</span>
-            </div>
-            <div style={{ fontSize:13, fontWeight:600, color: marketStatus.color, marginTop: 4 }}>
-              {marketStatus.label}
+              <span style={{ fontSize:20, fontWeight:800, color:'var(--text-primary)' }}>{dateStr}</span>
+              <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:600 }}>{weekDay}</span>
+              <span style={{ fontSize:13, color:'var(--text-muted)' }}>{timeStr}</span>
+              <span style={{ fontSize:14, fontWeight:700, color: marketStatus.color, marginLeft:4 }}>{marketStatus.label}</span>
             </div>
           </div>
 
           {/* 资产配置环形图 */}
-          <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>· 基于周期动态建议 · {dateStr}</span></div>
-            <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
-              <AssetDonut assetAlloc={assetAlloc} collapsed={sidebarCollapsed} />
+          <div style={{ margin:'4px 12px 8px' }}>
+            <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:11,fontWeight:400,color:'var(--text-muted)' }}>周期动态建议</span></div>
+            <div style={{ padding:12, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
+              <AssetDonut assetAlloc={assetAlloc} assetDetail={assetDetail} collapsed={sidebarCollapsed} />
             </div>
           </div>
 
-          {/* 四周期方向指示器 — 横排4方块 */}
-          <div style={{ margin:'0 16px 12px' }}>
-            <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>🔄 基于周期大概方向</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          {/* 四周期方向指示器 */}
+          <div style={{ margin:'4px 12px 8px' }}>
+            <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>🔄 周期方向</div>
+            <div style={{ display:'flex', gap:6 }}>
               {(cyclePhases.length > 0 ? cyclePhases : [
                 { name:'基钦', phase:'—', dir:'→', color:'#888' },
                 { name:'朱格拉', phase:'—', dir:'→', color:'#888' },
@@ -347,34 +419,37 @@ function SidebarContent() {
                 { name:'康波', phase:'—', dir:'→', color:'#888' },
               ]).map(c => (
                 <div key={c.name} style={{
-                  padding:'8px 10px', background:'rgba(0,0,0,0.2)',
+                  flex:1, padding:'6px 4px', background:'rgba(0,0,0,0.2)',
                   borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)',
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:1,
                 }}>
-                  <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>{c.name}</span>
-                  <span style={{ fontSize:18, color:c.color, fontWeight:800 }}>{c.dir}</span>
-                  <span style={{ fontSize:11, color:'var(--text-secondary)', textAlign:'center', lineHeight:1.3 }}>{c.phase}</span>
+                  <div style={{ width:10, height:10, borderRadius:2, background:c.color, boxShadow:`0 0 4px ${c.color}44`, marginBottom:2 }} />
+                  <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:700, lineHeight:1 }}>{c.name}</span>
+                  <span style={{ fontSize:16, color:c.color, fontWeight:800, lineHeight:1 }}>{c.dir}</span>
+                  <span style={{ fontSize:10, color:'var(--text-secondary)', textAlign:'center', lineHeight:1.2 }}>{c.phase}</span>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* 政策速递 */}
           {activeTab === 'policy' && (
-            <div style={{ margin:'0 16px 12px' }}>
-              <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 8px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
-              <div style={{ padding:14, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
+            <div style={{ margin:'4px 12px 8px' }}>
+              <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
+              <div style={{ padding:12, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
                 {policyBriefs.length>0 ? policyBriefs.map((b,i)=>(
-                  <div key={i} style={{ fontSize:'var(--fs-xs)',color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
-                    {b.length>35?b.slice(0,35)+'...':b}
+                  <div key={i} style={{ fontSize:12,color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
+                    {b.length>40?b.slice(0,40)+'...':b}
                   </div>
-                )) : <div style={{fontSize:'var(--fs-xs)',color:'var(--text-muted)'}}>加载中...</div>}
+                )) : <div style={{fontSize:12,color:'var(--text-muted)'}}>加载中...</div>}
               </div>
             </div>
           )}
         </>
       )}
 
-      <div style={{ fontSize:14,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: sidebarCollapsed ? '8px 10px 4px' : '8px 20px 4px', textAlign: sidebarCollapsed ? 'center' : 'left' }}>
+      {/* ── 导航区（展开/折叠都显示） ── */}
+      <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: sidebarCollapsed ? '8px 10px 4px' : '8px 16px 4px', textAlign: sidebarCollapsed ? 'center' : 'left' }}>
         {sidebarCollapsed ? '📍' : '📍 导航'}
       </div>
       <Menu>
@@ -399,7 +474,8 @@ function SidebarContent() {
           </MenuItem>
         ))}
       </Menu>
-    </Sidebar>
+      </nav>
+    </>
   );
 }
 

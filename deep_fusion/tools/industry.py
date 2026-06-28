@@ -1,5 +1,7 @@
 """行业 MCP 工具 — 数据源: 同花顺(ths) + 巨潮(cninfo)，零东方财富依赖。"""
 
+import asyncio
+
 import akshare as ak
 from pydantic import Field
 
@@ -603,19 +605,27 @@ def _compute_rolling_trends(returns, cluster_result, window: int = 60) -> dict:
     description="行业相关性主线识别 — 从行业日行情计算相关性/聚类/动量/资金流，聚合出市场当前主线。"
                 "需要先运行 industry_daily_collect 采集数据。返回JSON。",
 )
-def industry_themes(
+async def industry_themes(
         window: int = Field(120, description="收益率回看窗口(交易日)"),
         n_clusters: int = Field(5, description="目标主线数"),
         corr_method: str = Field("pearson", description="相关系数类型: pearson/spearman/kendall"),
 ) -> str:
     """行业主线识别：相关性聚类 + 近期动量 + 资金流 → 当前市场主线。"""
+    window = _val(window)
+    n_clusters = _val(n_clusters)
+    corr_method = _val(corr_method)
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_themes_sync, window, n_clusters, corr_method
+    )
+
+
+def _industry_themes_sync(window: int, n_clusters: int, corr_method: str) -> str:
     import json
     import time
     from ..shared.correlation import identify_themes
 
-    window = _val(window)
-    n_clusters = _val(n_clusters)
-    corr_method = _val(corr_method)
     t0 = time.time()
 
     # 1. 加载数据
@@ -781,16 +791,22 @@ def _build_themes_summary(
     description="DCC-GARCH 时变条件相关 — 估计行业间动态相关性矩阵，识别联动加强/减弱的行业对。"
                 "计算较慢(约30s)，返回JSON。",
 )
-def industry_themes_dcc(
+async def industry_themes_dcc(
         window: int = Field(120, description="收益率回看窗口(交易日)"),
 ) -> str:
     """DCC-GARCH 动态条件相关分析。"""
+    window = _val(window)
+    # CPU 密集的 GARCH 拟合丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _industry_themes_dcc_sync, window)
+
+
+def _industry_themes_dcc_sync(window: int) -> str:
     import json
     import time
     import numpy as np
     from ..shared.dcc_garch import fit_dcc_garch
 
-    window = _val(window)
     t0 = time.time()
 
     returns, _ = _load_returns_matrix(window=window)
@@ -951,17 +967,25 @@ def _build_dcc_summary(out: dict, returns) -> str:
     description="Granger因果检验 + 龙头行业识别 — 找出领先/滞后行业及因果传导链。"
                 "计算较慢(约60s)，需要statsmodels。返回JSON。",
 )
-def industry_themes_causality(
+async def industry_themes_causality(
         window: int = Field(120, description="收益率回看窗口(交易日)"),
         max_lag: int = Field(5, description="最大检验滞后期"),
 ) -> str:
     """Granger 因果检验 + 领先行业识别。"""
+    window = _val(window)
+    max_lag = _val(max_lag)
+    # CPU 密集的因果检验丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_themes_causality_sync, window, max_lag
+    )
+
+
+def _industry_themes_causality_sync(window: int, max_lag: int) -> str:
     import json
     import time
     from ..shared.causality import granger_causality_matrix, identify_leading_industries
 
-    window = _val(window)
-    max_lag = _val(max_lag)
     t0 = time.time()
 
     returns, _ = _load_returns_matrix(window=window)

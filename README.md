@@ -16,27 +16,31 @@ DeepFusion — 作为 **MCP 服务器** 为 AI Agent 提供中国金融市场全
 ```bash
 git clone https://github.com/chestnutsheep/DeepFusion.git
 cd DeepFusion
-
+```
 # 安装依赖
+```bash
 uv sync
+```
 
 # 复制环境变量模板
+```bash
 cp .env.example .env
+```
 # 编辑 .env，确保代理地址正确（东方财富接口需要代理）
-
+> **关于代理**：东方财富（`push2.eastmoney.com`）接口需要 HTTP 代理。推荐使用 Clash Verge，混合端口 `7897`。非东方财富接口（新浪/datacenter/OKX/Binance）无需代理。
+> 
 # 启动 MCP 服务器（Stdio 模式，供 MCP 客户端使用）
+```bash
 uv run python -m deep_fusion
+```
 
 # 查看所有已注册工具/资源/提示词
+```bash
 uv run python -m deep_fusion --inspect
 ```
 
-> **关于代理**：东方财富（`push2.eastmoney.com`）接口需要 HTTP 代理。推荐使用 Clash Verge，混合端口 `7897`。非东方财富接口（新浪/datacenter/OKX/Binance）无需代理。
-
 ### MCP 客户端配置
-
 在支持 MCP 的客户端（如 Claude Desktop、Cursor、OpenCode）中添加服务器配置：
-
 ```json
 {
   "mcpServers": {

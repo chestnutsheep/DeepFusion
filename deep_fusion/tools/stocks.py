@@ -1,9 +1,11 @@
+import asyncio
 import json
 
 import akshare as ak
 from fastmcp import Context
 from pydantic import Field
 
+from ..cache import ak_cache_async
 from ..server import mcp
 from ..shared.fields import field_market
 from ..shared.utils import ak_cache, ak_search_async
@@ -121,29 +123,28 @@ def _fetch_spot(market: str = "全部A股") -> "pd.DataFrame | None":
     title="个股档案信息",
     description="获取个股基本信息（东方财富+雪球）、股本股东、十大股东、高管变动、历史分红等综合档案数据",
 )
-def individual_info(
+async def individual_info(
         symbol: str = Field(description="6位股票代码，如 600519"),
         market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
-    results = {}
+    # 5 个独立 akshare 调用并发执行，串行→并发
+    info, xq, holder, mgmt, dividend = await asyncio.gather(
+        ak_cache_async(ak.stock_individual_info_em, symbol=symbol, ttl=43200),
+        ak_cache_async(ak.stock_individual_basic_info_xq, symbol=f"{market.upper()}{symbol}", ttl=43200),
+        ak_cache_async(ak.stock_main_stock_holder, stock=symbol, ttl=43200),
+        ak_cache_async(ak.stock_management_change_ths, symbol=symbol, ttl=43200),
+        ak_cache_async(ak.stock_dividend_cninfo, symbol=symbol, ttl=43200),
+    )
 
-    info = ak_cache(ak.stock_individual_info_em, symbol=symbol, ttl=43200)
+    results = {}
     if info is not None and not info.empty:
         results["基本信息(东方财富)"] = info.to_string()
-
-    xq = ak_cache(ak.stock_individual_basic_info_xq, symbol=f"{market.upper()}{symbol}", ttl=43200)
     if xq is not None and not xq.empty:
         results["基本信息(雪球)"] = xq.to_string()
-
-    holder = ak_cache(ak.stock_main_stock_holder, stock=symbol, ttl=43200)
     if holder is not None and not holder.empty:
         results["主要股东"] = holder.head(10).to_csv(index=False, float_format="%.2f")
-
-    mgmt = ak_cache(ak.stock_management_change_ths, symbol=symbol, ttl=43200)
     if mgmt is not None and not mgmt.empty:
         results["高管变动"] = mgmt.head(10).to_csv(index=False, float_format="%.2f")
-
-    dividend = ak_cache(ak.stock_dividend_cninfo, symbol=symbol, ttl=43200)
     if dividend is not None and not dividend.empty:
         results["历史分红"] = dividend.head(10).to_csv(index=False, float_format="%.2f")
 
