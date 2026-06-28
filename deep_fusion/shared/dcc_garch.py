@@ -105,39 +105,55 @@ def _dcc_log_likelihood(
         params: np.ndarray,
         std_resid_matrix: np.ndarray,
         Q_bar: np.ndarray,
-) -> float:
-    """DCC 模型对数似然函数。
+        return_R_series: bool = False,
+) -> float | tuple[float, np.ndarray]:
+    """DCC 模型对数似然函数（优化版）。
+
+    优化点：
+    1. 预计算 eps_outer 张量 (T, N, N)，避免循环内重复 np.outer
+    2. 缓存 eps @ eps 避免重复计算
+    3. 可选返回 R_t 序列供 fit 阶段复用，避免重复计算（2.2 的关键优化）
+
+    注：对小矩阵 (N<20)，det+inv 比 slogdet+cho_solve 更快，故保留。
 
     Args:
         params: [a, b] — DCC 参数
         std_resid_matrix: (T, N) 标准化残差矩阵
         Q_bar: (N, N) 无条件相关矩阵
+        return_R_series: 若 True，返回 (neg_log_lik, R_series)，R_series shape (T, N, N)
 
     Returns:
-        负对数似然（供 minimize 最小化）
+        负对数似然（供 minimize 最小化），或 (neg_log_lik, R_series)
     """
     a, b = params
     if a < 0 or b < 0 or a + b >= 1:
-        return 1e10  # 约束：a >= 0, b >= 0, a + b < 1
+        return (1e10, None) if return_R_series else 1e10
 
     T, N = std_resid_matrix.shape
+
+    # 预计算 eps_outer 张量 (T, N, N) —— 向量化，避免循环内 np.outer
+    eps = std_resid_matrix  # (T, N)
+    eps_outer = np.einsum('ti,tj->tij', eps, eps)  # (T, N, N)
+    eps_sq = np.einsum('ti,ti->t', eps, eps)  # (T,) 每期的 eps@eps
+
     Q_t = Q_bar.copy()
     log_lik = 0.0
+    R_series = np.zeros((T, N, N)) if return_R_series else None
+
+    one_minus_ab = 1.0 - a - b
 
     for t in range(T):
-        eps = std_resid_matrix[t]  # (N,)
-        eps_outer = np.outer(eps, eps)  # (N, N)
-
-        # Q_t 更新
-        Q_t = (1 - a - b) * Q_bar + a * eps_outer + b * Q_t
+        # Q_t 更新（顺序依赖，无法并行）
+        Q_t = one_minus_ab * Q_bar + a * eps_outer[t] + b * Q_t
 
         # R_t = diag(Q_t)^{-1/2} * Q_t * diag(Q_t)^{-1/2}
         diag_sqrt = np.sqrt(np.diag(Q_t))
         diag_sqrt = np.where(diag_sqrt > 1e-10, diag_sqrt, 1.0)
         R_t = Q_t / np.outer(diag_sqrt, diag_sqrt)
-
-        # 确保对角线为 1
         np.fill_diagonal(R_t, 1.0)
+
+        if return_R_series:
+            R_series[t] = R_t
 
         # 对数似然
         det_R = np.linalg.det(R_t)
@@ -146,37 +162,49 @@ def _dcc_log_likelihood(
 
         try:
             inv_R = np.linalg.inv(R_t)
-            eps_inv = eps @ inv_R @ eps
-            log_lik += -0.5 * (np.log(det_R) + eps_inv - eps @ eps)
+            eps_inv = eps[t] @ inv_R @ eps[t]
+            log_lik += -0.5 * (np.log(det_R) + eps_inv - eps_sq[t])
         except np.linalg.LinAlgError:
             continue
 
-    return -log_lik  # 负号因为 minimize
+    neg_log_lik = -log_lik
+    if return_R_series:
+        return neg_log_lik, R_series
+    return neg_log_lik
 
 
 def _estimate_dcc_params(
         std_resid_matrix: np.ndarray,
-) -> tuple[float, float]:
-    """估计 DCC 参数 (a, b)。"""
+) -> tuple[float, float, np.ndarray]:
+    """估计 DCC 参数 (a, b)，并返回最终的 R_t 序列供复用。
+
+    Returns:
+        (a, b, R_series) — R_series shape (T, N, N)，供 fit_dcc_garch 复用
+    """
     Q_bar = np.corrcoef(std_resid_matrix.T)
 
     # 初始猜测
     x0 = np.array([0.01, 0.95])
 
+    # 优化时不需要 R_series（节省内存）
     result = minimize(
         _dcc_log_likelihood,
         x0,
-        args=(std_resid_matrix, Q_bar),
+        args=(std_resid_matrix, Q_bar, False),
         method="L-BFGS-B",
         bounds=[(1e-6, 0.5), (0.5, 0.999)],
         options={"maxiter": 200, "ftol": 1e-8},
     )
 
     if result.success:
-        return float(result.x[0]), float(result.x[1])
+        a, b = float(result.x[0]), float(result.x[1])
+    else:
+        logger.warning(f"DCC 优化未收敛: {result.message}")
+        a, b = 0.01, 0.95
 
-    logger.warning(f"DCC 优化未收敛: {result.message}")
-    return 0.01, 0.95  # 默认值
+    # 用最优参数重新计算一次，拿到 R_series 供 fit 阶段复用
+    _, R_series = _dcc_log_likelihood(np.array([a, b]), std_resid_matrix, Q_bar, return_R_series=True)
+    return a, b, R_series
 
 
 # ═══════════════════════════════════════════════════════════
@@ -284,34 +312,15 @@ def fit_dcc_garch(
             garch_converged=garch_converged,
         )
 
-    # Step 2: 估计 DCC 参数
-    dcc_a, dcc_b = _estimate_dcc_params(std_resid_clean)
-
-    # Step 2b: 计算条件相关矩阵序列
-    Q_bar = np.corrcoef(std_resid_clean.T)
-    conditional_corr_series = np.zeros((T_clean, N, N))
-    Q_t = Q_bar.copy()
-
-    for t in range(T_clean):
-        eps = std_resid_clean[t]
-        eps_outer = np.outer(eps, eps)
-
-        Q_t = (1 - dcc_a - dcc_b) * Q_bar + dcc_a * eps_outer + dcc_b * Q_t
-
-        # R_t
-        diag_sqrt = np.sqrt(np.diag(Q_t))
-        diag_sqrt = np.where(diag_sqrt > 1e-10, diag_sqrt, 1.0)
-        R_t = Q_t / np.outer(diag_sqrt, diag_sqrt)
-        np.fill_diagonal(R_t, 1.0)
-
-        conditional_corr_series[t] = R_t
+    # Step 2: 估计 DCC 参数 + 一次性拿到 R_t 序列（复用，避免重复 T 循环）
+    dcc_a, dcc_b, conditional_corr_series = _estimate_dcc_params(std_resid_clean)
 
     return DCCResult(
         industries=industries,
         dates=dates_clean,
         dcc_a=dcc_a,
         dcc_b=dcc_b,
-        Q_bar=Q_bar,
+        Q_bar=np.corrcoef(std_resid_clean.T),
         conditional_corr_series=conditional_corr_series,
         garch_params=garch_params,
         n_industries=N,

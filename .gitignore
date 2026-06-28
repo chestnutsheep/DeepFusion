@@ -64,6 +64,11 @@ db.sqlite3-journal
 industry_data.db
 deep_fusion.db
 
+# DeepFusion 数据库/缓存/备份文件（运行时生成，不纳入版本控制）
+*.db
+*.backup
+data/*.db
+
 # Flask stuff:
 instance/
 .webassets-cache

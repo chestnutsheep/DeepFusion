@@ -1,12 +1,13 @@
 """Shenwan data source: classification tree + daily analysis + constituents."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 import akshare as ak
 import pandas as pd
 
-from ...cache import ak_cache
+from ...cache import ak_cache, ak_cache_async
 from ...shared import industry_db as db
 
 _LABEL = {1: "申万一级", 2: "申万二级", 3: "申万三级"}
@@ -263,26 +264,38 @@ def get_constituents(industry_code: str) -> pd.DataFrame:
 #  成分股 + 当日行情聚合
 # ═══════════════════════════════════════════════════════
 
-def _fallback_hist_quotes(stock_codes: list, limit: int = 5) -> pd.DataFrame | None:
+async def _fallback_hist_quotes(stock_codes: list, limit: int = 5) -> pd.DataFrame | None:
     """Fallback：当实时行情不可用时，从 akshare 获取最近交易日的历史日行情。
 
     对每个股票取最近1个交易日的收盘价、涨跌幅、换手率。
+    并发获取（aiometer 限流 8 并发）+ 缓存（ak_cache_async）。
     返回 DataFrame(columns: stock_code, close, change_pct, turnover_rate) 或 None。
     """
-    rows = []
-    for code in stock_codes[:50]:  # 限制最多50只，避免超时
+    import aiometer
+
+    codes = stock_codes[:50]  # 限制最多50只
+
+    async def fetch_one(code: str) -> dict | None:
         try:
-            df = ak.stock_zh_a_hist(symbol=code, period="daily", adjust="qfq")
+            df = await ak_cache_async(
+                ak.stock_zh_a_hist, symbol=code, period="daily", adjust="qfq",
+                ttl=3600,  # 1小时缓存，避免重复拉取
+            )
             if df is not None and not df.empty:
                 latest = df.iloc[-1]
-                rows.append({
+                return {
                     "stock_code": code,
                     "close": latest.get("收盘", pd.NA),
                     "change_pct": latest.get("涨跌幅", pd.NA),
                     "turnover_rate": latest.get("换手率", pd.NA),
-                })
+                }
         except Exception:
-            continue
+            pass
+        return None
+
+    # aiometer 限流并发，避免触发 akshare/东财限流
+    results = await aiometer.run_on_each(fetch_one, codes, max_at_once=8)
+    rows = [r for r in results if r is not None]
     if not rows:
         return None
     return pd.DataFrame(rows)

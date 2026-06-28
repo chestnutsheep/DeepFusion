@@ -155,23 +155,6 @@ def data_kitchin() -> str:
     return text
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="data_juglar",
     description="获取朱格拉周期（固定资本投资周期）各阶段定位数据（JSON数组）",
@@ -191,23 +174,6 @@ def data_juglar() -> str:
     text = json.dumps(results, ensure_ascii=False)
     _ck.set(text)
     return text
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
@@ -232,23 +198,6 @@ def data_kuznets() -> str:
 
 
 # ── FRED 扩展周期工具 ─────────────────────────────────────
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="data_kitchin_extended",
     description="基钦周期 FRED 扩展版（1919~），工业生产+制造商库存+M2，年频JSON数组",
@@ -265,23 +214,6 @@ def data_kitchin_extended() -> str:
     if rows:
         _ck.set(text)
     return text
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
@@ -302,23 +234,6 @@ def data_juglar_extended() -> str:
     return text
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="data_kuznets_extended",
     description="库兹涅茨周期 FRED 扩展版（1947~），美国房价+新屋开工+住宅投资，年频JSON数组",
@@ -335,40 +250,6 @@ def data_kuznets_extended() -> str:
     if rows:
         _ck.set(text)
     return text
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
@@ -537,23 +418,6 @@ def cycle_nesting() -> str:
 #  周期数据缓存工具
 # ============================================================
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="cycle_collect",
     description="预采集全部周期指标数据到本地 SQLite 缓存，避免每次分析重新拉取",
@@ -600,23 +464,6 @@ def cycle_collect() -> str:
     return "\n".join(lines)
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="fred_data",
     description="FRED 数据查询。传注册名(fred_ppiaco)或任意 series_id(GDPC1/UNRATE/...)",
@@ -641,23 +488,6 @@ def fred_data(
     return "\n".join(out)
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="fred_list",
     description="列出所有可采集的 FRED 数据集（共8个）",
@@ -669,23 +499,6 @@ def fred_list() -> str:
     for i in items:
         lines.append(f"  {i['key']:20s}  {i['series_id']:10s}  {i['desc']}")
     return "\n".join(lines)
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
@@ -718,23 +531,6 @@ def wb_data(
     return "\n".join(out)
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="wb_list",
     description="列出所有可采集的世界银行数据集（共7个）",
@@ -746,23 +542,6 @@ def wb_list() -> str:
     for i in items:
         lines.append(f"  {i['key']:25s}  {i['indicator']:25s}  {i['desc']}")
     return "\n".join(lines)
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
@@ -783,23 +562,6 @@ def cycle_cache_status() -> str:
 # ============================================================
 #  康波周期（单独注册，参数更多）
 # ============================================================
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="kondratiev_cycle",
     description="判断当前长波周期（康德拉季耶夫周期）阶段。可选方法: pca(默认, 8谱法+相位映射), wavelet(Morlet小波功率谱), bandpass(40-60年带通滤波)",
@@ -890,23 +652,6 @@ async def kondratiev_cycle(
     return text
 
 
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
-
-
 @mcp.tool(
     name="chart_kondratiev_cycle",
     description="生成康波周期分析图（PCA合成指数+主周期标注），保存为PNG。可选方法: pca/wavelet/bandpass",
@@ -920,23 +665,6 @@ async def chart_kondratiev_cycle(
     if not vals:
         return "数据不足"
     return await loop.run_in_executor(None, _gen_kondratiev_chart, result, vals, output_path)
-
-
-def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
-    """滚动均值平滑，消除年际噪声。
-
-    边界处理：前 window-1 个点用可用的历史均值（递增窗口），
-    保证输出与输入等长。
-    """
-    n = len(vals)
-    if n == 0:
-        return []
-    result = []
-    for i in range(n):
-        start = max(0, i - window + 1)
-        segment = vals[start:i + 1]
-        result.append(sum(segment) / len(segment))
-    return result
 
 
 @mcp.tool(
