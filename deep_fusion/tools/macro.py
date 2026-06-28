@@ -86,6 +86,8 @@ def _fetch_with_priority(
         if needs_incremental_update(indicator, db_latest):
             try:
                 if akshare_fn:
+                    # 用 force=True 绕过 akshare 缓存，确保拿到最新数据
+                    # （增量场景必须拿新数据，缓存命中反而有害）
                     raw = ak_cache(akshare_fn, ttl=akshare_ttl, ttl2=akshare_ttl2, force=True)
                     if raw is not None and not raw.empty:
                         data_lake.store(indicator, raw, source="akshare_incremental")

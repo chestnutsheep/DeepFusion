@@ -279,10 +279,24 @@ def cycle_nesting() -> str:
     if cached is not None and isinstance(cached, str):
         return cached
 
-    # ── 1. 拉取四周期扩展数据（FRED/世界银行，百年+年频） ──
-    _, ki_rows = compute_kitchin_extended()
-    _, ju_rows = compute_juglar_extended()
-    _, ku_rows = compute_kuznets_extended()
+    # ── 1. 拉取四周期扩展数据（复用 data_*_extended 的缓存，避免重算） ──
+    def _get_extended_rows(cache_key: str, compute_fn):
+        """优先从缓存读 JSON 字符串并解析，未命中才调 compute_fn。"""
+        _ck = CacheKey.init(cache_key, ttl=604800, ttl2=2592000)
+        cached_str = _ck.get()
+        if cached_str is not None and isinstance(cached_str, str):
+            try:
+                return json.loads(cached_str)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        _, rows = compute_fn()
+        if rows:
+            _ck.set(json.dumps(rows, ensure_ascii=False))
+        return rows
+
+    ki_rows = _get_extended_rows("cycles_data_kitchin_extended_v1", compute_kitchin_extended)
+    ju_rows = _get_extended_rows("cycles_data_juglar_extended_v1", compute_juglar_extended)
+    ku_rows = _get_extended_rows("cycles_data_kuznets_extended_v1", compute_kuznets_extended)
     kondratiev_result, _ = _compute_kondratiev("pca")
 
     # ── 2. 构建康波逐行数据 ──
@@ -575,7 +589,15 @@ async def kondratiev_cycle(
         return cached
     # CPU 密集计算丢入 executor，避免阻塞事件循环
     loop = asyncio.get_event_loop()
-    result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
+    # 复用共享计算缓存（chart_kondratiev_cycle 也用这个）
+    _ck_compute = CacheKey.init(f"cycles_compute_kondratiev_{method}_v1", ttl=604800, ttl2=2592000)
+    cached_compute = _ck_compute.get()
+    if cached_compute is not None and isinstance(cached_compute, tuple) and len(cached_compute) == 2:
+        result, vals = cached_compute
+    else:
+        result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
+        if vals:
+            _ck_compute.set((result, vals))
     if not vals:
         return "数据不足（需要至少 20 年序列）"
     dp = result.get("dominant_period")
@@ -661,7 +683,15 @@ async def chart_kondratiev_cycle(
         output_path: str = Field("kondratiev_cycle.png", description="图表保存路径"),
 ) -> str:
     loop = asyncio.get_event_loop()
-    result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
+    # 复用 kondratiev_cycle 的计算结果缓存，避免重跑 _compute_kondratiev
+    _ck = CacheKey.init(f"cycles_compute_kondratiev_{method}_v1", ttl=604800, ttl2=2592000)
+    cached = _ck.get()
+    if cached is not None and isinstance(cached, tuple) and len(cached) == 2:
+        result, vals = cached
+    else:
+        result, vals = await loop.run_in_executor(None, _compute_kondratiev, method)
+        if vals:  # 仅有效结果才缓存
+            _ck.set((result, vals))
     if not vals:
         return "数据不足"
     return await loop.run_in_executor(None, _gen_kondratiev_chart, result, vals, output_path)

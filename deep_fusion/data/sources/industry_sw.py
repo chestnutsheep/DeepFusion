@@ -294,7 +294,14 @@ async def _fallback_hist_quotes(stock_codes: list, limit: int = 5) -> pd.DataFra
         return None
 
     # aiometer 限流并发，避免触发 akshare/东财限流
-    results = await aiometer.run_on_each(fetch_one, codes, max_at_once=8)
+    # 用 Semaphore 限制并发数，asyncio.gather 收集结果
+    sem = asyncio.Semaphore(8)
+
+    async def fetch_with_limit(code: str) -> dict | None:
+        async with sem:
+            return await fetch_one(code)
+
+    results = await asyncio.gather(*[fetch_with_limit(c) for c in codes])
     rows = [r for r in results if r is not None]
     if not rows:
         return None
@@ -331,8 +338,14 @@ def get_constituents_with_quotes(industry_code: str) -> pd.DataFrame:
         spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, key="stock_zh_a_spot_em")
 
         if spot is None or spot.empty:
-            # 实时行情不可用（休市/周末）→ fallback 到最近交易日历史数据
-            hist_quotes = _fallback_hist_quotes(codes)
+            # 实时行情不可用（休市/周末）→ fallback 到并发历史数据
+            try:
+                hist_quotes = asyncio.run(_fallback_hist_quotes(codes))
+            except RuntimeError:
+                # 已在事件循环中（如 async tool 调用），用 asyncio.ensure_future
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    hist_quotes = ex.submit(lambda: asyncio.run(_fallback_hist_quotes(codes))).result()
             if hist_quotes is not None and not hist_quotes.empty:
                 spot_renamed = hist_quotes.rename(columns={
                     "stock_code": "stock_code",
