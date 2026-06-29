@@ -33,8 +33,8 @@ def fx_rates(
     raw = ak_cache(ak.fx_spot_quote, ttl=300)
     if not isinstance(raw, pd.DataFrame):
         return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=1)
-    df = raw.copy()
-    data = df.copy()
+    # 仅在写入前 copy 一次，避免 3 次冗余拷贝
+    data = raw.copy()
     if symbol and symbol.upper() in FX_PAIRS:
         pair_name = FX_PAIRS[symbol.upper()]
         if "货币对" in data.columns:
@@ -54,7 +54,6 @@ def fx_rates(
             break
     if rate_column is None:
         return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=1)
-    data = data.copy()
     data["rate"] = data[rate_column]
     if "时间" in data.columns:
         data["date"] = data["时间"]
@@ -78,8 +77,8 @@ def fx_history(
     raw = ak_cache(ak.fx_pair_quote)
     if not isinstance(raw, pd.DataFrame):
         return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=limit)
-    df = raw.copy()
-    df = df.tail(limit).copy()
+    # 仅在写入前 copy 一次，避免 3 次冗余拷贝
+    df = raw.tail(limit).copy()
     date_col = "日期" if "日期" in df.columns else "时间" if "时间" in df.columns else None
     rate_col = None
     for candidate in ["收盘价", "最新价", "收盘"]:
@@ -88,7 +87,6 @@ def fx_history(
             break
     if date_col is None or rate_col is None:
         return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=limit)
-    df = df.copy()
     df["rate"] = df[rate_col]
     return normalize_rate_df(df, {"date": date_col, "rate": "rate"}, source="akshare", currency=symbol.upper(),
                              limit=limit, float_format="%.4f")

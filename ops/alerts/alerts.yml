@@ -1,0 +1,85 @@
+# DeepFusion 告警规则
+# 用于 Prometheus Alertmanager，文件名: deepfusion_alerts.yml
+groups:
+  - name: deepfusion_cache
+    rules:
+      # 缓存命中率 <50% 持续 5 分钟
+      - alert: DeepFusionLowCacheHitRate
+        expr: |
+          sum(rate(deepfusion_cache_hits_total[5m]))
+          /
+          (sum(rate(deepfusion_cache_hits_total[5m])) + sum(rate(deepfusion_cache_misses_total[5m])))
+          < 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DeepFusion 缓存命中率低于 50%"
+          description: "缓存命中率持续 5 分钟低于 50%，可能存在缓存键设计问题或 TTL 过短。"
+
+  - name: deepfusion_akshare
+    rules:
+      # akshare p95 > 10s 持续 5 分钟
+      - alert: DeepFusionAkshareSlowP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(deepfusion_request_latency_seconds_bucket[5m])) by (le, tool)
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "akshare 调用 p95 > 10s: {{ $labels.tool }}"
+          description: "akshare 函数 {{ $labels.tool }} 的 p95 耗时持续 5 分钟超过 10s，可能存在网络问题或限流。"
+
+      # akshare 超时次数激增
+      - alert: DeepFusionAkshareTimeoutSpike
+        expr: rate(deepfusion_akshare_timeout_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "akshare 超时激增: {{ $labels.fun }}"
+          description: "akshare 函数 {{ $labels.fun }} 每分钟超时 >6 次，akshare 服务可能不可用。"
+
+  - name: deepfusion_executor
+    rules:
+      # executor 饱和：活跃任务 == max_workers 持续 1 分钟
+      - alert: DeepFusionExecutorSaturated
+        expr: deepfusion_executor_active >= on() (env(deepfusion_executor_max_workers) or 8)
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "线程池饱和"
+          description: "Executor 活跃任务数持续 1 分钟达到 max_workers，建议调高 DF_EXECUTOR_WORKERS。"
+
+  - name: deepfusion_event_loop
+    rules:
+      # 事件循环阻塞 p95 > 100ms
+      - alert: DeepFusionEventLoopBlocked
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(deepfusion_event_loop_block_seconds_bucket[5m])) by (le, op)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "事件循环阻塞: {{ $labels.op }}"
+          description: "操作 {{ $labels.op }} 的 p95 阻塞耗时 >100ms，可能阻塞事件循环。"
+
+  - name: deepfusion_dcc
+    rules:
+      # DCC 拟合耗时 p95 > 30s
+      - alert: DeepFusionDCCFitSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(deepfusion_dcc_fit_latency_seconds_bucket[5m])) by (le, stage)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DCC 拟合缓慢: {{ $labels.stage }}"
+          description: "DCC-GARCH {{ $labels.stage }} 阶段 p95 >30s，考虑评估向量化效果或行业数量。"

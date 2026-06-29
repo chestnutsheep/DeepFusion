@@ -327,10 +327,12 @@ Agent 调用以下提示词可触发完整的结构化分析工作流：
 ```
 DeepFusion/
 ├── deep_fusion/              # 主包
-│   ├── __init__.py           # 程序入口 + main() + inspect
+│   ├── __init__.py           # 程序入口 + main() + inspect + lazy import
 │   ├── __main__.py           # python -m deep_fusion
 │   ├── server.py             # FastMCP 服务器实例（含决策树 INSTRUCTIONS）
-│   ├── cache.py              # 双层缓存（L1 内存 / L2 磁盘）
+│   ├── cache.py              # 双层缓存（L1 内存 / L2 磁盘）+ 线程安全 + 超时 + structlog
+│   ├── metrics.py            # Prometheus 指标（7 个核心指标 + 埋点工具）
+│   ├── logging_config.py     # structlog 结构化日志配置（JSON + trace_id）
 │   ├── prompts.py            # 7 个 SOP 分析提示词
 │   ├── resources.py          # 14 个投研资源
 │   ├── analysis/             # 周期分析引擎

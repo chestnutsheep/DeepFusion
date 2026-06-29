@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import warnings
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,6 +27,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+
+from ..metrics import DCC_FIT_LATENCY
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +284,7 @@ def fit_dcc_garch(
         return DCCResult()
 
     # Step 1: 逐行业拟合 GARCH(1,1)
+    _t0_univariate = time.perf_counter()
     std_resid_matrix = np.zeros((T, N))
     garch_params = {}
     garch_converged = {}
@@ -297,6 +301,7 @@ def fit_dcc_garch(
         std_resid_matrix[:, j] = result["std_resid"]
         garch_params[ind] = result["params"]
         garch_converged[ind] = result["converged"]
+    DCC_FIT_LATENCY.labels(stage="univariate").observe(time.perf_counter() - _t0_univariate)
 
     # 去除 NaN（GARCH 预热期可能产生 NaN）
     nan_mask = np.any(np.isnan(std_resid_matrix), axis=1)
@@ -313,7 +318,9 @@ def fit_dcc_garch(
         )
 
     # Step 2: 估计 DCC 参数 + 一次性拿到 R_t 序列（复用，避免重复 T 循环）
+    _t0_dcc = time.perf_counter()
     dcc_a, dcc_b, conditional_corr_series = _estimate_dcc_params(std_resid_clean)
+    DCC_FIT_LATENCY.labels(stage="likelihood").observe(time.perf_counter() - _t0_dcc)
 
     return DCCResult(
         industries=industries,

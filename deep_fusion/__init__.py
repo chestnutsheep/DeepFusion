@@ -4,6 +4,7 @@ load_dotenv()
 
 import argparse
 import asyncio
+import importlib
 import io
 import json
 import os
@@ -15,57 +16,40 @@ from starlette.middleware.cors import CORSMiddleware
 
 from .server import mcp
 
-# Trigger @mcp.tool / @mcp.prompt / @mcp.resource registration
-from . import prompts
-from . import resources
-
-from .tools import (
-    analysis,
-    anti_fraud,
-    bonds,
-    crypto,
-    cycles,
-    forex,
-    funds,
-    futures,
-    industry,
-    international,
-    macro,
-    market,
-    portfolio,
-    precious_metals,
-    spectral,
-    stock_reports,
-    stocks,
-    tech_indicators,
-)
-
-__all__ = [
-    "analysis",
-    "anti_fraud",
-    "bonds",
-    "crypto",
-    "cycles",
-    "forex",
-    "funds",
-    "futures",
-    "industry",
-    "international",
-    "macro",
-    "market",
-    "mcp",
-    "portfolio",
-    "precious_metals",
-    "prompts",
-    "resources",
-    "spectral",
-    "stock_reports",
-    "stocks",
+# Tool 模块名列表（lazy import，避免顶层 import 拖慢启动）
+_TOOL_MODULES = [
+    "analysis", "anti_fraud", "bonds", "crypto", "cycles", "forex",
+    "funds", "futures", "industry", "international", "macro", "market",
+    "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
     "tech_indicators",
 ]
 
+# prompts/resources 轻量，顶层 import
+from . import prompts
+from . import resources
+
+_tools_loaded = False
+
+
+def _load_tools():
+    """延迟导入所有工具模块，触发 @mcp.tool 注册。
+
+    在 main()/inspect 前调用，确保 MCP 协议 tools/list 能返回完整列表。
+    顶层 import 时跳过，避免 import deep_fusion 本身拖慢 3-6s。
+    """
+    global _tools_loaded
+    if _tools_loaded:
+        return
+    for name in _TOOL_MODULES:
+        importlib.import_module(f".tools.{name}", __package__)
+    _tools_loaded = True
+
+
+__all__ = ["mcp", "prompts", "resources", "main"]
+
 
 def _run_inspect():
+    _load_tools()  # 确保 tool 已注册
     if mcp.instructions:
         print("=== Server Instructions ===")
         print(mcp.instructions)
@@ -103,6 +87,9 @@ def main():
     parser.add_argument("--port", type=int, default=port, help=f"Port to listen on (default: {port})")
 
     args = parser.parse_args()
+
+    # 在解析参数后、执行命令前加载所有 tool（触发 @mcp.tool 注册）
+    _load_tools()
 
     if args.command == "inspect":
         _run_inspect()

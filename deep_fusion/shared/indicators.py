@@ -89,7 +89,11 @@ def add_sma(df: pd.DataFrame, close: pd.Series, low: pd.Series, high: pd.Series,
     tr1 = (high - low).abs()
     tr2 = (high - close.shift(1)).abs()
     tr3 = (low - close.shift(1)).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    # 用 np.maximum.reduce 就地计算，避免 pd.concat 中间 DataFrame
+    tr = pd.Series(
+        np.maximum.reduce([tr1.values, tr2.values, tr3.values]),
+        index=close.index,
+    )
     atr14 = tr.ewm(span=14, adjust=False).mean()
     df["ATR14"] = atr14
     up_move = (high - high.shift(1)).fillna(0)

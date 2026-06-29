@@ -212,7 +212,7 @@ def newsnow_news(channels=None):
                 "User-Agent": USER_AGENT,
                 "Referer": base,
             },
-            timeout=60,
+            timeout=30,
         )
         lst = res.json() or []
         for item in lst:

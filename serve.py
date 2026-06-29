@@ -26,9 +26,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-from deep_fusion import mcp
+from deep_fusion import mcp, _load_tools
 from deep_fusion.logging_config import configure_logging, get_logger
 from deep_fusion.metrics import metrics_app
+
+# 触发 @mcp.tool 注册（lazy import 的工具模块）
+_load_tools()
 
 configure_logging(os.getenv('DF_LOG_LEVEL', 'WARNING'))
 _LOGGER = get_logger(__name__)
@@ -102,4 +105,15 @@ import uvicorn
 
 print(f'  ⟡ Deep Fusion API → http://localhost:5173/api')
 threading.Thread(target=_warmup_cycle_cache, daemon=True).start()
-uvicorn.run(app, host='0.0.0.0', port=5173, log_level='warning')
+
+# 多 worker：用模块字符串传 app，uvicorn 才能 fork 多进程
+# 单 worker（默认）：直接传 app 实例，避免 import 开销
+workers = int(os.getenv('DF_WORKERS', '1'))
+if workers > 1:
+    uvicorn.run(
+        "serve:app",
+        host='0.0.0.0', port=5173, log_level='warning',
+        workers=workers,
+    )
+else:
+    uvicorn.run(app, host='0.0.0.0', port=5173, log_level='warning')

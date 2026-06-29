@@ -131,10 +131,13 @@ from .metrics import (
     measure_block,
 )
 from .shared.constants import REQUEST_TIMEOUT
+from .logging_config import get_logger as _get_structlog
 
 _LOGGER = logging.getLogger(__name__)
+# structlog logger，用于结构化日志（含 trace_id 等字段）
+_SLOG = _get_structlog(__name__)
 
-_executor = ThreadPoolExecutor(max_workers=8)
+_executor = ThreadPoolExecutor(max_workers=int(os.getenv("DF_EXECUTOR_WORKERS", "8")))
 
 # EM (East Money) API cooldown and fallback
 _last_em_error: float = 0.0
@@ -195,11 +198,12 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
         key = f"{fun.__name__}-{args}-{kwargs}"
     cache = CacheKey.init(key, ttl1, ttl2)
     all_df = cache.get()
+    cache_hit = all_df is not None and not force
     if all_df is None or force:
         start = time.perf_counter()
         try:
             if _LOGGER.isEnabledFor(logging.INFO):
-                _LOGGER.info("Request akshare: %s", [key, args, kwargs])
+                _LOGGER.info("Request akshare: %s", [key, repr(args)[:200], repr(kwargs)[:200]])
             EXECUTOR_ACTIVE.inc()
             try:
                 # 用 Future.result(timeout) 强制超时，避免 akshare 内部 requests 挂死
@@ -209,6 +213,7 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
                 except TimeoutError:
                     AKSHARE_TIMEOUT.labels(fun=fun.__name__).inc()
                     _LOGGER.warning("ak_cache timeout after %ds: %s", REQUEST_TIMEOUT, fun.__name__)
+                    _SLOG.warning("akshare_timeout", tool=fun.__name__, timeout=REQUEST_TIMEOUT)
                     all_df = None
             finally:
                 EXECUTOR_ACTIVE.dec()
@@ -221,7 +226,12 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
                 if all_df is not None:
                     cache.set(all_df)
         finally:
-            REQUEST_LATENCY.labels(tool=fun.__name__).observe(time.perf_counter() - start)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            REQUEST_LATENCY.labels(tool=fun.__name__).observe(elapsed_ms / 1000)
+            _SLOG.info("akshare_call", tool=fun.__name__, duration_ms=round(elapsed_ms, 2),
+                       cache_hit=False, key=key[:80])
+    else:
+        _SLOG.info("akshare_call", tool=fun.__name__, duration_ms=0.0, cache_hit=True, key=key[:80])
     return all_df
 
 
@@ -246,7 +256,7 @@ async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
         start = time.perf_counter()
         try:
             if _LOGGER.isEnabledFor(logging.INFO):
-                _LOGGER.info("Request akshare async: %s", [key, args, kwargs])
+                _LOGGER.info("Request akshare async: %s", [key, repr(args)[:200], repr(kwargs)[:200]])
             EXECUTOR_ACTIVE.inc()
             try:
                 # asyncio.wait_for 强制超时；超时后底层线程可能仍在跑（akshare 不可中断），

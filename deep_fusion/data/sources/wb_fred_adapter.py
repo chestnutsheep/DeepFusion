@@ -34,25 +34,23 @@ def _flip_request(url: str, timeout: int = 15) -> _raw_requests.Response | None:
     If session has no proxy → try with env proxy.
     """
     proxies = _get_proxies()
-    flip_proxies = None if proxies else proxies  # will set below if no proxy
 
     if proxies:
         # Currently using proxy → retry WITHOUT proxy
-        old_http = os.environ.pop("HTTP_PROXY", None)
-        old_https = os.environ.pop("HTTPS_PROXY", None)
-        _ = os.environ.pop("http_proxy", None)
-        _ = os.environ.pop("https_proxy", None)
+        # 用 mock.patch.dict 原子改环境变量，避免并发竞态
+        from unittest.mock import patch
+        env_override = {
+            "HTTP_PROXY": None, "http_proxy": None,
+            "HTTPS_PROXY": None, "https_proxy": None,
+            "ALL_PROXY": None, "all_proxy": None,
+        }
         try:
-            resp = _raw_requests.get(url, timeout=timeout)
-            if resp.status_code == 200:
-                return resp
+            with patch.dict(os.environ, env_override, clear=False):
+                resp = _raw_requests.get(url, timeout=timeout)
+                if resp.status_code == 200:
+                    return resp
         except Exception:
             pass
-        finally:
-            if old_http:
-                os.environ["HTTP_PROXY"] = old_http
-            if old_https:
-                os.environ["HTTPS_PROXY"] = old_https
     else:
         # Currently NO proxy → try WITH proxy from INTERNATIONAL_PROXY or default
         proxy_url = os.getenv("INTERNATIONAL_PROXY") or "http://127.0.0.1:7897"
