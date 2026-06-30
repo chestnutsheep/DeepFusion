@@ -11,6 +11,8 @@ export const useAppStore = create((set) => ({
   theme: 'matin',
   sidebarCollapsed: false,
   stockSearchKeyword: '',
+  fundDetailCode: null,       // 基金详情跳转：基金代码
+  fundDetailName: null,       // 金详情跳转：基金名称
   setActiveTab: (tab) => set({ activeTab: tab }),
   setActiveMacroSub: (sub) => set({ activeMacroSub: sub }),
   setActiveMesoSub: (sub) => set({ activeMesoSub: sub }),
@@ -21,6 +23,8 @@ export const useAppStore = create((set) => ({
   setTheme: (theme) => set({ theme }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setStockSearchKeyword: (kw) => set({ stockSearchKeyword: kw }),
+  setFundDetail: (code, name) => set({ fundDetailCode: code, fundDetailName: name }),
+  clearFundDetail: () => set({ fundDetailCode: null, fundDetailName: null }),
 }));
 
 // 暴露到 window 便于调试和端到端测试
