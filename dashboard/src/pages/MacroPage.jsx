@@ -268,7 +268,7 @@ function CycleNesting() {
         // 零线参考
         {
           name: '零线', type: 'line', data: dates.map(() => 0),
-          lineStyle: { color: 'rgb(248 241 232 / 0.86)', width: 1.5, type: 'dashed' },
+          lineStyle: { color: 'rgb(248 241 232 / 0.86)', width: 2, type: 'dashed' },
           symbol: 'none', silent: true, tooltip: { show: false },
           z: 0,
         },
@@ -279,7 +279,7 @@ function CycleNesting() {
           data: getData(id),
           smooth: true,
           connectNulls: true,
-          lineStyle: { color: NEST_COLORS[id], width: id === 'kondratiev' ? 3 : 2 },
+          lineStyle: { color: NEST_COLORS[id], width: id === 'kondratiev' ? 3.5 : 2.5 },
           areaStyle: id === 'kondratiev'
             ? { opacity: 0.06, color: NEST_COLORS[id] }
             : { opacity: 0.03, color: NEST_COLORS[id] },
@@ -289,19 +289,30 @@ function CycleNesting() {
       ],
     };
     chart.setOption(option);
-    return () => chart.dispose();
+
+    // ResizeObserver 监听容器尺寸变化（侧边栏展开/收起时自动 resize）
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => chart.resize());
+      ro.observe(chartRef.current);
+    }
+
+    return () => {
+      if (ro) ro.disconnect();
+      chart.dispose();
+    };
   }, [rows]);
 
   if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
   return (
-    <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表5：四周期合成Z值嵌套对比</h3>
+    <CardWrapper hoverable style={{ padding: 'var(--sp-xl)', transition: 'all 0.25s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-lg)' }}>
+        <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--accent-gold)' }}>表5：四周期合成Z值嵌套对比</h3>
         <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
       </div>
-      <div ref={chartRef} style={{ width: '100%', height: 400 }} />
+      <div ref={chartRef} style={{ width: '100%', height: 'clamp(320px, 45vh, 500px)' }} />
     </CardWrapper>
   );
 }
@@ -453,9 +464,9 @@ function CycleGantt() {
           const style = GANTT_PHASE_STYLE[phase] || GANTT_PHASE_STYLE[0];
           const rectShape = {
             x: start[0],
-            y: start[1] - 5,
+            y: start[1] - 8,
             width: end[0] - start[0],
-            height: 10,
+            height: 16,
           };
 
           // 纹理装饰：用 decal pattern 区分
@@ -484,19 +495,30 @@ function CycleGantt() {
       }],
     };
     chart.setOption(option);
-    return () => chart.dispose();
+
+    // ResizeObserver 监听容器尺寸变化（侧边栏展开/收起时自动 resize）
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => chart.resize());
+      ro.observe(chartRef.current);
+    }
+
+    return () => {
+      if (ro) ro.disconnect();
+      chart.dispose();
+    };
   }, [rows]);
 
   if (isLoading) return <div style={{ padding: 20 }}>加载中...</div>;
   if (!rows.length) return <div style={{ padding: 20 }}>暂无数据</div>;
 
   return (
-    <CardWrapper hoverable style={{ padding: 18, transition: 'all 0.25s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)' }}>表6：四周期相位演进甘特图</h3>
+    <CardWrapper hoverable style={{ padding: 'var(--sp-xl)', transition: 'all 0.25s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-lg)' }}>
+        <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--accent-gold)' }}>表6：四周期相位演进甘特图</h3>
         <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>数据来源：FRED/世界银行; 手动计算</span>
       </div>
-      <div ref={chartRef} style={{ width: '100%', height: 220 }} />
+      <div ref={chartRef} style={{ width: '100%', height: 'clamp(180px, 25vh, 280px)' }} />
     </CardWrapper>
   );
 }
@@ -619,8 +641,8 @@ export default function MacroPage() {
       {/* 周期覆盖 — Sidebar 子导航 "宏观覆盖" 锚点 */}
       <hr className="section-divider" />
       <div id="coverage">
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>周期覆盖</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>周期覆盖</h2>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期当前相位一览
         </p>
         <ErrorBoundary><CoverageGrid /></ErrorBoundary>
@@ -629,8 +651,8 @@ export default function MacroPage() {
       {/* 周期嵌套图 — 四周期 composite_z 对比 */}
       <hr className="section-divider" />
       <div id="nesting">
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>周期嵌套</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>周期嵌套</h2>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期合成Z值（composite_z）波动对比：零线以上扩张，以下收缩
         </p>
         <ErrorBoundary><CycleNesting /></ErrorBoundary>
@@ -639,8 +661,8 @@ export default function MacroPage() {
       {/* 周期相位甘特图 */}
       <hr className="section-divider" />
       <div id="gantt">
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, marginTop: 8 }}>相位分布</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>相位分布</h2>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
         </p>
         <ErrorBoundary><CycleGantt /></ErrorBoundary>

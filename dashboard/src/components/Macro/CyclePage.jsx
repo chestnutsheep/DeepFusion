@@ -98,7 +98,8 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
   const badge = PHASE_BADGE[phaseValue] || PHASE_BADGE[0];
 
   const metrics = config.metrics || [];
-  const chartHeight = Math.round(320 * 1.2); // 1.2x 放大
+  // 图表高度：用响应式高度而非固定像素
+  const chartHeight = 'clamp(320px, 40vh, 480px)';
 
   // 根据数据源动态选择绘图系列
   const isUsingExtData = extResult.data && _parseJSON(extResult.data).length > 0;
@@ -183,14 +184,16 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
         }
 
         // 统一布局：图表全宽 + 指标卡下方网格
-        // 列数：≤6张用6列，>6张用4列（卡片已调大，6个一行更紧凑）
-        const gridCols = N <= 6 ? N : 4;
+        // 排版规则：一行能放完且不太挤→N列，否则宽松布局
+        // 75%内容区宽度下：4列刚好(每卡~18.75vw)，5列偏挤(每卡~15vw)，6列太窄
+        // 所以 ≤4 → N列(一行完)，5~6 → 3列(两行宽松)，>6 → 4列(多行宽松)
+        const gridCols = N <= 4 ? N : N <= 6 ? 3 : 4;
 
         return (
           <div style={{ marginBottom: 'var(--sp-2xl)' }}>
             {chartContent}
             <div style={{ marginTop: 'var(--sp-lg)' }}>
-              <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={gridCols} gap="var(--sp-md)" />
+              <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={gridCols} gap="var(--sp-lg)" />
             </div>
           </div>
         );

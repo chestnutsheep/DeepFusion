@@ -7,16 +7,16 @@ echarts.registerTheme('df-dark', {
   textStyle: { color: '#CBC0B0' },
   legend: { textStyle: { color: '#CBC0B0' } },
   categoryAxis: {
-    axisLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } },
+    axisLine: { lineStyle: { color: 'rgba(212,168,83,0.18)', width: 2 } },
     axisTick: { show: false },
-    axisLabel: { color: '#CBC0B0', fontSize: 11 },
+    axisLabel: { color: '#CBC0B0', fontSize: 12 },
     splitLine: { show: false },
   },
   valueAxis: {
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: '#CBC0B0', fontSize: 11 },
-    splitLine: { lineStyle: { color: 'rgba(212,168,83,0.10)' } },
+    axisLabel: { color: '#CBC0B0', fontSize: 12 },
+    splitLine: { lineStyle: { color: 'rgba(212,168,83,0.12)', width: 1.5 } },
   },
 });
 
@@ -138,7 +138,7 @@ export default function DataChart({
           data: seriesData,
           smooth: !isReturnMode, // 收益率模式不平滑，保留波动细节
           connectNulls: !isReturnMode, // 收益率模式不连接 null（首个点）
-          lineStyle: { color: s.color, width: isReturnMode ? 1.2 : (s.lineWidth || 2), ...(s.lineStyle || {}) },
+          lineStyle: { color: s.color, width: isReturnMode ? 1.5 : (s.lineWidth || 2.5), ...(s.lineStyle || {}) },
           areaStyle: s.type !== 'bar' && !isReturnMode
             ? { opacity: s.areaOpacity ?? 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
@@ -267,8 +267,35 @@ export default function DataChart({
       }
     };
   }, []);
+
+  // 窗口 resize 时自动调整图表大小
+  useEffect(() => {
+    const handleResize = () => {
+      if (chartRef.current) {
+        const chart = echarts.getInstanceByDom(chartRef.current);
+        if (chart) chart.resize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    // ResizeObserver 监听容器本身尺寸变化（比 window resize 更精准）
+    let ro;
+    if (chartRef.current && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(handleResize);
+      ro.observe(chartRef.current);
+    }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  // height: 数字 → px 字符串, 'auto' → min-height 响应式
+  const containerStyle = typeof height === 'number'
+    ? { position: 'relative', width: '100%', height }
+    : { position: 'relative', width: '100%', minHeight: 320, height: typeof height === 'string' ? height : '420px' };
+
   return (
-    <div style={{ position: 'relative', width: '100%', height }}>
+    <div style={containerStyle}>
       {showYAxisToggle && (
         <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4, zIndex: 10 }}>
           <button onClick={() => setChartMode('value')} style={{
@@ -287,7 +314,7 @@ export default function DataChart({
           )}
         </div>
       )}
-      <div ref={chartRef} style={{ width: '100%', height }} />
+      <div ref={chartRef} style={{ width: '100%', height: '100%' }} />
     </div>
   );
 }

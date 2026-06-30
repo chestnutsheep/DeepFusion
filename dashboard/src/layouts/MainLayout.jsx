@@ -11,7 +11,7 @@ export default function MainLayout() {
       <div
         className="mn"
         style={{
-          marginLeft: sidebarCollapsed ? '60px' : 'var(--nav-width)',
+          marginLeft: sidebarCollapsed ? '70px' : 'clamp(240px, 24vw, 400px)',
           minHeight: '100vh',
           transition: 'margin-left var(--sidebar-slide-duration) cubic-bezier(0.22, 1, 0.36, 1)',
         }}

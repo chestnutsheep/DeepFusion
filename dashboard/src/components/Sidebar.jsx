@@ -370,12 +370,15 @@ function SidebarContent() {
       >
         {/* 折叠/展开按钮 */}
         <div style={{
-          position: 'absolute', top: 24, right: 8,
+          position: 'absolute', top: 24,
+          right: sidebarCollapsed ? 'auto' : 8,
+          left: sidebarCollapsed ? '50%' : 'auto',
+          transform: sidebarCollapsed ? 'translateX(-50%)' : 'none',
           zIndex: 100, cursor: 'pointer',
-          width: 30, height: 30, borderRadius: 14,
+          width: 32, height: 32, borderRadius: 16,
           background: 'rgba(212,168,83,0.32)', border: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, color: 'var(--accent-gold)',
+          fontSize: 18, color: 'var(--accent-gold)',
         }} onClick={toggleSidebar}>
           {sidebarCollapsed ? '☰' : '‹'}
         </div>
@@ -466,7 +469,8 @@ function SidebarContent() {
             }}
             style={{
               color: activeSub === key ? 'var(--accent-gold)' : 'var(--text-secondary)',
-              fontSize: 15, borderRadius: 8, margin: '2px 8px',
+              fontSize: sidebarCollapsed ? 14 : 15, borderRadius: 8,
+              margin: sidebarCollapsed ? '2px 4px' : '2px 8px',
               backgroundColor: activeSub === key ? 'rgba(212,168,83,0.08)' : 'transparent',
             }}
           >
