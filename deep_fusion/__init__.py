@@ -20,7 +20,7 @@ from .server import mcp
 _TOOL_MODULES = [
     "analysis", "anti_fraud", "bonds", "crypto", "cycles", "forex",
     "funds", "futures", "industry", "international", "macro", "market",
-    "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
+    "policy", "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
     "tech_indicators",
 ]
 

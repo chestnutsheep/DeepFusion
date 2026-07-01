@@ -42,7 +42,7 @@ export default function TopTabs() {
         gap: 4,
         borderBottom: '1px solid var(--border-subtle)',
         paddingBottom: 0,
-        marginBottom: 16,
+        marginBottom: 'var(--sp-md)',
       }}
     >
       {TABS.map((tab) => (
@@ -51,8 +51,8 @@ export default function TopTabs() {
           onClick={() => handleTabClick(tab)}
           style={{
             flex: 1,
-            padding: '10px 0',
-            fontSize: 14,
+            padding: 'var(--sp-md) 0',
+            fontSize: 'var(--fs-base)',
             fontWeight: activeTab === tab.key ? 700 : 500,
             color: activeTab === tab.key ? 'var(--accent-gold)' : 'var(--text-secondary)',
             background: 'transparent',

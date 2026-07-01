@@ -40,16 +40,16 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         ref={refs.setReference}
         {...getReferenceProps()}
         hoverable={!!detail}
-        style={{ padding: 'var(--sp-lg) var(--sp-xl)', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 72 }}
+        style={{ padding: 'var(--sp-lg) var(--sp-md)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-xs)', minHeight: 120, justifyContent: 'space-between' }}
       >
         {/* 标签行：名称 + 来源标签 + tooltip */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 22 }}>
-          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1.3 }}>{label}</span>
           {srcDot && (
             <span style={{
               fontSize: 'var(--fs-2xs)', fontWeight: 600, color: srcDot,
               background: `${srcDot}15`, border: `1px solid ${srcDot}40`,
-              borderRadius: 3, padding: '1px 5px', lineHeight: 1.3,
+              borderRadius: 3, padding: '2px 6px', lineHeight: 1.3,
             }}>
               {source}
             </span>
@@ -57,10 +57,10 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
           {tooltip && <TooltipIcon content={tooltip} position="top" />}
         </div>
         {/* 数值行 */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-          <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: valueColor, lineHeight: 1.15 }}>{display}</span>
-          {unit && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>{unit}</span>}
-          {arrow && <span style={{ fontSize: 'var(--fs-sm)', color: arrowColor, fontWeight: 700 }}>{arrow}</span>}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 800, color: valueColor, lineHeight: 1.1 }}>{display}</span>
+          {unit && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>{unit}</span>}
+          {arrow && <span style={{ fontSize: 'var(--fs-md)', color: arrowColor, fontWeight: 700 }}>{arrow}</span>}
         </div>
       </CardWrapper>
       {isOpen && detail && (

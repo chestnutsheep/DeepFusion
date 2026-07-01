@@ -19,7 +19,7 @@ export default function MainLayout() {
         <main
           id="main-panel"
           style={{
-            padding: '20px 0',
+            padding: 'var(--sp-xl) 0',
           }}
         >
           <TopTabs />

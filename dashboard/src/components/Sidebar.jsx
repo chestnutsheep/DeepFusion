@@ -183,12 +183,12 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
           if (!detail) return `${label}: ${params.value}%`;
           const subAllocLines = Object.entries(detail.subAlloc)
             .map(([k, v]) => `  ${k}  ${v}%`).join('\n');
-          return `<div style="font-weight:800;margin-bottom:6px;font-size:22px;color:#D4A853">${label}</div>
-            <div style="font-weight:800;font-size:28px;color:#f2d89f;margin-bottom:8px">${params.value}%</div>
-            <div style="font-size:14px;margin-bottom:3px;font-weight:600">📈 ${detail.cycleDirection}</div>
-            <div style="font-size:14px;margin-bottom:8px;font-weight:600">🎯 ${detail.attitude}</div>
-            <div style="font-size:12px;color:#CBC0B0;border-top:1px solid rgba(212,168,83,0.2);padding-top:6px;margin-top:4px">细分配比</div>
-            <div style="font-size:13px;color:#CBC0B0;line-height:1.8">${subAllocLines}</div>`;
+          return `<div style="font-weight:800;margin-bottom:6px;font-size:var(--fs-lg,18px);color:#D4A853">${label}</div>
+            <div style="font-weight:800;font-size:var(--fs-xl,20px);color:#f2d89f;margin-bottom:8px">${params.value}%</div>
+            <div style="font-size:var(--fs-base,14px);margin-bottom:3px;font-weight:600">📈 ${detail.cycleDirection}</div>
+            <div style="font-size:var(--fs-base,14px);margin-bottom:8px;font-weight:600">🎯 ${detail.attitude}</div>
+            <div style="font-size:var(--fs-xs,12px);color:#CBC0B0;border-top:1px solid rgba(212,168,83,0.2);padding-top:6px;margin-top:4px">细分配比</div>
+            <div style="font-size:var(--fs-sm,13px);color:#CBC0B0;line-height:1.8">${subAllocLines}</div>`;
         },
         backgroundColor: 'rgba(26,47,42,0.96)',
         borderColor: 'rgba(212,168,83,0.3)',
@@ -204,7 +204,7 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
           show: true,
           position: 'outside',
           formatter: '{b}\n{d}%',
-          fontSize: 13,
+          fontSize: 'var(--fs-sm)',
           fontWeight: 700,
           color: '#CBC0B0',
           lineHeight: 18,
@@ -216,7 +216,7 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
           lineStyle: { color: 'rgba(212,168,83,0.3)', width: 1 },
         },
         emphasis: {
-          label: { show: true, fontSize: 16, fontWeight: 800, color: '#D4A853' },
+          label: { show: true, fontSize: 'var(--fs-md)', fontWeight: 800, color: '#D4A853' },
           itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' },
         },
         data: assetAlloc.map(a => ({
@@ -231,7 +231,7 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
         top: 'middle',
         style: {
           text: '配置',
-          fontSize: 15,
+          fontSize: 'var(--fs-base)',
           fontWeight: 800,
           fill: '#D4A853',
           textAlign: 'center',
@@ -282,6 +282,20 @@ function SidebarContent() {
   const [assetAlloc, setAssetAlloc] = useState(null);
   const [assetDetail, setAssetDetail] = useState(null);
   const [marketStatus, setMarketStatus] = useState(getMarketStatus());
+  // 移动端侧边栏抽屉状态（默认隐藏，点击汉堡按钮才滑出）
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // 动态检测移动端：监听窗口尺寸变化，<=768px 视为移动端
+  // 使用 useEffect + ResizeObserver 确保响应式切换时状态正确重置
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768 && mobileOpen) {
+        setMobileOpen(false); // 切回宽屏时自动关闭抽屉
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileOpen]);
 
   // 每分钟更新市场状态
   useEffect(() => {
@@ -356,17 +370,26 @@ function SidebarContent() {
 
   return (
     <>
+      {/* 移动端浮动汉堡按钮 — 固定在屏幕左上角，不跟随侧边栏滑出 */}
+      <button
+        className="mobile-menu-toggle"
+        aria-label="打开菜单"
+        onClick={() => setMobileOpen(!mobileOpen)}
+      >
+        {mobileOpen ? '✕' : '☰'}
+      </button>
+
       {/* 遮罩层 — 展开时点击关闭 */}
       {!sidebarCollapsed && (
         <div
-          className="sidebar-overlay visible"
-          onClick={toggleSidebar}
+          className={`sidebar-overlay visible${mobileOpen ? ' mobile-active' : ''}`}
+          onClick={() => { setMobileOpen(false); toggleSidebar(); }}
         />
       )}
 
       {/* 侧边栏滑入面板 */}
       <nav
-        className={`sidebar-slide-panel ${sidebarCollapsed ? 'collapsed-mode' : 'open'}`}
+        className={`sidebar-slide-panel ${sidebarCollapsed ? 'collapsed-mode' : 'open'}${mobileOpen ? ' mobile-active' : ''}`}
       >
         {/* 折叠/展开按钮 */}
         <div style={{
@@ -378,42 +401,45 @@ function SidebarContent() {
           width: 32, height: 32, borderRadius: 16,
           background: 'rgba(212,168,83,0.32)', border: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, color: 'var(--accent-gold)',
-        }} onClick={toggleSidebar}>
+          fontSize: 'var(--fs-lg)', color: 'var(--accent-gold)',
+        }} onClick={() => {
+          if (window.innerWidth <= 768) setMobileOpen(!mobileOpen);
+          else toggleSidebar();
+        }}>
           {sidebarCollapsed ? '☰' : '‹'}
         </div>
 
         {/* 标题 */}
-        <div style={{ padding: sidebarCollapsed ? '8px 4px' : '20px 16px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4, textAlign: sidebarCollapsed ? 'center' : 'left' }}>
-          <h1 style={{ fontSize: sidebarCollapsed ? 14 : 20, fontWeight: 800, color: 'var(--accent-gold)', letterSpacing: 1, margin: 0 }}>{sidebarCollapsed ? '◈' : 'Deep Fusion'}</h1>
-          {!sidebarCollapsed && <p style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 6 }}>多维分析系统</p>}
+        <div style={{ padding: sidebarCollapsed ? '8px 4px' : 'var(--sp-lg) var(--sp-md) var(--sp-sm)', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4, textAlign: sidebarCollapsed ? 'center' : 'left' }}>
+          <h1 style={{ fontSize: sidebarCollapsed ? 'var(--fs-base)' : 'var(--fs-2xl)', fontWeight: 800, color: 'var(--accent-gold)', letterSpacing: 1, margin: 0 }}>{sidebarCollapsed ? '◈' : 'Deep Fusion'}</h1>
+          {!sidebarCollapsed && <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginTop: 6 }}>多维分析系统</p>}
         </div>
 
       {/* ── 展开态信息区 ── */}
       {!sidebarCollapsed && (
         <>
           {/* 日期/星期/时间/市场状态 */}
-          <div style={{ margin: '4px 12px 8px', padding: 12, background: 'rgba(0,0,0,0.20)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ margin: '4px var(--sp-md) var(--sp-sm)', padding: 'var(--sp-md)', background: 'rgba(0,0,0,0.20)', borderRadius: 'var(--radius)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width:8, height:8, background: marketStatus.color, borderRadius:'50%', display:'inline-block', boxShadow: `0 0 6px ${marketStatus.color}44` }} />
-              <span style={{ fontSize:20, fontWeight:800, color:'var(--text-primary)' }}>{dateStr}</span>
-              <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:600 }}>{weekDay}</span>
-              <span style={{ fontSize:13, color:'var(--text-muted)' }}>{timeStr}</span>
-              <span style={{ fontSize:14, fontWeight:700, color: marketStatus.color, marginLeft:4 }}>{marketStatus.label}</span>
+              <span style={{ fontSize:'var(--fs-xl)', fontWeight:800, color:'var(--text-primary)' }}>{dateStr}</span>
+              <span style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)', fontWeight:600 }}>{weekDay}</span>
+              <span style={{ fontSize:'var(--fs-sm)', color:'var(--text-muted)' }}>{timeStr}</span>
+              <span style={{ fontSize:'var(--fs-base)', fontWeight:700, color: marketStatus.color, marginLeft:4 }}>{marketStatus.label}</span>
             </div>
           </div>
 
           {/* 资产配置环形图 */}
-          <div style={{ margin:'4px 12px 8px' }}>
-            <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:11,fontWeight:400,color:'var(--text-muted)' }}>周期动态建议</span></div>
-            <div style={{ padding:12, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
+          <div style={{ margin:'4px var(--sp-md) var(--sp-sm)' }}>
+            <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>周期动态建议</span></div>
+            <div style={{ padding:'var(--sp-md)', background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               <AssetDonut assetAlloc={assetAlloc} assetDetail={assetDetail} collapsed={sidebarCollapsed} />
             </div>
           </div>
 
           {/* 四周期方向指示器 */}
-          <div style={{ margin:'4px 12px 8px' }}>
-            <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>🔄 周期方向</div>
+          <div style={{ margin:'4px var(--sp-md) var(--sp-sm)' }}>
+            <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>🔄 周期方向</div>
             <div style={{ display:'flex', gap:6 }}>
               {(cyclePhases.length > 0 ? cyclePhases : [
                 { name:'基钦', phase:'—', dir:'→', color:'#888' },
@@ -422,14 +448,14 @@ function SidebarContent() {
                 { name:'康波', phase:'—', dir:'→', color:'#888' },
               ]).map(c => (
                 <div key={c.name} style={{
-                  flex:1, padding:'6px 4px', background:'rgba(0,0,0,0.2)',
+                  flex:1, padding:'var(--sp-xs) 4px', background:'rgba(0,0,0,0.2)',
                   borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)',
                   display:'flex', flexDirection:'column', alignItems:'center', gap:1,
                 }}>
                   <div style={{ width:10, height:10, borderRadius:2, background:c.color, boxShadow:`0 0 4px ${c.color}44`, marginBottom:2 }} />
-                  <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:700, lineHeight:1 }}>{c.name}</span>
-                  <span style={{ fontSize:16, color:c.color, fontWeight:800, lineHeight:1 }}>{c.dir}</span>
-                  <span style={{ fontSize:10, color:'var(--text-secondary)', textAlign:'center', lineHeight:1.2 }}>{c.phase}</span>
+                  <span style={{ fontSize:'var(--fs-2xs)', color:'var(--text-muted)', fontWeight:700, lineHeight:1 }}>{c.name}</span>
+                  <span style={{ fontSize:'var(--fs-md)', color:c.color, fontWeight:800, lineHeight:1 }}>{c.dir}</span>
+                  <span style={{ fontSize:'var(--fs-2xs)', color:'var(--text-secondary)', textAlign:'center', lineHeight:1.2 }}>{c.phase}</span>
                 </div>
               ))}
             </div>
@@ -437,14 +463,14 @@ function SidebarContent() {
 
           {/* 政策速递 */}
           {activeTab === 'policy' && (
-            <div style={{ margin:'4px 12px 8px' }}>
-              <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
-              <div style={{ padding:12, background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
+            <div style={{ margin:'4px var(--sp-md) var(--sp-sm)' }}>
+              <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px' }}>📜 政策速递 {policyCnt && `(${policyCnt}篇)`}</div>
+              <div style={{ padding:'var(--sp-md)', background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
                 {policyBriefs.length>0 ? policyBriefs.map((b,i)=>(
-                  <div key={i} style={{ fontSize:12,color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
+                  <div key={i} style={{ fontSize:'var(--fs-xs)',color:'var(--text-secondary)',padding:'3px 0',borderBottom:i<policyBriefs.length-1?'1px solid rgba(212,168,83,0.06)':'none' }}>
                     {b.length>40?b.slice(0,40)+'...':b}
                   </div>
-                )) : <div style={{fontSize:12,color:'var(--text-muted)'}}>加载中...</div>}
+                )) : <div style={{fontSize:'var(--fs-xs)',color:'var(--text-muted)'}}>加载中...</div>}
               </div>
             </div>
           )}
@@ -452,7 +478,7 @@ function SidebarContent() {
       )}
 
       {/* ── 导航区（展开/折叠都显示） ── */}
-      <div style={{ fontSize:13,fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: sidebarCollapsed ? '8px 10px 4px' : '8px 16px 4px', textAlign: sidebarCollapsed ? 'center' : 'left' }}>
+      <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding: sidebarCollapsed ? 'var(--sp-sm) var(--sp-xs) 4px' : 'var(--sp-sm) var(--sp-md) 4px', textAlign: sidebarCollapsed ? 'center' : 'left' }}>
         {sidebarCollapsed ? '📍' : '📍 导航'}
       </div>
       <Menu>
@@ -469,7 +495,7 @@ function SidebarContent() {
             }}
             style={{
               color: activeSub === key ? 'var(--accent-gold)' : 'var(--text-secondary)',
-              fontSize: sidebarCollapsed ? 14 : 15, borderRadius: 8,
+              fontSize: sidebarCollapsed ? 'var(--fs-base)' : 'var(--fs-md)', borderRadius: 8,
               margin: sidebarCollapsed ? '2px 4px' : '2px 8px',
               backgroundColor: activeSub === key ? 'rgba(212,168,83,0.08)' : 'transparent',
             }}

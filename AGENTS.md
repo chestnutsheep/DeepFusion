@@ -392,6 +392,7 @@ A 股行业收益率的 PC1 解释 ~54% 方差，本质是市场系统性 beta�
 | `correlation` | `deep_fusion/shared/correlation.py` | `compute_correlation_matrix`, `hierarchical_clustering`, `pca_loadings`, `rolling_correlation`, `identify_themes` | `industry_themes` 直接调用 |
 | `dcc_garch` | `deep_fusion/shared/dcc_garch.py` | `fit_dcc_garch` → `DCCResult` | `industry_themes_dcc` 调用 |
 | `causality` | `deep_fusion/shared/causality.py` | `granger_causality_matrix`, `identify_leading_industries` | `industry_themes_causality` 调用 |
+| `correlation` | `deep_fusion/shared/correlation.py` | `seasonal_correlation` | `industry_seasonal_corr` 调用 |
 
 **降级策略**:
 - `causality.py`: statsmodels 不可用时降级为互相关分析（`_granger_fallback`）
@@ -955,6 +956,12 @@ A 股行业收益率的 PC1 解释 ~54% 方差，本质是市场系统性 beta�
           "return": "JSON — Granger因果检验+龙头行业识别(领先/滞后行业+因果传导链TOP15)",
           "data_source": "本地SQLite行业日行情 + statsmodels Granger检验",
           "data_span": "最近window交易日, 计算约60s, 需先采集"
+        },
+        "industry_seasonal_corr": {
+          "params": { "industries": "str 必填 逗号分隔行业名(至少2个)", "corr_method": "str 默认pearson", "min_years": "int 默认3" },
+          "return": "JSON — 季节性相关性分析(月度联动热力图+峰谷月份+波动幅度排行+剖面数据)",
+          "data_source": "本地SQLite行业日行情(需全量多年数据)",
+          "data_span": "全量数据(2020至今), 需先采集"
         }
       }
     },

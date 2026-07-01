@@ -69,7 +69,7 @@ function MethodCards() {
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: 'var(--accent-gold)' }}>
+      <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 700, marginBottom: 'var(--sp-sm)', color: 'var(--accent-gold)' }}>
         三种计算方法对比
       </h3>
       <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
@@ -79,7 +79,7 @@ function MethodCards() {
         <b style={{ color: 'var(--text-primary)' }}>带通滤波法</b>用Butterworth滤波器直接提取长波。
         三者置信度含义不同，不可直接横向比较数值大小。
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-md)' }} className="data-grid-responsive">
         {methods.map((m) => {
           const ps = PHASE_STYLE[m.phase] || PHASE_STYLE[0];
           const gps = PHASE_STYLE[m.globalPhase] || PHASE_STYLE[0];
@@ -153,10 +153,11 @@ function CoverageGrid() {
 
   return (
     <div
+      className="coverage-grid"
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${rows.length}, 1fr)`,
-        gap: 12,
+        gap: 'var(--sp-md)',
       }}
     >
       {rows.map((r, i) => (
@@ -640,8 +641,8 @@ export default function MacroPage() {
 
       {/* 周期覆盖 — Sidebar 子导航 "宏观覆盖" 锚点 */}
       <hr className="section-divider" />
-      <div id="coverage">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>周期覆盖</h2>
+      <div id="coverage" className="section-block">
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期覆盖</h2>
         <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期当前相位一览
         </p>
@@ -650,8 +651,8 @@ export default function MacroPage() {
 
       {/* 周期嵌套图 — 四周期 composite_z 对比 */}
       <hr className="section-divider" />
-      <div id="nesting">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>周期嵌套</h2>
+      <div id="nesting" className="section-block">
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期嵌套</h2>
         <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期合成Z值（composite_z）波动对比：零线以上扩张，以下收缩
         </p>
@@ -660,8 +661,8 @@ export default function MacroPage() {
 
       {/* 周期相位甘特图 */}
       <hr className="section-divider" />
-      <div id="gantt">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>相位分布</h2>
+      <div id="gantt" className="section-block">
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>相位分布</h2>
         <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
           四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
         </p>

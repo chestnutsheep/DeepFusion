@@ -10,6 +10,7 @@ import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
 import * as echarts from 'echarts';
 import TrendsAndSignals, {WarningBar} from './TrendsAndSignals';
+import SeasonalCorrelation from './SeasonalCorrelation';
 
 // ── CSV 解析工具 ──
 
@@ -1620,6 +1621,13 @@ export default function MesoLayout() {
       <div style={{ paddingBottom: 24 }}>
         <ErrorBoundary><EnergySection /></ErrorBoundary>
       </div>
+
+      <hr className="section-divider" />
+
+      {/* ═══ 区块五：季节性相关性分析 ═══ */}
+      <section id="seasonal" style={{ paddingBottom: 24 }}>
+        <ErrorBoundary><SeasonalCorrelation industries={industries} /></ErrorBoundary>
+      </section>
     </div>
   );
 }

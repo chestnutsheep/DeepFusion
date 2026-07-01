@@ -44,6 +44,30 @@ export default function PolicyDashboard() {
 
   const stageName = tl?.five_year?.stage || '';
 
+  // ── 距离下个重要政策发布日的倒数 ──
+  // 从当前月份及未来月份（同一年内）找有政策文件的第一个月份
+  const upcomingPolicy = (() => {
+    if (!tl?.months) return null;
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    for (let mIdx = curMonth; mIdx < 12; mIdx++) {
+      const monthData = tl.months[mIdx];
+      if (monthData && monthData.count > 0 && monthData.items && monthData.items.length > 0) {
+        const item = monthData.items[0];
+        const targetDate = new Date(curYear, mIdx, 15); // 月中作为预计发布日
+        const diffDays = Math.ceil((targetDate - now) / (1000 * 60 * 60 * 24));
+        return {
+          title: item.title,
+          dept: item.org,
+          date: targetDate,
+          diffDays: Math.max(0, diffDays),
+          monthIdx: mIdx,
+        };
+      }
+    }
+    return null;
+  })();
+
   useEffect(() => {
     localStorage.setItem('policyFavorites', JSON.stringify([...favorites]));
   }, [favorites]);
@@ -136,24 +160,48 @@ export default function PolicyDashboard() {
     <div className="policy-dashboard-container" onMouseMove={moveHover}>
       {/* ── 顶部卡片 ── */}
       <div className="top-cards">
-        <div className="card countdown-card">
-          <h3>📅 十五五规划进度</h3>
-          <div className="countdown-days">{progress.toFixed(1)}%</div>
-          <div className="card-subtitle">剩余 {rYears}年{rMonths}月{rFinalDays}天</div>
-          <div className="card-desc">
-            {tl?.five_year?.start || '2026'} → {tl?.five_year?.end || '2030'}
-            {stageName ? ` · ${stageName}` : ''}
-          </div>
-        </div>
-        <div className="card progress-card">
+        {/* 合并卡：十五五规划进度（百分比 + 进度条） — 加宽 */}
+        <div className="card progress-card" style={{ flex: '1.6', minWidth: 320 }}>
           <h3>📊 十五五规划{stageName ? ` · ${stageName}` : ''}</h3>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 44, fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>{progress.toFixed(1)}%</span>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              剩余 <span className="highlight-text" style={{ fontWeight: 700 }}>{rYears}年{rMonths}月{rFinalDays}天</span>
+            </span>
+          </div>
           <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }}></div></div>
           <div className="progress-info">
-            <span>已完成 {progress.toFixed(1)}%</span>
-            <span>剩余 <span className="highlight-text">{rYears}年{rMonths}月</span></span>
+            <span>{tl?.five_year?.start || '2026'} → {tl?.five_year?.end || '2030'}</span>
+            <span>已过 {elapsedDays.toFixed(0)}天 / 共 {totalDays.toFixed(0)}天</span>
           </div>
         </div>
-        <div className="card">
+
+        {/* 新增卡：距离下个重要政策发布日倒数 */}
+        <div className="card countdown-card" style={{ flex: 1, minWidth: 240 }}>
+          <h3>⏰ 下个政策发布</h3>
+          {upcomingPolicy ? (
+            <>
+              <div className="countdown-days" style={{ fontSize: 56, fontWeight: 800, color: 'var(--secondary)', lineHeight: 1, margin: '4px 0 8px' }}>
+                {upcomingPolicy.diffDays}<span style={{ fontSize: 18, marginLeft: 4, color: 'var(--text-muted)' }}>天</span>
+              </div>
+              <div className="card-subtitle" style={{ marginBottom: 6, fontWeight: 600, color: 'var(--text)' }}>
+                {upcomingPolicy.title.length > 28 ? upcomingPolicy.title.slice(0, 28) + '…' : upcomingPolicy.title}
+              </div>
+              <div className="card-desc" style={{ fontStyle: 'normal' }}>
+                {upcomingPolicy.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                {upcomingPolicy.dept ? ` · ${upcomingPolicy.dept}` : ''}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="countdown-days" style={{ fontSize: 32, color: 'var(--text-muted)', margin: '12px 0' }}>—</div>
+              <div className="card-subtitle">暂无即将发布的政策</div>
+            </>
+          )}
+        </div>
+
+        {/* 政策文件库 */}
+        <div className="card" style={{ flex: 1, minWidth: 240 }}>
           <h3>📂 政策文件库</h3>
           <div className="favorites-count">{realStats.match(/\d+/)?.[0] || '—'}</div>
           <div className="card-subtitle">篇 · 已收藏 {favorites.size} 篇</div>

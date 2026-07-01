@@ -1,4 +1,4 @@
-"""行业相关性分析工具类 — 静态/滚动相关矩阵 + 层次聚类 + PCA 载荷。
+"""行业相关性分析工具类 — 静态/滚动相关矩阵 + 层次聚类 + PCA 载荷 + 季节性相关。
 
 纯数学模块，不依赖外部数据源。输入为 pd.DataFrame（行业×日期收益率矩阵），
 输出为结构化字典，供上层脚本/MCP工具消费。
@@ -8,6 +8,7 @@
     hierarchical_clustering(corr_matrix, n_clusters) -> dict
     pca_loadings(returns, n_components) -> dict
     rolling_correlation(returns, window) -> dict
+    seasonal_correlation(returns, industries) -> dict
 """
 from __future__ import annotations
 
@@ -449,3 +450,197 @@ def _label_themes(
         })
 
     return themes
+
+
+# ═══════════════════════════════════════════════════════════
+#  6. 季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+_MONTH_NAMES = {
+    1: "1月", 2: "2月", 3: "3月", 4: "4月", 5: "5月", 6: "6月",
+    7: "7月", 8: "8月", 9: "9月", 10: "10月", 11: "11月", 12: "12月",
+}
+
+
+def _month_name(m: int) -> str:
+    return _MONTH_NAMES.get(m, f"{m}月")
+
+
+def seasonal_correlation(
+        returns: pd.DataFrame,
+        industries: list[str] | None = None,
+        corr_method: str = "pearson",
+) -> dict[str, Any]:
+    """按年度区分、月度切片计算行业间季节性相关性规律。
+
+    将数据按 (年, 月) 切片，在每个切片内计算选中行业间的相关系数，
+    得到各月份相关性的横向跨年比较，识别季节性联动规律。
+
+    Args:
+        returns: DataFrame, index=日期(DatetimeIndex), columns=行业名, values=日收益率
+        industries: 选中计算的行业名列表。None 则使用 returns 的全部列
+        corr_method: 相关系数类型 ("pearson" | "spearman")
+
+    Returns:
+        {
+            "monthly_corr": dict, key="(年,月)" → {行业对: 相关系数},
+            "monthly_avg_corr": dict, key="月份(1~12)" → {行业对: 多年平均相关系数},
+            "seasonal_profile": dict, key="(行业A,行业B)" → {月份: 平均相关系数},
+            "peak_months": dict, key="(行业A,行业B)" → {month, corr, month_name},
+            "valley_months": dict, key="(行业A,行业B)" → {month, corr, month_name},
+            "seasonal_strength": dict, key="(行业A,行业B)" → 季节性波动幅度(max-min),
+            "heatmap_data": list, 供前端 ECharts 热力图渲染,
+            "year_range": [min_year, max_year],
+            "n_years": int,
+            "industries": list[str],
+            "method": str,
+        }
+    """
+    if returns.empty:
+        return {"monthly_corr": {}, "monthly_avg_corr": {},
+                "seasonal_profile": {}, "peak_months": {}, "valley_months": {},
+                "seasonal_strength": {}, "heatmap_data": [],
+                "year_range": [], "n_years": 0, "industries": [], "method": corr_method}
+
+    # 确保索引是 DatetimeIndex
+    if not isinstance(returns.index, pd.DatetimeIndex):
+        returns = returns.copy()
+        returns.index = pd.to_datetime(returns.index)
+
+    # 选中行业
+    if industries is None:
+        industries = returns.columns.tolist()
+    else:
+        industries = [i for i in industries if i in returns.columns]
+    if len(industries) < 2:
+        return {"monthly_corr": {}, "monthly_avg_corr": {},
+                "seasonal_profile": {}, "peak_months": {}, "valley_months": {},
+                "seasonal_strength": {}, "heatmap_data": [],
+                "year_range": [], "n_years": 0, "industries": industries,
+                "method": corr_method}
+
+    sub = returns[industries]
+
+    # 添加年、月辅助列
+    years = sub.index.year
+    months = sub.index.month
+    unique_years = sorted(set(years))
+    if len(unique_years) < 2:
+        return {"monthly_corr": {}, "monthly_avg_corr": {},
+                "seasonal_profile": {}, "peak_months": {}, "valley_months": {},
+                "seasonal_strength": {}, "heatmap_data": [],
+                "year_range": unique_years, "n_years": len(unique_years),
+                "industries": industries, "method": corr_method,
+                "note": "需要至少2年数据才能做季节性比较"}
+
+    # ── 1. 按(年,月)切片计算相关系数 → 扁平化输出 ──
+    monthly_corr: dict[str, dict[str, float]] = {}
+    for year in unique_years:
+        for month in range(1, 13):
+            mask = (years == year) & (months == month)
+            chunk = sub.loc[mask]
+            if len(chunk) < 10:  # 至少10个交易日才有意义
+                continue
+            corr = chunk.corr(method=corr_method)
+            corr = corr.dropna(axis=0, how="all").dropna(axis=1, how="all")
+            if corr.empty:
+                continue
+            # 扁平化为行业对 → 相关系数
+            flat: dict[str, float] = {}
+            for i in range(len(industries)):
+                for j in range(i + 1, len(industries)):
+                    a, b = industries[i], industries[j]
+                    if a in corr.index and b in corr.columns:
+                        v = corr.loc[a, b]
+                        if not np.isnan(v):
+                            flat[f"({a}, {b})"] = round(float(v), 4)
+            if flat:
+                monthly_corr[f"({year},{month})"] = flat
+
+    # ── 2. 按月聚合：多年平均相关系数 ──
+    monthly_avg_corr: dict[str, dict[str, float]] = {}
+    for month in range(1, 13):
+        keys = [k for k in monthly_corr if k.endswith(f",{month})")]
+        if len(keys) < 2:
+            continue
+        # 收集各行业对在多年同一月的值 → 取平均
+        pair_values: dict[str, list[float]] = {}
+        for key in keys:
+            for pair, val in monthly_corr[key].items():
+                pair_values.setdefault(pair, []).append(val)
+        avg_flat: dict[str, float] = {}
+        for pair, vals in pair_values.items():
+            avg_flat[pair] = round(sum(vals) / len(vals), 4)
+        if avg_flat:
+            monthly_avg_corr[str(month)] = avg_flat
+
+    # ── 3. 季节性剖面 + 峰/谷月 ──
+    seasonal_profile: dict[str, dict[str, float]] = {}
+    peak_months: dict[str, dict[str, Any]] = {}
+    valley_months: dict[str, dict[str, Any]] = {}
+    seasonal_strength: dict[str, float] = {}
+
+    # 收集所有行业对
+    all_pairs = set()
+    for month_data in monthly_avg_corr.values():
+        all_pairs.update(month_data.keys())
+
+    for pair in sorted(all_pairs):
+        profile: dict[str, float] = {}
+        for month in range(1, 13):
+            month_key = str(month)
+            if month_key in monthly_avg_corr and pair in monthly_avg_corr[month_key]:
+                profile[month_key] = monthly_avg_corr[month_key][pair]
+
+        if len(profile) >= 6:  # 至少6个月有数据才算有意义
+            seasonal_profile[pair] = profile
+            peak_month = max(profile, key=profile.get)
+            peak_months[pair] = {
+                "month": int(peak_month),
+                "corr": profile[peak_month],
+                "month_name": _month_name(int(peak_month)),
+            }
+            valley_month = min(profile, key=profile.get)
+            valley_months[pair] = {
+                "month": int(valley_month),
+                "corr": profile[valley_month],
+                "month_name": _month_name(int(valley_month)),
+            }
+            # 季节性波动幅度 = 峰 - 谷
+            seasonal_strength[pair] = round(
+                profile[peak_month] - profile[valley_month], 4
+            )
+
+    # ── 4. 生成前端热力图数据 ──
+    # 格式: [{ pair, month, corr }] — 供 ECharts heatmap 渲染
+    heatmap_data = []
+    for pair, profile in seasonal_profile.items():
+        for month_str, corr_val in profile.items():
+            heatmap_data.append({
+                "pair": pair,
+                "month": int(month_str),
+                "month_name": _month_name(int(month_str)),
+                "corr": corr_val,
+            })
+
+    # ── 5. 按季节性强度排序 ──
+    strength_ranking = sorted(
+        seasonal_strength.items(), key=lambda x: x[1], reverse=True
+    )
+
+    return {
+        "monthly_corr": monthly_corr,
+        "monthly_avg_corr": monthly_avg_corr,
+        "seasonal_profile": seasonal_profile,
+        "peak_months": peak_months,
+        "valley_months": valley_months,
+        "seasonal_strength": seasonal_strength,
+        "strength_ranking": [
+            {"pair": p, "amplitude": a} for p, a in strength_ranking[:20]
+        ],
+        "heatmap_data": heatmap_data,
+        "year_range": [int(unique_years[0]), int(unique_years[-1])],
+        "n_years": len(unique_years),
+        "industries": industries,
+        "method": corr_method,
+    }

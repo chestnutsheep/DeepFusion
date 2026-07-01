@@ -299,14 +299,14 @@ export default function DataChart({
       {showYAxisToggle && (
         <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4, zIndex: 10 }}>
           <button onClick={() => setChartMode('value')} style={{
-            padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
+            padding: '2px 8px', fontSize: 'var(--fs-2xs)', borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
             background: chartMode === 'value' ? 'rgba(212,168,83,0.35)' : 'transparent',
             color: chartMode === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
             fontWeight: chartMode === 'value' ? 700 : 400,
           }}>线性</button>
           {enableReturnMode && (
             <button onClick={() => setChartMode('return')} style={{
-              padding: '2px 8px', fontSize: 10, borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
+              padding: '2px 8px', fontSize: 'var(--fs-2xs)', borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
               background: chartMode === 'return' ? 'rgba(212,168,83,0.35)' : 'transparent',
               color: chartMode === 'return' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
               fontWeight: chartMode === 'return' ? 700 : 400,

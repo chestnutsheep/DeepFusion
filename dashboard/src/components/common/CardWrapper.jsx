@@ -26,21 +26,22 @@ export default function CardWrapper({
   const handleLeave = useCallback(() => setHovered(false), []);
 
   const base = {
-    background: 'var(--bg-panel)',
-    backdropFilter: 'blur(16px) saturate(1.15)',
-    WebkitBackdropFilter: 'blur(16px) saturate(1.15)',
+    // 玻璃质感：高饱和 + 多层模糊 + 渐变高光
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, var(--bg-panel) 35%, var(--bg-panel) 65%, rgba(255,255,255,0.03) 100%)',
+    backdropFilter: 'blur(20px) saturate(1.6)',
+    WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
     border: hovered && hoverable
-      ? '1.5px solid rgba(212,168,83,0.85)'
-      : '1.5px solid rgba(212,168,83,0.50)',
+      ? '1.5px solid rgba(212,168,83,0.9)'
+      : '1.5px solid rgba(212,168,83,0.45)',
     borderRadius: 'var(--radius)',
     padding: 'var(--sp-lg)',
     position: 'relative',
     transition: 'all var(--transition, 0.25s ease)',
     overflow: truncate ? 'hidden' : undefined,
     boxShadow: hovered && hoverable
-      ? 'inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 32px rgba(0,0,0,0.35), 0 0 20px rgba(212,168,83,0.12)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 24px rgba(0,0,0,0.28), 0 0 8px rgba(212,168,83,0.05)',
-    transform: hovered && hoverable ? 'translateY(-1px)' : 'none',
+      ? 'inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.15), 0 12px 40px rgba(0,0,0,0.4), 0 0 28px rgba(212,168,83,0.18)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1), 0 6px 24px rgba(0,0,0,0.28), 0 0 6px rgba(212,168,83,0.06)',
+    transform: hovered && hoverable ? 'translateY(-3px) scale(1.005)' : 'none',
   };
 
   if (truncate) {

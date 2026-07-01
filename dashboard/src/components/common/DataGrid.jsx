@@ -11,8 +11,19 @@ export default function DataGrid({ config, data, prevData, columns = 3, gap = 'v
       prevValue: prevData?.[cfg.key],
     };
   });
+  // 响应式列数：≤4列保持原样，>4列在窄屏降级
+  const responsiveClass = columns > 3 ? 'data-grid-4col' : '';
+  const mobileClass = columns > 2 ? 'data-grid-responsive' : '';
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap, ...containerStyle }}>
+    <div
+      className={`data-grid-responsive ${responsiveClass} ${mobileClass}`}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${columns}, 1fr)`,
+        gap,
+        ...containerStyle,
+      }}
+    >
       {items.map((item, i) => {
         const { key: _key, transform: _transform, ...cardProps } = item;
         return <DataCard key={i} {...cardProps} />;

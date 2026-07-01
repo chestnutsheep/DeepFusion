@@ -130,6 +130,233 @@ def industry_daily_collect(
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(
     name="industry_daily_query",
     description="查询本地 SQLite 中的行业日行情",
@@ -212,6 +439,233 @@ def industry_collect() -> str:
     lines.append("数据库状态:")
     for name, cnt in stats.items():
         lines.append(f"  {name}: {cnt} 行")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
     return "\n".join(lines)
 
 
@@ -311,6 +765,233 @@ def industry_db_status() -> str:
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(
     name="spot_prices",
     description="大宗商品现货行情（99qh），单个品种返回2012年至今全部历史数据",
@@ -351,6 +1032,233 @@ def spot_symbols() -> str:
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(
     name="caixin_indices",
     description="财新指数数据（19个指数）：数字经济/新经济/大宗商品/高质量因子/AI策略/PMI等",
@@ -379,6 +1287,233 @@ def caixin_list() -> str:
     lines = [f"共 {len(indices)} 个财新指数"]
     for i in indices:
         lines.append(f"  {i['key']:15s}  {i['desc']}")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
     return "\n".join(lines)
 
 
@@ -786,6 +1921,233 @@ def _build_themes_summary(
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(
     name="industry_themes_dcc",
     description="DCC-GARCH 时变条件相关 — 估计行业间动态相关性矩阵，识别联动加强/减弱的行业对。"
@@ -962,6 +2324,233 @@ def _build_dcc_summary(out: dict, returns) -> str:
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
+
+    return "\n".join(lines)
+
+
 @mcp.tool(
     name="industry_themes_causality",
     description="Granger因果检验 + 龙头行业识别 — 找出领先/滞后行业及因果传导链。"
@@ -1116,5 +2705,232 @@ def _build_causality_summary(out: dict) -> str:
             f"意味着{p['source']}的异动领先{p['target']}约{p['lag']}个交易日。"
         )
         lines.append("  实战建议: 关注领先行业信号，提前布局滞后行业的同向波动。")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  行业季节性相关性分析
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool(
+    name="industry_seasonal_corr",
+    description="行业季节性相关性分析 — 选择2个及以上板块，按年度区分、月度切片横向比较，"
+                "识别行业间联动的季节性规律（哪些月份联动最强/最弱）。"
+                "需要先运行 industry_daily_collect 采集数据。返回JSON。",
+)
+async def industry_seasonal_corr(
+        industries: str = Field(
+            "",
+            description="行业名称列表，逗号分隔，如 银行,房地产,非银金融。至少2个",
+        ),
+        corr_method: str = Field(
+            "pearson",
+            description="相关系数类型: pearson/spearman",
+        ),
+        min_years: int = Field(
+            3,
+            description="最少需要多少年数据才执行计算",
+        ),
+) -> str:
+    """行业季节性相关性：按(年,月)切片计算选中行业间相关系数，跨年横向比较。"""
+    industries_str = _val(industries)
+    corr_method = _val(corr_method)
+    min_years = _val(min_years)
+
+    # CPU 密集计算丢入 executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, _industry_seasonal_corr_sync, industries_str, corr_method, min_years
+    )
+
+
+def _industry_seasonal_corr_sync(industries_str: str, corr_method: str, min_years: int) -> str:
+    import json
+    import time
+    from ..shared.correlation import seasonal_correlation
+
+    t0 = time.time()
+
+    # 解析行业列表
+    if not industries_str:
+        return json.dumps(
+            {"error": "请指定至少2个行业，逗号分隔，如: 银行,房地产,非银金融"},
+            ensure_ascii=False,
+        )
+    industry_list = [i.strip() for i in industries_str.split(",") if i.strip()]
+    if len(industry_list) < 2:
+        return json.dumps(
+            {"error": f"至少需要2个行业，当前仅 {len(industry_list)} 个: {industry_list}"},
+            ensure_ascii=False,
+        )
+
+    # 加载全量数据（需要足够多的年份做季节性分析）
+    # 取最近 min_years+1 年的数据
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return json.dumps(
+            {"error": "本地无行业数据，请先运行 industry_daily_collect 采集"},
+            ensure_ascii=False,
+        )
+
+    cls = db.get_classify("ths")
+    code2name = {}
+    name2code = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+            name2code[r["industry_name"]] = r["industry_code"]
+
+    # 加载足够多年份的日行情
+    # 从数据库取全量数据（industry_daily_collect 通常采集 2020 至今 ≈ 5年+）
+    all_data = {}
+    for name in industry_list:
+        code = name2code.get(name, name)
+        df = db.get_daily(industry_code=code, limit=0)  # 全量
+        if df.empty:
+            continue
+        close = df.set_index("trade_date")["close"]
+        close.index = pd.to_datetime(close.index)
+        close = close.sort_index()
+        if len(close) > 30:
+            all_data[name] = close
+
+    if len(all_data) < 2:
+        available = list(all_data.keys())
+        missing = [i for i in industry_list if i not in all_data]
+        return json.dumps(
+            {"error": f"有效行业不足2个(有效:{available}, 缺数据:{missing})，请检查行业名称或先采集数据"},
+            ensure_ascii=False,
+        )
+
+    prices = pd.DataFrame(all_data)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    # 检查年份数量
+    n_years = len(set(returns.index.year))
+    if n_years < min_years:
+        return json.dumps(
+            {"error": f"数据仅覆盖{n_years}年，需要至少{min_years}年才能做季节性分析。"
+                      f"数据范围: {returns.index[0]} ~ {returns.index[-1]}"},
+            ensure_ascii=False,
+        )
+
+    # 执行季节性分析
+    result = seasonal_correlation(returns, industries=list(returns.columns), corr_method=corr_method)
+
+    # 构建输出 JSON（只保留前端需要的扁平数据，不含 DataFrame）
+    out = {
+        "meta": {
+            "industries": result["industries"],
+            "n_years": result["n_years"],
+            "year_range": result["year_range"],
+            "method": result["method"],
+            "n_pairs": len(result["seasonal_profile"]),
+            "elapsed_seconds": round(time.time() - t0, 1),
+        },
+        "monthly_avg_corr": result["monthly_avg_corr"],
+        "seasonal_profile": result["seasonal_profile"],
+        "peak_months": result["peak_months"],
+        "valley_months": result["valley_months"],
+        "seasonal_strength": result["seasonal_strength"],
+        "strength_ranking": result["strength_ranking"],
+        "heatmap_data": result["heatmap_data"],
+    }
+
+    # 生成可读性摘要
+    out["readable_summary"] = _build_seasonal_summary(out)
+
+    return json.dumps(out, ensure_ascii=False, default=str)
+
+
+def _build_seasonal_summary(out: dict) -> str:
+    """生成季节性相关性分析的可读性摘要。"""
+    lines = []
+    meta = out.get("meta", {})
+    n_pairs = meta.get("n_pairs", 0)
+    n_years = meta.get("n_years", 0)
+    year_range = meta.get("year_range", [])
+    industries = meta.get("industries", [])
+
+    # ── 总体概况 ──
+    lines.append("【季节性相关性分析概况】")
+    lines.append(
+        f"  {len(industries)}个行业 × {n_years}年数据 ({year_range[0]}~{year_range[-1]})，"
+        f"共{n_pairs}个行业对具有季节性规律。"
+    )
+    lines.append("")
+
+    # ── 季节性强度排行 ──
+    ranking = out.get("strength_ranking", [])
+    if ranking:
+        lines.append("【季节性联动强度排行 TOP10】")
+        lines.append("  (峰值月与谷值月相关性之差 = 季节性波动幅度)")
+        for item in ranking[:10]:
+            pair = item["pair"]
+            amp = item["amplitude"]
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_name = peak.get("month_name", "?")
+            valley_name = valley.get("month_name", "?")
+            lines.append(
+                f"  {pair}: 波幅 {amp:+.4f} | 峰值 {peak_name}({peak.get('corr', '?'):.4f}) | 谷值 {valley_name}({valley.get('corr', '?'):.4f})"
+            )
+        lines.append("")
+
+    # ── 逐对分析 ──
+    profile = out.get("seasonal_profile", {})
+    if profile:
+        lines.append("【各行业对月度联动剖面】")
+        for pair, months in list(profile.items())[:8]:
+            peak = out.get("peak_months", {}).get(pair, {})
+            valley = out.get("valley_months", {}).get(pair, {})
+            peak_m = peak.get("month_name", "?")
+            valley_m = valley.get("month_name", "?")
+            # 找出 >0.5 的高联动月
+            high_months = [f"{m}月({v:.3f})" for m, v in months.items() if v > 0.5]
+            low_months = [f"{m}月({v:.3f})" for m, v in months.items() if v < 0.2]
+            desc_parts = []
+            if high_months:
+                desc_parts.append(f"强联动: {', '.join(high_months[:4])}")
+            if low_months:
+                desc_parts.append(f"弱联动: {', '.join(low_months[:4])}")
+            lines.append(f"  {pair}:")
+            if desc_parts:
+                lines.append(f"    {'; '.join(desc_parts)}")
+            else:
+                lines.append(f"    联动中等，峰{peak_m} 谷{valley_m}")
+        if len(profile) > 8:
+            lines.append(f"  ... 还有 {len(profile) - 8} 个行业对")
+        lines.append("")
+
+    # ── 综合研判 ──
+    lines.append("【综合研判】")
+    if ranking:
+        top = ranking[0]
+        pair = top["pair"]
+        amp = top["amplitude"]
+        peak = out.get("peak_months", {}).get(pair, {})
+        valley = out.get("valley_months", {}).get(pair, {})
+        lines.append(
+            f"  季节性最显著的行业对是{pair}，"
+            f"峰{peak.get('month_name', '?')}联动{peak.get('corr', '?'):.4f}，"
+            f"谷{valley.get('month_name', '?')}联动{valley.get('corr', '?'):.4f}，"
+            f"波幅{amp:+.4f}。"
+        )
+        if amp > 0.3:
+            lines.append("  波幅较大，季节性联动规律非常明显，可作为跨行业轮动参考。")
+        elif amp > 0.15:
+            lines.append("  波幅中等，季节性联动有一定规律性，需结合其他信号确认。")
+        else:
+            lines.append("  波幅较小，季节性联动不太明显，各月联动较为均匀。")
 
     return "\n".join(lines)
