@@ -36,14 +36,22 @@ function parseFinancial(csv) {
   const lines = section.split('\n').filter(l => l.trim());
   if (lines.length < 2) return {};
   const headers = lines[0].split(',').map(h => h.trim());
-  const last = lines[lines.length - 1].split(',').map(v => v.trim());
+  // 取最后一行有效数据（跳过空值过多的行）
+  let last = null;
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const parts = lines[i].split(',').map(v => v.trim());
+    if (parts.length === headers.length) { last = parts; break; }
+  }
+  if (!last) return {};
   const result = {};
   headers.forEach((h, i) => { result[h] = last[i]; });
+  // parseFloat 安全包装：空字符串/无效值返回 null（DataCard 显示 "—"）
+  const safeParse = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
   return {
-    revenue_growth: parseFloat(result['主营业务收入增长率(%)']),
-    profit_growth: parseFloat(result['净利润增长率(%)']),
-    roe: parseFloat(result['净资产收益率(%)']),
-    gross_margin: parseFloat(result['销售毛利率(%)']),
+    revenue_growth: safeParse(result['主营业务收入增长率(%)']),
+    profit_growth: safeParse(result['净利润增长率(%)']),
+    roe: safeParse(result['净资产收益率(%)']),
+    gross_margin: safeParse(result['销售毛利率(%)']),
   };
 }
 
