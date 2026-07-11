@@ -3,6 +3,7 @@ import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataCard from '../common/DataCard.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 function parseQvixCsv(csv) {
   if (!csv) return [];
@@ -26,7 +27,7 @@ function parseGenericCsv(csv, dateCol = 0, valCol = 1, slicePeriod = 10) {
 }
 
 export default function OptionPanel() {
-  const { data: qvixRaw } = useMCP('option_ivix', { limit: 120 });
+  const { data: qvixRaw, updatedAt } = useMCP('option_ivix', { limit: 120 });
 
   const qvixData = useMemo(() => parseQvixCsv(qvixRaw), [qvixRaw]);
 
@@ -41,6 +42,7 @@ export default function OptionPanel() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 指标卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
         <DataCard label="QVIX 恐慌指数" value={latestQvix} unit="" decimals={2} higherBetter={null} detail="中国版VIX" />

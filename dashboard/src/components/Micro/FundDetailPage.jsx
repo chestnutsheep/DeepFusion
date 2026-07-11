@@ -4,6 +4,7 @@ import {useAppStore} from '../../store/index.js';
 import CardWrapper from '../common/CardWrapper.jsx';
 import DataChart from '../common/DataChart.jsx';
 import DataGrid from '../common/DataGrid.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 // ── fund_info 解析（雪球源：item:value 格式） ──
 function parseFundInfo(raw) {
@@ -121,7 +122,7 @@ const ANALYSIS_CONFIG = [
 ];
 
 export default function FundDetailPage({ code, name, onBack }) {
-  const { data: infoRaw } = useMCP('fund_info', { code });
+  const { data: infoRaw, updatedAt } = useMCP('fund_info', { code });
   const { data: navRaw } = useMCP('fund_nav', { code, limit: 120 });
   const { data: allocRaw } = useMCP('fund_asset_allocation', { code });
   const { data: analysisRaw } = useMCP('fund_analysis', { code });
@@ -182,6 +183,7 @@ export default function FundDetailPage({ code, name, onBack }) {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 返回按钮 + 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={onBack} style={{

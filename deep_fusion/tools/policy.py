@@ -109,6 +109,8 @@ def policy_stats() -> str:
     lines = [f"政策文件库: 共 {st['total']} 篇"]
     for org, cnt in st.get("orgs", {}).items():
         lines.append(f"  {org}: {cnt} 篇")
+    if st.get("last_collected"):
+        lines.append(f"最后采集: {st['last_collected']}")
     return "\n".join(lines)
 
 

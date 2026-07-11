@@ -165,7 +165,8 @@ class PolicyDB:
         orgs = conn.execute(
             "SELECT organization, COUNT(*) as c FROM policy_docs WHERE organization != '' GROUP BY organization ORDER BY c DESC"
         ).fetchall()
-        return {"total": total, "orgs": {r["organization"]: r["c"] for r in orgs}}
+        last = conn.execute("SELECT MAX(found_at) as last FROM policy_docs").fetchone()["last"]
+        return {"total": total, "orgs": {r["organization"]: r["c"] for r in orgs}, "last_collected": last or ""}
 
     def normalize_all_dates(self) -> int:
         """批量标准化数据库中所有非 ISO 日期。返回修正条数。"""

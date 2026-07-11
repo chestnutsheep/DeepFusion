@@ -8,6 +8,7 @@ import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 import * as echarts from 'echarts';
 import TrendsAndSignals, {WarningBar} from './TrendsAndSignals';
 import SeasonalCorrelation from './SeasonalCorrelation';
@@ -1225,6 +1226,7 @@ export default function MesoLayout() {
   const startStr = startDay.toISOString().slice(0, 10).replace(/-/g, '');
   const endStr = today.toISOString().slice(0, 10).replace(/-/g, '');
   const swResult = useMCP('industry_sw_daily', { symbol: '一级行业', start_date: startStr, end_date: endStr, limit: 800 });
+  const updatedAt = swResult.updatedAt;
   const { industries, dates, matrix } = useMemo(() => parseSWDaily(swResult.data), [swResult.data]);
 
   // ── 刷新行情数据：先采集入库，再刷新热力图 ──
@@ -1372,6 +1374,7 @@ export default function MesoLayout() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 英雄区 */}
       <ErrorBoundary><Hero industries={industries} dates={dates} /></ErrorBoundary>
 

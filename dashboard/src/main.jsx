@@ -22,7 +22,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         enableSystem={false}
         themes={['matin', 'crepuscule', 'eclat', 'reve', 'lumiere']}
       >
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ProSidebarProvider>
             <Routes>
               <Route path="/" element={<MainLayout />}>

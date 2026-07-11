@@ -3,6 +3,7 @@ import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataCard from '../common/DataCard.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 function parsePriceCsv(csv) {
   if (!csv) return [];
@@ -42,7 +43,7 @@ export default function FuturesPanel() {
     { name: '铁矿石', label: '🪨 铁矿石' },
   ];
 
-  const { data: priceRaw } = useMCP('futures_prices', symbol ? { symbol, limit: 90 } : null);
+  const { data: priceRaw, updatedAt } = useMCP('futures_prices', symbol ? { symbol, limit: 90 } : null);
   const { data: invRaw } = useMCP('futures_inventory', symbol ? { symbol } : null);
   const { data: basisRaw } = useMCP('futures_basis', symbol ? { symbol } : null);
   const { data: posRaw } = useMCP('futures_positions', symbol ? { symbol } : null);
@@ -59,6 +60,7 @@ export default function FuturesPanel() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 品种选择 */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={inputVal} onChange={e => setInputVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && setSymbol(inputVal)}

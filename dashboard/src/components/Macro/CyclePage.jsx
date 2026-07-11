@@ -5,6 +5,7 @@ import DataGrid from '../common/DataGrid.jsx';
 import StatusBar from '../common/StatusBar.jsx';
 import PhaseWheel from '../common/PhaseWheel.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 // 所有图表默认显示全量数据的后 1/5
 const DEFAULT_WINDOW = { start: 80, end: 100 };
@@ -46,7 +47,7 @@ function fillLatestMetrics(rows, keys) {
 }
 
 export default function CyclePage({ config, showTitle, tableIndex }) {
-  const { data: rawData, isLoading } = useMCP(config.queryKey, config.params || {});
+  const { data: rawData, isLoading, updatedAt } = useMCP(config.queryKey, config.params || {});
   // 三个小周期额外拉 FRED 扩展数据（百年序列）；传 null args 则不发请求
   const extResult = useMCP(config.extQueryKey, config.extQueryKey ? {} : null);
 
@@ -114,6 +115,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {showTitle && <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>{showTitle}</h2>}
 
       {/* 相位概览：PhaseWheel + 关键指标 */}

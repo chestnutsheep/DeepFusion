@@ -10,9 +10,9 @@
  *     单行截断文本
  *   </CardWrapper>
  */
-import {useCallback, useState} from 'react';
+import {forwardRef, useCallback, useState} from 'react';
 
-export default function CardWrapper({
+const CardWrapper = forwardRef(function CardWrapper({
   children,
   as: Tag = 'div',
   hoverable = true,
@@ -20,7 +20,7 @@ export default function CardWrapper({
   goldLine = true,
   style,
   ...props
-}) {
+}, ref) {
   const [hovered, setHovered] = useState(false);
   const handleEnter = useCallback(() => hoverable && setHovered(true), [hoverable]);
   const handleLeave = useCallback(() => setHovered(false), []);
@@ -57,6 +57,7 @@ export default function CardWrapper({
 
   return (
     <Tag
+      ref={ref}
       className={className}
       style={{ ...base, ...style }}
       onMouseEnter={handleEnter}
@@ -66,4 +67,6 @@ export default function CardWrapper({
       {children}
     </Tag>
   );
-}
+});
+
+export default CardWrapper;

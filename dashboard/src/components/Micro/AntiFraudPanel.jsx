@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useMCP } from '../../hooks/useMCP';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 export default function AntiFraudPanel({ symbol, name, onBack }) {
-  const { data: reportRaw, isLoading, error } = useMCP('anti_fraud_report', symbol ? { symbol } : null);
+  const { data: reportRaw, isLoading, error, updatedAt } = useMCP('anti_fraud_report', symbol ? { symbol } : null);
   const [templateHtml, setTemplateHtml] = useState('');
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function AntiFraudPanel({ symbol, name, onBack }) {
 
   return (
     <div style={{ marginTop: 16 }}>
+      <UpdateTimestamp updatedAt={updatedAt} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <button onClick={onBack} style={{
           padding: '4px 12px', borderRadius: 6, fontSize: 'var(--fs-sm)',

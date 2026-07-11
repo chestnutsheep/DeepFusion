@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from typing import Callable
+from urllib.parse import urljoin
 
 import requests as _rq
 from bs4 import BeautifulSoup
@@ -22,7 +23,8 @@ _ORG_MAP: dict[str, str] = {}  # url_pattern → org_name, set in _sites
 
 # ── 通用工具 ─────────────────────────────────────────
 
-_DATE_RE = re.compile(r"(\d{4}[-/年]\d{1,2}[-/月]\d{1,2}[日]?)")
+_DATE_RE = re.compile(r"(\d{4}年\d{1,2}月\d{1,2}日?|\d{4}[-/]\d{1,2}[-/]\d{1,2})")
+_URL_DATE_RE = re.compile(r"/(\d{4})[-_/]?(\d{1,2})(?:[-_/]?(\d{1,2}))?/")
 _KW_SET = {"五年规划", "十五五", "十四五", "改革", "创新", "数字经济",
            "绿色", "碳中和", "新能源", "产业链", "消费", "投资",
            "房地产", "地方债", "专项债", "财政", "货币", "降准", "降息",
@@ -77,7 +79,7 @@ def _extract_detail(entry: dict) -> dict:
         # 日期 — 多策略：URL路径 > meta > 正文元素
         date_found = ""
         # 策略1: 从 URL 路径提取（如 /202606/ 或 /2026/06/02/）
-        url_date_m = re.search(r"/(\d{4})[-_/]?(\d{2})[-_/]?(\d{2})?/", entry["url"])
+        url_date_m = _URL_DATE_RE.search(entry["url"])
         if url_date_m:
             y, mo = url_date_m.group(1), url_date_m.group(2)
             d = url_date_m.group(3) or "01"
@@ -126,6 +128,15 @@ def _extract_detail(entry: dict) -> dict:
     return entry
 
 
+def _build_page_url(url: str, page: int) -> str:
+    """构建分页 URL，兼容 url 已含 index.html 的情况。"""
+    base = re.sub(r"index\w*\.html?$", "", url)
+    if not base.endswith("/"):
+        base += "/"
+    suffix = "index.htm" if page == 1 else f"index_{page}.htm"
+    return f"{base}{suffix}"
+
+
 def _parse_list(url: str, link_filter: Callable[[str], bool],
                 source: str, org: str = "", max_pages: int = 2) -> list[dict]:
     """通用列表页解析。"""
@@ -134,7 +145,7 @@ def _parse_list(url: str, link_filter: Callable[[str], bool],
     base_domain = re.match(r"(https?://[^/]+)", url).group(1)
 
     for page in range(1, max_pages + 1):
-        page_url = f"{url}index.htm" if page == 1 else re.sub(r"index.*\.htm", f"index_{page}.htm", url)
+        page_url = _build_page_url(url, page)
         try:
             r = _SESSION.get(page_url, timeout=15)
             if r.status_code != 200:
@@ -147,7 +158,7 @@ def _parse_list(url: str, link_filter: Callable[[str], bool],
                 txt = a.get_text(strip=True)
                 if not txt or len(txt) < 8:
                     continue
-                full = href if href.startswith("http") else f"{base_domain}{href}"
+                full = href if href.startswith("http") else urljoin(base_domain + "/", href)
                 if not link_filter(full):
                     continue
                 if full in seen:
@@ -281,6 +292,13 @@ def collect_all(max_pages: int = 2) -> dict[str, dict[str, int]]:
         except Exception as ex:
             print(f"  ❌ {ex}")
             totals[name] = {"error": str(ex)}
+    # 采集后标准化所有日期为 ISO 格式
+    try:
+        fixed = db.normalize_all_dates()
+        if fixed:
+            print(f"  日期标准化: 修正 {fixed} 条")
+    except Exception as ex:
+        print(f"  ⚠ 日期标准化失败: {ex}")
     return totals
 
 

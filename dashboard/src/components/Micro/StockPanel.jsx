@@ -5,6 +5,7 @@ import DataGrid from '../common/DataGrid.jsx';
 import DataChart from '../common/DataChart.jsx';
 import {STOCK_FINANCE_CONFIG} from '../../configs/stockFinance.js';
 import AntiFraudPanel from './AntiFraudPanel.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 function parseKline(csv) {
   if (!csv) return [];
@@ -117,7 +118,7 @@ export default function StockPanel() {
   const { data: searchRes, refetch } = useMCP('search', (keyword && !isCode) ? { keyword, market } : null);
 
   // K线和财务指标：只在 symbol 非空时查询
-  const { data: klineRaw } = useMCP('individual_hist', symbol ? { symbol, period: 'daily', limit: 120 } : null);
+  const { data: klineRaw, updatedAt } = useMCP('individual_hist', symbol ? { symbol, period: 'daily', limit: 120 } : null);
   const { data: finRaw } = useMCP('financial_indicators', symbol ? { symbol } : null);
 
   const doSearch = useCallback(() => {
@@ -177,6 +178,7 @@ export default function StockPanel() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <input
           value={keyword}

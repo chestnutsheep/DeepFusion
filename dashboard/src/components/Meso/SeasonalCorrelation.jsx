@@ -7,6 +7,7 @@ import { useMCP } from '../../hooks/useMCP';
 import { mcp } from '../../services/mcp.js';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 import * as echarts from 'echarts';
 
 const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
@@ -252,6 +253,7 @@ export default function SeasonalCorrelation({ industries: allIndustries }) {
   const [resultData, setResultData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(null);
 
   const handleToggle = useCallback((name, checked, presetNames) => {
     if (presetNames) {
@@ -271,9 +273,10 @@ export default function SeasonalCorrelation({ industries: allIndustries }) {
     setLoading(true);
     setError(null);
     try {
-      const raw = await mcp.call('industry_seasonal_corr', {
+      const { data: raw, updatedAt: ts } = await mcp.callWithMeta('industry_seasonal_corr', {
         industries: selectedIndustries.join(','), corr_method: 'pearson', min_years: 3,
       });
+      setUpdatedAt(ts);
       const parsed = JSON.parse(raw);
       if (parsed.error) { setError(parsed.error); setResultData(null); }
       else { setResultData(parsed); }
@@ -336,12 +339,13 @@ export default function SeasonalCorrelation({ industries: allIndustries }) {
       {/* 结果 */}
       {resultData && (
         <div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', alignItems: 'center' }}>
             <span>{meta.n_years}年({meta.year_range?.[0]}~{meta.year_range?.[1]})</span>
             <span>· {meta.industries?.length}行业</span>
             <span>· {meta.n_pairs}行业对</span>
             <span>· {meta.method}</span>
             {meta.elapsed_seconds && <span>· {meta.elapsed_seconds}s</span>}
+            <UpdateTimestamp updatedAt={updatedAt} />
           </div>
 
           <CardWrapper style={{ padding: 'var(--sp-xl)', marginBottom: 20 }}>

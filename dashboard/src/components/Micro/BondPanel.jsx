@@ -3,6 +3,7 @@ import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataCard from '../common/DataCard.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 function parseYieldsCsv(csv) {
   if (!csv) return [];
@@ -19,7 +20,7 @@ function parseYieldsCsv(csv) {
 }
 
 export default function BondPanel() {
-  const { data: yieldsRaw } = useMCP('bond_yields', { limit: 120 });
+  const { data: yieldsRaw, updatedAt } = useMCP('bond_yields', { limit: 120 });
   const { data: collectRaw } = useMCP('bond_collect');
 
   const yieldsData = useMemo(() => parseYieldsCsv(yieldsRaw), [yieldsRaw]);
@@ -30,6 +31,7 @@ export default function BondPanel() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 指标卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
         <DataCard label="10年期国债收益率" value={latestYield} unit="%" decimals={3} higherBetter={null} detail="中债估值" />

@@ -1,6 +1,9 @@
 import React, {useEffect, useState} from 'react';
+import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {useMCP} from '../../hooks/useMCP.js';
+import {mcp} from '../../services/mcp.js';
 import CardWrapper from '../common/CardWrapper.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 import '../../styles/policy-dashboard.css';
 
 // ── 月份名称 ──
@@ -24,6 +27,17 @@ export default function PolicyDashboard() {
   const stats = useMCP('policy_stats');
   const timeline = useMCP('policy_timeline', { year: timelineYear });
   const search = useMCP('policy_search', { limit: 30, year: timelineYear });
+
+  // ── 刷新（触发后端采集） ──
+  const queryClient = useQueryClient();
+  const collectMutation = useMutation({
+    mutationFn: () => mcp.policy.collect(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['policy_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['policy_timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['policy_search'] });
+    },
+  });
 
   const tl = parseTimeline(timeline.data);
   const realStats = stats.data || '';
@@ -202,10 +216,28 @@ export default function PolicyDashboard() {
 
         {/* 政策文件库 */}
         <div className="card" style={{ flex: 1, minWidth: 240 }}>
-          <h3>📂 政策文件库</h3>
+          <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>📂 政策文件库</span>
+            <button
+              onClick={() => collectMutation.mutate()}
+              disabled={collectMutation.isPending}
+              style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                background: 'var(--primary)', color: '#fff', border: 'none', opacity: collectMutation.isPending ? 0.6 : 1,
+              }}
+            >
+              {collectMutation.isPending ? '采集中…' : '🔄 刷新'}
+            </button>
+          </h3>
           <div className="favorites-count">{realStats.match(/\d+/)?.[0] || '—'}</div>
           <div className="card-subtitle">篇 · 已收藏 {favorites.size} 篇</div>
           {realStats.split('\n').slice(1, 3).map((l, i) => <div key={i} className="card-desc">{l}</div>)}
+          <div className="card-desc" style={{ marginTop: 4 }}>
+            <UpdateTimestamp updatedAt={stats.updatedAt} compact />
+          </div>
+          {collectMutation.isError && (
+            <div className="card-desc" style={{ color: 'var(--secondary)' }}>采集失败</div>
+          )}
         </div>
       </div>
 

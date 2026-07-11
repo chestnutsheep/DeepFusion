@@ -2,6 +2,7 @@
 import os
 import sys
 import threading
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,7 +43,7 @@ async def call_tool(request: Request) -> JSONResponse:
     try:
         result = await mcp.call_tool(body['name'], body.get('arguments', {}))
         text = ''.join(c.text for c in result.content if hasattr(c, 'text') and c.text)
-        return JSONResponse({'ok': True, 'data': text})
+        return JSONResponse({'ok': True, 'data': text, 'updatedAt': datetime.now().isoformat()})
     except Exception as e:
         return JSONResponse({'ok': False, 'error': str(e)}, status_code=500)
 
@@ -101,10 +102,32 @@ def _warmup_cycle_cache():
         print(f"  ⚠ 缓存预热失败: {e}")
 
 
+def _policy_collect_loop():
+    """后台定期采集政策文件（启动时 + 每 6 小时）。"""
+    import time
+    time.sleep(5)  # 等服务完全启动
+    interval = 6 * 60 * 60  # 6 小时
+    while True:
+        try:
+            from deep_fusion.data.sources import policy as policy_collector
+            print('  ⟡ 政策采集开始...')
+            totals = policy_collector.collect_all(max_pages=2)
+            for site, r in totals.items():
+                if 'error' in r:
+                    print(f'  ❌ {site}: {r["error"]}')
+                else:
+                    print(f'  ✅ {site}: {r["total"]} 条, 新增 {r["new"]}')
+            print('  ⟡ 政策采集完成')
+        except Exception as e:
+            print(f'  ⚠ 政策采集失败: {e}')
+        time.sleep(interval)
+
+
 import uvicorn
 
 print(f'  ⟡ Deep Fusion API → http://localhost:5173/api')
 threading.Thread(target=_warmup_cycle_cache, daemon=True).start()
+threading.Thread(target=_policy_collect_loop, daemon=True).start()
 
 # 多 worker：用模块字符串传 app，uvicorn 才能 fork 多进程
 # 单 worker（默认）：直接传 app 实例，避免 import 开销

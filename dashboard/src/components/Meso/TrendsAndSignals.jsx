@@ -8,6 +8,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useQueryClient} from '@tanstack/react-query';
 import {useMCP} from '../../hooks/useMCP';
 import CardWrapper from '../common/CardWrapper';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 import {
   BAROMETER_CARDS,
   CAUSAL_ROLE,
@@ -689,7 +690,7 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
   const [refreshing, setRefreshing] = useState(false);
 
   // 请求因果检验数据
-  const { data: causalityRaw, isFetching: causalityFetching } = useMCP('industry_themes_causality', { window: 120, max_lag: 5 });
+  const { data: causalityRaw, isFetching: causalityFetching, updatedAt } = useMCP('industry_themes_causality', { window: 120, max_lag: 5 });
   // 请求主题聚类数据
   const { data: themesRaw, isFetching: themesFetching } = useMCP('industry_themes', { window: 120, n_clusters: 5, corr_method: 'pearson' });
   // 请求 DCC-GARCH 数据
@@ -759,6 +760,7 @@ export default function TrendsAndSignals({ l1Industries, l2Industries, l1Dates, 
   // ── 渲染 ──
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* 关联性分析刷新按钮 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <button

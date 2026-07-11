@@ -5,6 +5,7 @@ import DataChart from '../common/DataChart';
 import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 // ── CSV 解析工具 ──
 
@@ -86,7 +87,7 @@ function SectionHeader({ badge, title, highlight, desc }) {
 // ══════════════════════════════════════════
 
 function StressSection() {
-  const { data: stressRaw } = useMCP('financial_stress_index', {});
+  const { data: stressRaw, updatedAt } = useMCP('financial_stress_index', {});
   const stress = safeParseJSON(stressRaw);
 
   if (!stress) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载金融压力数据...</p></CardWrapper>;
@@ -100,6 +101,7 @@ function StressSection() {
   return (
     <div>
       <SectionHeader badge="⚡ 金融压力" title="全球金融压力" highlight="实时指数" desc="利差 · 汇率异动 · 信用冻结 · 区域预警 — 看出谁快爆了" />
+      <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* ── 核心评分仪表盘 ── */}
       <CardWrapper style={{ padding: 24, marginBottom: 16, textAlign: 'center',
@@ -223,7 +225,7 @@ function StressSection() {
 // ══════════════════════════════════════════
 
 function DebtSection() {
-  const { data: debtRaw } = useMCP('debt_sustainability', { countries: 'CN,JP,KR,US' });
+  const { data: debtRaw, updatedAt } = useMCP('debt_sustainability', { countries: 'CN,JP,KR,US' });
   const debt = safeParseJSON(debtRaw);
 
   if (!debt) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载债务可持续性数据...</p></CardWrapper>;
@@ -233,6 +235,7 @@ function DebtSection() {
   return (
     <div>
       <SectionHeader badge="🏛️ 债务" title="债务可持续性" highlight="对比评估" desc="政府债务/GDP · 外汇储备 · 增长率 — 谁还得上债" />
+      <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 排名总览 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -301,7 +304,7 @@ function DebtSection() {
 // ══════════════════════════════════════════
 
 function CapitalSection() {
-  const { data: capitalRaw } = useMCP('capital_flow_monitor', { focus: 'apac' });
+  const { data: capitalRaw, updatedAt } = useMCP('capital_flow_monitor', { focus: 'apac' });
   const capital = safeParseJSON(capitalRaw);
 
   if (!capital) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载资本流动数据...</p></CardWrapper>;
@@ -317,6 +320,7 @@ function CapitalSection() {
   return (
     <div>
       <SectionHeader badge="💸 资本" title="资本流动" highlight="监测" desc="汇率趋势 · 外储变化 · 美债锚 · 资金在进还是在逃" />
+      <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 总体判断 */}
       <CardWrapper style={{ padding: 16, marginBottom: 16, textAlign: 'center',
@@ -390,7 +394,7 @@ function CapitalSection() {
 // ══════════════════════════════════════════
 
 function BubbleSection() {
-  const { data: bubbleRaw } = useMCP('asset_bubble_watch', { region: 'all' });
+  const { data: bubbleRaw, updatedAt } = useMCP('asset_bubble_watch', { region: 'all' });
   const bubble = safeParseJSON(bubbleRaw);
 
   if (!bubble) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载泡沫监测数据...</p></CardWrapper>;
@@ -401,6 +405,7 @@ function BubbleSection() {
   return (
     <div>
       <SectionHeader badge="🫧 泡沫" title="资产泡沫" highlight="监视" desc="量先跌价后跌 — 交易量萎缩=崩盘前兆" />
+      <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 总体风险 */}
       <CardWrapper style={{ padding: 16, marginBottom: 16, textAlign: 'center',

@@ -3,6 +3,7 @@ import {useMCP} from '../../hooks/useMCP.js';
 import {useAppStore} from '../../store/index.js';
 import CardWrapper from '../common/CardWrapper.jsx';
 import FundDetailPage from './FundDetailPage.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 /* ═══ CSV 解析 ═══ */
 function parseCsv(raw) {
@@ -124,7 +125,7 @@ export default function FundPanel() {
   // 龙虎榜排名
   const [rankType, setRankType] = useState('股票型');
   const [rankPeriod, setRankPeriod] = useState('dailyGrowth');
-  const { data: rankingRaw, isLoading: rankLoading } = useMCP('fund_ranking', { fund_type: rankType });
+  const { data: rankingRaw, isLoading: rankLoading, updatedAt } = useMCP('fund_ranking', { fund_type: rankType });
   const rankingData = useMemo(() => parseRanking(rankingRaw), [rankingRaw]);
 
   // 行业分类 + 持仓重叠
@@ -196,6 +197,7 @@ export default function FundPanel() {
 
   return (
     <div>
+      <UpdateTimestamp updatedAt={updatedAt} />
       {/* ═══ 第一部分：龙虎榜 ═══ */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>

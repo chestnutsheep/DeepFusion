@@ -29,11 +29,17 @@ function getStaleTime(toolName) {
  */
 export function useMCP(toolName, args = {}) {
   const queryKey = [toolName, JSON.stringify(args)];
-  return useQuery({
+  const query = useQuery({
     queryKey,
-    queryFn: () => mcp.call(toolName, args),
+    queryFn: () => mcp.callWithMeta(toolName, args),
     enabled: args !== null,
     staleTime: getStaleTime(toolName),
     retry: 1,
   });
+  // 向后兼容：调用方期望 data 是字符串；额外暴露 updatedAt
+  return {
+    ...query,
+    data: query.data?.data,
+    updatedAt: query.data?.updatedAt,
+  };
 }

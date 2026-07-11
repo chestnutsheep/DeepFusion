@@ -1,6 +1,7 @@
 import {useMCP} from '../../hooks/useMCP.js';
 import {MACRO_SNAPSHOT_CONFIG} from '../../configs/macroSnapshot.js';
 import DataGrid from '../common/DataGrid.jsx';
+import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
 function parseLatest(csv, colIdx = 1) {
   if (!csv) return null;
@@ -29,6 +30,7 @@ export default function MacroSnapshot() {
   const cpi = useMCP('macro_cpi', { limit: 1 });
   const pmi = useMCP('macro_pmi', { limit: 1 });
   const inv = useMCP('macro_inventory_growth', { limit: 1 });
+  const updatedAt = gdp.updatedAt;
 
   const data = {
     gdp: parseLatestByHeader(gdp.data, '同比增长'),      // GDP 同比增长
@@ -36,5 +38,10 @@ export default function MacroSnapshot() {
     pmi: parseLatestByHeader(pmi.data, '制造业-指数'),    // 制造业 PMI 指数
     inventory: parseLatest(inv.data, 1),
   };
-  return <DataGrid config={MACRO_SNAPSHOT_CONFIG} data={data} prevData={{}} columns={4} />;
+  return (
+    <>
+      <UpdateTimestamp updatedAt={updatedAt} />
+      <DataGrid config={MACRO_SNAPSHOT_CONFIG} data={data} prevData={{}} columns={4} />
+    </>
+  );
 }
