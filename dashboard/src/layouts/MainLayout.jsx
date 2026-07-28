@@ -6,6 +6,8 @@ import {useAppStore} from '../store/index.js';
 
 // 路由路径 → store activeTab 映射
 const PATH_TO_TAB = {
+  '/': 'daily',
+  '/daily': 'daily',
   '/macro': 'macro',
   '/meso': 'meso',
   '/micro': 'micro',
@@ -14,6 +16,7 @@ const PATH_TO_TAB = {
 };
 
 const TAB_LABEL = {
+  daily: '每日',
   macro: '宏观',
   meso: '中观',
   micro: '微观',

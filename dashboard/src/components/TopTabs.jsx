@@ -4,6 +4,7 @@ import { useTheme } from 'next-themes';
 import { useEffect } from 'react';
 
 const TABS = [
+  { key: 'daily', label: '每日', theme: 'reve', path: '/' },
   { key: 'macro', label: '宏观', theme: 'matin', path: '/macro' },
   { key: 'meso', label: '中观', theme: 'crepuscule', path: '/meso' },
   { key: 'micro', label: '微观', theme: 'eclat', path: '/micro' },

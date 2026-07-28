@@ -11,6 +11,7 @@ import MesoPage from './pages/MesoPage.jsx';
 import MicroPage from './pages/MicroPage.jsx';
 import PolicyPage from './pages/PolicyPage.jsx';
 import GlobalPage from './pages/GlobalPage.jsx';
+import DailyBoardPage from './pages/DailyBoardPage.jsx';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -26,9 +27,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <ProSidebarProvider>
             <Routes>
               <Route path="/" element={<MainLayout />}>
-                <Route index element={<MacroPage />} />
-                <Route path="macro" element={<MacroPage />} />
-                <Route path="meso" element={<MesoPage />} />
+              <Route index element={<DailyBoardPage />} />
+              <Route path="daily" element={<DailyBoardPage />} />
+              <Route path="macro" element={<MacroPage />} />
+              <Route path="meso" element={<MesoPage />} />
                 <Route path="micro" element={<MicroPage />} />
                 <Route path="policy" element={<PolicyPage />} />
                 <Route path="global" element={<GlobalPage />} />
