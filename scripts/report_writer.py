@@ -19,6 +19,9 @@
 
   # 新增/更新单条日历事件
   python3 report_writer.py --action calendar_add --date 2026-10-01 --name "..." --sector "..." --rating 4 --category "行业大会"
+
+  # 写入连板评分实证校准结果（与 limit_up_calibrate 同口径，rtype=score_calibration）
+  python3 report_writer.py --action save_calibration --date 2026-07-29 --json '{"recommended_weights":{...},"n":1020,...}'
 """
 import argparse
 import json
@@ -111,7 +114,7 @@ def add_calendar_event(con, rdate, name, sector, rating, category):
 def main():
     p = argparse.ArgumentParser(description="将定时任务结构化报告写入 reports.db（回溯留档）")
     p.add_argument("--db", default=DEFAULT_DB, help="reports.db 路径")
-    p.add_argument("--action", required=True, choices=["save_report", "save_limit_up", "seed_calendar", "calendar_add"])
+    p.add_argument("--action", required=True, choices=["save_report", "save_limit_up", "seed_calendar", "calendar_add", "save_calibration"])
     p.add_argument("--rtype", help="报告类型: premarket/noonnews/qualitystock/dailyreview")
     p.add_argument("--date", help="数据日期 YYYY-MM-DD")
     p.add_argument("--json", help="JSON 字符串（save_report/save_limit_up/seed_calendar 用）")
@@ -145,6 +148,12 @@ def main():
                 sys.exit("calendar_add 需 --date --name")
             add_calendar_event(con, args.date, args.name, args.sector, args.rating, args.category)
             print(json.dumps({"ok": True, "action": "calendar_add", "date": args.date, "name": args.name}))
+        elif args.action == "save_calibration":
+            if not args.date or not args.json:
+                sys.exit("save_calibration 需 --date --json")
+            # 校准结果落 reports 表(rtype=score_calibration)，与 limit_up_calibrate 同口径
+            save_report(con, "score_calibration", args.date, json.loads(args.json))
+            print(json.dumps({"ok": True, "action": "save_calibration", "date": args.date}))
     finally:
         con.close()
 
