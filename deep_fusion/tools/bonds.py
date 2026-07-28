@@ -98,19 +98,19 @@ def bond_collect() -> str:
     results = {}
 
     try:
-        _ = bond_yields.fn(limit=0, china_only=False)
+        _ = bond_yields(limit=0, china_only=False)
         results["中美国债收益率"] = "已缓存"
     except Exception as e:
         results["中美国债收益率"] = f"❌ {e}"
 
     try:
-        _ = option_ivix.fn(limit=0)
+        _ = option_ivix(limit=0)
         results["50ETF QVIX"] = "已缓存"
     except Exception as e:
         results["50ETF QVIX"] = f"❌ {e}"
 
     try:
-        _ = us_economic_indicators.fn(limit=1)
+        _ = us_economic_indicators(limit=1)
         results["美国经济指标"] = "已缓存"
     except Exception as e:
         results["美国经济指标"] = f"❌ {e}"

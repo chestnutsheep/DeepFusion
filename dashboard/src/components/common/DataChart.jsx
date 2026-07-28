@@ -45,6 +45,7 @@ export default function DataChart({
   showYAxisToggle = true,
   enableReturnMode = true,
   onPointClick,
+  yearAxis = false,
 }) {
   // 两种模式：value=线性原值, return=对数收益率（突出变化方向）
   const [chartMode, setChartMode] = useState('value');
@@ -104,7 +105,29 @@ export default function DataChart({
       },
       legend: { data: processedSeries.map(s => s.name), bottom: 0 },
       grid: { left: '8%', right: hasDualY ? '8%' : '5%', top: '10%', bottom: '15%', containLabel: true },
-      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
+      xAxis: yearAxis
+        ? {
+            type: 'category',
+            data: dates,
+            axisLabel: {
+              interval: 0,
+              color: '#CBC0B0',
+              fontSize: 12,
+              formatter: (value, index) => {
+                const s = String(value);
+                const year = s.slice(0, 4);
+                if (!/^\d{4}$/.test(year)) return s;
+                const disp = s.length > 4 ? year : s;
+                const total = dates.length;
+                if (index === 0 || index === total - 1) return disp;
+                const y = parseInt(year, 10);
+                if (y % 5 === 0) return `{mid|${disp}}`;
+                return '';
+              },
+              rich: { mid: { fontSize: 10, color: 'rgba(203,192,176,0.65)' } },
+            },
+          }
+        : { type: 'category', data: dates, axisLabel: { rotate: 45 } },
       yAxis: hasDualY
         ? [
             { type: activeYType, name: isReturnMode ? '对数收益率(%)' : '',
@@ -298,19 +321,9 @@ export default function DataChart({
     <div style={containerStyle}>
       {showYAxisToggle && (
         <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4, zIndex: 10 }}>
-          <button onClick={() => setChartMode('value')} style={{
-            padding: '2px 8px', fontSize: 'var(--fs-2xs)', borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
-            background: chartMode === 'value' ? 'rgba(212,168,83,0.35)' : 'transparent',
-            color: chartMode === 'value' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
-            fontWeight: chartMode === 'value' ? 700 : 400,
-          }}>线性</button>
+          <button onClick={() => setChartMode('value')} className={`chart-toggle${chartMode === 'value' ? ' active' : ''}`}>线性</button>
           {enableReturnMode && (
-            <button onClick={() => setChartMode('return')} style={{
-              padding: '2px 8px', fontSize: 'var(--fs-2xs)', borderRadius: 3, border: '1px solid rgba(212,168,83,0.2)',
-              background: chartMode === 'return' ? 'rgba(212,168,83,0.35)' : 'transparent',
-              color: chartMode === 'return' ? '#D4A853' : '#CBC0B0', cursor: 'pointer',
-              fontWeight: chartMode === 'return' ? 700 : 400,
-            }} title="对数收益率：突出每日涨跌方向，小波动也清晰可见">收益率</button>
+            <button onClick={() => setChartMode('return')} className={`chart-toggle${chartMode === 'return' ? ' active' : ''}`} title="对数收益率：突出每日涨跌方向，小波动也清晰可见">收益率</button>
           )}
         </div>
       )}

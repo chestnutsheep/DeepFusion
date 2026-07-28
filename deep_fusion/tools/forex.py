@@ -2,10 +2,12 @@
 
 import akshare as ak
 import pandas as pd
+from datetime import datetime, timedelta
 from pydantic import Field
 
 from ..server import mcp
 from ..shared.normalize import normalize_rate_df
+from ..shared.request import safe_get
 from ..shared.utils import ak_cache
 
 FX_PAIRS = {
@@ -74,19 +76,28 @@ def fx_history(
         ),
         limit: int = Field(30, description="返回数量(int)，建议30-252", strict=False),
 ):
-    raw = ak_cache(ak.fx_pair_quote)
-    if not isinstance(raw, pd.DataFrame):
-        return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=limit)
-    # 仅在写入前 copy 一次，避免 3 次冗余拷贝
-    df = raw.tail(limit).copy()
-    date_col = "日期" if "日期" in df.columns else "时间" if "时间" in df.columns else None
-    rate_col = None
-    for candidate in ["收盘价", "最新价", "收盘"]:
-        if candidate in df.columns:
-            rate_col = candidate
-            break
-    if date_col is None or rate_col is None:
-        return normalize_rate_df(None, {}, source="akshare", currency=symbol.upper(), limit=limit)
-    df["rate"] = df[rate_col]
-    return normalize_rate_df(df, {"date": date_col, "rate": "rate"}, source="akshare", currency=symbol.upper(),
-                             limit=limit, float_format="%.4f")
+    # 历史汇率来自 exchangerate.host 免费时序接口（无需 key）
+    if "/" in symbol:
+        base, target = symbol.split("/")
+    else:
+        base, target = symbol[:3], symbol[3:]
+    base, target = base.upper(), target.upper()
+    end = datetime.now()
+    start = end - timedelta(days=max(limit, 1) * 2)
+    url = f"https://api.frankfurter.app/{start.strftime('%Y-%m-%d')}..{end.strftime('%Y-%m-%d')}"
+    resp = safe_get(url, params={"from": base, "to": target}, timeout=20)
+    if resp:
+        try:
+            payload = resp.json()
+            rates = payload.get("rates", {})
+            rows = []
+            for d, r in rates.items():
+                if target in r and r.get(target) is not None:
+                    rows.append({"date": d, "rate": float(r[target])})
+            if rows:
+                df = pd.DataFrame(rows).sort_values("date").tail(limit)
+                return normalize_rate_df(df, {"date": "date", "rate": "rate"}, source="frankfurter",
+                                         currency=symbol.upper(), limit=limit, float_format="%.4f")
+        except Exception:
+            pass
+    return normalize_rate_df(None, {}, source="frankfurter", currency=symbol.upper(), limit=limit)

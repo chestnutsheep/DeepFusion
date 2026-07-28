@@ -34,6 +34,24 @@ const PHASE_STYLE = {
   0: { bg: 'rgba(136,136,136,0.08)', border: '#555', label: '未知', arrow: '·' },
 };
 
+/**
+ * 年份坐标轴标签格式化：5 年为一个标准刻度。
+ * 头尾年（首/末）用正常字号，5 年刻度上的年份用小 2 号字，其余年份仅留刻度不标文字。
+ */
+function yearAxisLabelFormatter(dates) {
+  return (value, index) => {
+    const s = String(value);
+    const year = s.slice(0, 4);
+    if (!/^\d{4}$/.test(year)) return s;
+    const disp = s.length > 4 ? year : s;
+    const total = dates.length;
+    if (index === 0 || index === total - 1) return disp;
+    const y = parseInt(year, 10);
+    if (y % 5 === 0) return `{mid|${disp}}`;
+    return '';
+  };
+}
+
 function MethodCards() {
   const pcaResult = useMCP('data_kondratiev', { method: 'pca' });
   const waveletResult = useMCP('data_kondratiev', { method: 'wavelet' });
@@ -246,7 +264,14 @@ function CycleNesting() {
       },
       legend: { data: cycleIds.map(id => NEST_LABELS[id]), bottom: 0 },
       grid: { left: '8%', right: '5%', top: '8%', bottom: '18%', containLabel: true },
-      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 12 } },
+      xAxis: {
+        type: 'category', data: dates,
+        axisLabel: {
+          interval: 0, color: '#CBC0B0', fontSize: 12,
+          formatter: yearAxisLabelFormatter(dates),
+          rich: { mid: { fontSize: 10, color: 'rgba(203,192,176,0.65)' } },
+        },
+      },
       yAxis: {
         type: 'value', min: yMin, max: yMax,
         axisLabel: {
@@ -422,7 +447,11 @@ function CycleGantt() {
       xAxis: {
         type: 'category',
         data: yearSet,
-        axisLabel: { rotate: 45, fontSize: 12, interval: Math.max(0, Math.floor(yearSet.length / 30) - 1) },
+        axisLabel: {
+          interval: 0, color: '#CBC0B0', fontSize: 12,
+          formatter: yearAxisLabelFormatter(yearSet),
+          rich: { mid: { fontSize: 10, color: 'rgba(203,192,176,0.65)' } },
+        },
       },
       yAxis: {
         type: 'category',
@@ -629,6 +658,17 @@ export default function MacroPage() {
     <div>
       <MacroSnapshot />
       <hr className="section-divider" />
+
+      {/* 周期速览 — 一排四个周期当前相位一览（在具体图表上方） */}
+      <div id="coverage" className="section-block">
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期速览</h2>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
+          四周期当前相位一览
+        </p>
+        <ErrorBoundary><CoverageGrid /></ErrorBoundary>
+      </div>
+
+      <hr className="section-divider" />
       {CYCLES.map((c, i) => (
         <div key={c.id} id={c.id}>
           <ErrorBoundary>
@@ -638,16 +678,6 @@ export default function MacroPage() {
           {i < CYCLES.length - 1 && <hr className="section-divider-thin" />}
         </div>
       ))}
-
-      {/* 周期覆盖 — Sidebar 子导航 "宏观覆盖" 锚点 */}
-      <hr className="section-divider" />
-      <div id="coverage" className="section-block">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期覆盖</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
-          四周期当前相位一览
-        </p>
-        <ErrorBoundary><CoverageGrid /></ErrorBoundary>
-      </div>
 
       {/* 周期嵌套图 — 四周期 composite_z 对比 */}
       <hr className="section-divider" />

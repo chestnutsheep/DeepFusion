@@ -13,6 +13,14 @@ const PATH_TO_TAB = {
   '/global': 'global',
 };
 
+const TAB_LABEL = {
+  macro: '宏观',
+  meso: '中观',
+  micro: '微观',
+  policy: '政策',
+  global: '国际',
+};
+
 export default function MainLayout() {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const activeTab = useAppStore((s) => s.activeTab);
@@ -25,6 +33,8 @@ export default function MainLayout() {
     const tab = PATH_TO_TAB[path] || (path === '/' ? 'macro' : null);
     if (tab && tab !== activeTab) setActiveTab(tab);
   }, [location.pathname, activeTab, setActiveTab]);
+
+  const title = TAB_LABEL[activeTab] || '宏观';
 
   return (
     <div>
@@ -43,6 +53,17 @@ export default function MainLayout() {
             padding: 'var(--sp-xl) 0',
           }}
         >
+          <header className="app-header">
+            <div className="app-brand">
+              <span className="brand-mark">◆</span>
+              <span className="brand-name">{title}</span>
+              <span className="brand-sub">DeepFusion Terminal</span>
+            </div>
+            <div className="brand-status">
+              <span className="live-dot" />
+              实时数据
+            </div>
+          </header>
           <TopTabs />
           <Outlet />
         </main>

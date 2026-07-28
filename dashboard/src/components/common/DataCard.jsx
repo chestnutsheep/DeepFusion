@@ -3,7 +3,7 @@ import {autoUpdate, flip, offset, shift, useFloating, useHover, useInteractions}
 import TooltipIcon from './TooltipIcon.jsx';
 import CardWrapper from './CardWrapper.jsx';
 
-export default function DataCard({ label, value, prevValue, unit = '', higherBetter, decimals = 1, detail, source, tooltip }) {
+export default function DataCard({ label, value, prevValue, unit = '', higherBetter, decimals = 1, detail, source, tooltip, square = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const dir = (value != null && prevValue != null) ? (value > prevValue ? 'up' : value < prevValue ? 'down' : null) : null;
   let valueColor = 'var(--text-primary)';
@@ -40,7 +40,7 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         ref={refs.setReference}
         {...getReferenceProps()}
         hoverable={!!detail}
-        style={{ padding: 'var(--sp-lg) var(--sp-md)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-xs)', minHeight: 120, justifyContent: 'space-between' }}
+        style={{ padding: 'var(--sp-lg) var(--sp-md)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-xs)', ...(square ? { aspectRatio: '1 / 1', minHeight: 'auto', justifyContent: 'center', alignItems: 'center', textAlign: 'center' } : { minHeight: 120, justifyContent: 'space-between' }) }}
       >
         {/* 标签行：名称 + 来源标签 + tooltip */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24, flexWrap: 'wrap' }}>
@@ -58,7 +58,7 @@ export default function DataCard({ label, value, prevValue, unit = '', higherBet
         </div>
         {/* 数值行 */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 800, color: valueColor, lineHeight: 1.1 }}>{display}</span>
+          <span style={{ fontSize: 'var(--fs-2xl)', fontWeight: 800, color: valueColor, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{display}</span>
           {unit && <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>{unit}</span>}
           {arrow && <span style={{ fontSize: 'var(--fs-md)', color: arrowColor, fontWeight: 700 }}>{arrow}</span>}
         </div>

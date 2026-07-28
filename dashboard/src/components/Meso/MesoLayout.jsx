@@ -9,6 +9,7 @@ import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
+import SectionHeader from '../common/SectionHeader';
 import * as echarts from 'echarts';
 import TrendsAndSignals, {WarningBar} from './TrendsAndSignals';
 import SeasonalCorrelation from './SeasonalCorrelation';
@@ -172,24 +173,6 @@ function Hero({ industries, dates }) {
           <span>领跌 <b style={{ color: 'var(--accent-green)' }}>{bottomInd.name} {bottomInd.change >= 0 ? '+' : ''}{bottomInd.change.toFixed(2)}%</b></span>
         )}
       </div>
-    </div>
-  );
-}
-
-/** 区块标题 */
-function SectionHeader({ badge, title, highlight, desc }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <span style={{
-        display: 'inline-flex', padding: '4px 12px',
-        background: 'rgba(123,94,123,0.12)', border: '1px solid rgba(123,94,123,0.2)',
-        borderRadius: 16, fontSize: 'var(--fs-sm)', fontWeight: 600,
-        color: 'var(--accent-rose)', marginBottom: 6,
-      }}>{badge}</span>
-      <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700 }}>
-        {title} <span style={{ color: 'var(--accent-gold)' }}>{highlight}</span>
-      </h2>
-      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 2 }}>{desc}</p>}
     </div>
   );
 }

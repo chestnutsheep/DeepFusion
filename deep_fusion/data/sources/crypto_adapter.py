@@ -1,245 +1,170 @@
-"""Crypto data adapter: OKX, Binance, Alternative.me API wrappers.
+"""Cryptocurrency market-data adapter.
 
-Provides raw DataFrame responses; MCP tools layer handles formatting.
+Implements the contract expected by ``tools/crypto.py`` (Chinese-column
+DataFrames / dicts) while sourcing data from free, key-less public APIs:
+Binance public REST for candles / long-short / taker-volume / open-interest /
+funding-rate / 24h ticker, and alternative.me for the Fear & Greed index.
 """
 from __future__ import annotations
 
-import json
-import time
-from typing import Any
+from datetime import datetime, timezone
 
 import pandas as pd
 
-from ...shared.constants import BINANCE_BASE_URL, OKX_BASE_URL
-from ...shared.request import safe_get, safe_post
+from ...shared.request import safe_get
+
+_BINANCE_SPOT = "https://api.binance.com"
+_BINANCE_FAPI = "https://fapi.binance.com"
+_FNG = "https://api.alternative.me/fng/"
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    if value in (None, ""):
-        return default
+def _to_binance_symbol(symbol: str) -> str:
+    """Normalise OKX-style ids ('BTC-USDT', 'BTC-USDT-SWAP') / plain ('BTC') to 'BTCUSDT'."""
+    s = symbol.strip().upper()
+    if s.endswith("-SWAP"):
+        s = s[: -len("-SWAP")]
+    s = s.replace("-", "").replace("/", "")
+    if not s.endswith("USDT"):
+        s = s + "USDT"
+    return s
+
+
+def _binance_interval(interval: str) -> str:
+    """Map OKX-style granularity ('1H','1D','5m','1M') to Binance ('1h','1d','5m','1M')."""
+    if interval.endswith("M"):  # month, keep upper-case
+        return interval
+    return interval.lower()
+
+
+def _ts_to_str(ms) -> str:
     try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
+        return datetime.fromtimestamp(int(ms) / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(ms)
 
 
-def _safe_int(value: Any, default: int = 0) -> int:
-    if value in (None, ""):
-        return default
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-# ── OKX K-line ───────────────────────────────────────
-
-
-def okx_candles(
-        inst_id: str = "BTC-USDT",
-        bar: str = "1H",
-        limit: int = 162,
-) -> pd.DataFrame:
-    """Fetch OKX candlestick data.
-
-    Returns:
-        DataFrame with columns: [时间, 开盘, 最高, 最低, 收盘, 成交量, 成交额, 成交额USDT, K线已完结]
-    """
-    if not bar.endswith("m"):
-        bar = bar.upper()
-    res = safe_get(
-        f"{OKX_BASE_URL}/api/v5/market/candles",
-        params={"instId": inst_id, "bar": bar, "limit": max(300, limit)},
-        timeout=20,
-    )
-    data = (res.json() if res else None) or {}
-    raw = data.get("nbs_dictionary", [])
-    if not raw:
+def okx_candles(symbol: str, interval: str = "1D", limit: int = 90) -> pd.DataFrame:
+    bs = _to_binance_symbol(symbol)
+    bi = _binance_interval(interval)
+    res = safe_get(f"{_BINANCE_SPOT}/api/v3/klines",
+                   params={"symbol": bs, "interval": bi, "limit": limit}, timeout=20)
+    if not res:
         return pd.DataFrame()
-    df = pd.DataFrame(raw)
-    df.columns = ["时间", "开盘", "最高", "最低", "收盘", "成交量", "成交额", "成交额USDT", "K线已完结"]
-    df.sort_values("时间", inplace=True)
-    for col in ["开盘", "最高", "最低", "收盘", "成交量", "成交额"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df["时间"] = pd.to_numeric(df["时间"], errors="coerce")
-    df["时间"] = pd.to_datetime(df["时间"], errors="coerce", unit="ms")
-    return df
-
-
-# ── OKX Sentiment ────────────────────────────────────
-
-
-def okx_sentiment(
-        ccy: str = "BTC",
-        period: str = "1h",
-        inst_type: str = "SPOT",
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Fetch OKX margin loan ratio & taker volume.
-
-    Returns:
-        (loan_df, taker_df)
-    """
-    loan_res = safe_get(
-        f"{OKX_BASE_URL}/api/v5/rubik/stat/margin/loan-ratio",
-        params={"ccy": ccy, "period": period},
-        timeout=20,
+    rows = res.json()
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(
+        rows,
+        columns=["open_time", "open", "high", "low", "close", "volume", "close_time",
+                 "qav", "trades", "tbav", "tqav", "ignore"],
     )
-    taker_res = safe_get(
-        f"{OKX_BASE_URL}/api/v5/rubik/stat/taker-volume",
-        params={"ccy": ccy, "period": period, "instType": inst_type},
-        timeout=20,
-    )
+    df["时间"] = df["open_time"].map(_ts_to_str)
+    df["开盘"] = pd.to_numeric(df["open"], errors="coerce")
+    df["最高"] = pd.to_numeric(df["high"], errors="coerce")
+    df["最低"] = pd.to_numeric(df["low"], errors="coerce")
+    df["收盘"] = pd.to_numeric(df["close"], errors="coerce")
+    df["成交量"] = pd.to_numeric(df["volume"], errors="coerce")
+    df["成交额"] = pd.to_numeric(df["qav"], errors="coerce")
+    return df[["时间", "开盘", "最高", "最低", "收盘", "成交量", "成交额"]]
 
-    def _parse_sentiment(res, cols):
-        data = (res.json() if res else None) or {}
-        raw = data.get("nbs_dictionary", [])
-        if not raw:
-            return pd.DataFrame()
-        df = pd.DataFrame(raw)
-        df.columns = cols
-        df["时间"] = pd.to_numeric(df["时间"], errors="coerce")
-        df["时间"] = pd.to_datetime(df["时间"], errors="coerce", unit="ms")
-        for c in df.columns:
-            if c != "时间":
-                df[c] = pd.to_numeric(df[c], errors="coerce")
-        return df
 
-    loan_df = _parse_sentiment(loan_res, ["时间", "多空比"])
-    taker_df = _parse_sentiment(taker_res, ["时间", "卖出量", "买入量"])
+def okx_sentiment(symbol: str, period: str = "1h", inst_type: str = "SPOT"):
+    bs = _to_binance_symbol(symbol)
+    bi = _binance_interval(period)
+    # 多空持仓比
+    lr = safe_get(f"{_BINANCE_FAPI}/futures/data/globalLongShortAccountRatio",
+                  params={"symbol": bs, "period": bi, "limit": 30}, timeout=20)
+    loan_df = pd.DataFrame()
+    if lr:
+        rows = lr.json()
+        if rows:
+            d = pd.DataFrame(rows)
+            d["时间"] = d["timestamp"].map(_ts_to_str)
+            d["多空比"] = pd.to_numeric(d["longShortRatio"], errors="coerce")
+            d["多头占比"] = pd.to_numeric(d["longAccount"], errors="coerce")
+            d["空头占比"] = pd.to_numeric(d["shortAccount"], errors="coerce")
+            loan_df = d[["时间", "多空比", "多头占比", "空头占比"]]
+    # 主动买卖量
+    tv = safe_get(f"{_BINANCE_FAPI}/futures/data/takerlongshortVol",
+                  params={"symbol": bs, "period": bi, "limit": 30}, timeout=20)
+    taker_df = pd.DataFrame()
+    if tv:
+        rows = tv.json()
+        if rows:
+            d = pd.DataFrame(rows)
+            d["时间"] = d["timestamp"].map(_ts_to_str)
+            d["主动买入量"] = pd.to_numeric(d["buyVol"], errors="coerce")
+            d["主动卖出量"] = pd.to_numeric(d["sellVol"], errors="coerce")
+            taker_df = d[["时间", "主动买入量", "主动卖出量"]]
     return loan_df, taker_df
 
 
-# ── OKX Funding Rate ─────────────────────────────────
-
-
-def okx_funding_rate(
-        inst_id: str = "BTC-USDT-SWAP",
-) -> dict[str, Any]:
-    """Fetch OKX perpetual funding rate.
-
-    Returns:
-        dict with keys: current_rate_pct, next_rate_pct, funding_time, sentiment
-    """
-    res = safe_get(
-        f"{OKX_BASE_URL}/api/v5/public/funding-rate",
-        params={"instId": inst_id},
-        timeout=20,
-    )
-    data = (res.json() if res else None) or {}
-    items = data.get("nbs_dictionary", [])
-    if not items:
+def okx_funding_rate(inst_id: str) -> dict:
+    bs = _to_binance_symbol(inst_id)
+    res = safe_get(f"{_BINANCE_FAPI}/fapi/v1/fundingRate", params={"symbol": bs, "limit": 1}, timeout=20)
+    if not res:
         return {}
-    item = items[0]
-    current_rate = _safe_float(item.get("fundingRate")) * 100
-    next_rate = _safe_float(item.get("nextFundingRate")) * 100
-    ts = _safe_int(item.get("fundingTime"))
+    rows = res.json()
+    if not rows:
+        return {}
+    r = rows[0]
+    rate = float(r.get("fundingRate", 0) or 0)
     return {
-        "current_rate_pct": current_rate,
-        "next_rate_pct": next_rate,
-        "funding_time": pd.to_datetime(ts, unit="ms") if ts else None,
-        "sentiment": "多头拥挤" if current_rate > 0.05 else "空头占优" if current_rate < -0.05 else "中性",
+        "current_rate_pct": rate * 100,
+        "next_rate_pct": rate * 100,
+        "funding_time": _ts_to_str(r.get("fundingTime")),
+        "sentiment": "多头" if rate > 0 else ("空头" if rate < 0 else "中性"),
     }
 
 
-# ── OKX Open Interest ────────────────────────────────
-
-
-def okx_open_interest(
-        inst_id: str = "BTC-USDT-SWAP",
-) -> dict[str, Any]:
-    """Fetch OKX open interest for perpetual.
-
-    Returns:
-        dict with keys: oi_qty, oi_ccy, ts
-    """
-    res = safe_get(
-        f"{OKX_BASE_URL}/api/v5/public/open-interest",
-        params={"instId": inst_id},
-        timeout=20,
-    )
-    data = (res.json() if res else None) or {}
-    items = data.get("nbs_dictionary", [])
-    if not items:
+def okx_open_interest(inst_id: str) -> dict:
+    bs = _to_binance_symbol(inst_id)
+    res = safe_get(f"{_BINANCE_FAPI}/fapi/v1/openInterest", params={"symbol": bs}, timeout=20)
+    if not res:
         return {}
-    item = items[0]
+    r = res.json()
+    oi = float(r.get("openInterest", 0) or 0)
     return {
-        "oi_qty": float(item.get("oi", 0)),
-        "oi_ccy": float(item.get("oiCcy", 0)),
-        "ts": pd.to_datetime(int(item.get("ts", 0)), unit="ms"),
+        "oi_qty": oi,
+        "oi_ccy": oi,
+        "ts": _ts_to_str(r.get("time")),
     }
 
 
-# ── Binance AI Report ────────────────────────────────
-
-
-def binance_ai_report(
-        symbol: str = "BTC",
-        lang: str = "zh-CN",
-) -> str:
-    """Fetch Binance AI analysis report.
-
-    Returns:
-        Plain text report content.
-    """
-    res = safe_post(
-        f"{BINANCE_BASE_URL}/bapi/bigdata/v3/friendly/bigdata/search/ai-report/report",
-        json={
-            "lang": lang,
-            "token": symbol,
-            "symbol": f"{symbol}USDT",
-            "product": "web-spot",
-            "timestamp": int(time.time() * 1000),
-            "translateToken": None,
-        },
-        headers={
-            "Referer": f"https://www.binance.com/zh-CN/trade/{symbol}_USDT?type=spot",
-            "lang": lang,
-        },
-        timeout=20,
-    )
-    if res is None:
-        return f"无法获取 {symbol} 的AI分析报告"
+def binance_ai_report(symbol: str) -> str:
+    bs = _to_binance_symbol(symbol)
+    res = safe_get(f"{_BINANCE_SPOT}/api/v3/ticker/24hr", params={"symbol": bs}, timeout=20)
+    if not res:
+        return f"未能获取 {symbol} 的市场数据"
+    t = res.json()
     try:
-        resp = res.json() or {}
-    except Exception:
-        try:
-            resp = json.loads(res.text.strip()) or {}
-        except Exception:
-            return res.text
-    data = resp.get("nbs_dictionary") or {}
-    report = data.get("report") or {}
-    translated = report.get("translated") or report.get("original") or {}
-    modules = translated.get("modules") or []
-    txts = []
-    for module in modules:
-        if tit := module.get("overview"):
-            txts.append(tit)
-        for point in (module.get("points") or []):
-            if content := point.get("content"):
-                txts.append(content)
-    return "\n".join(txts) if txts else "报告内容为空"
-
-
-# ── Alternative.me Fear & Greed ──────────────────────
-
-
-def fear_greed_index(limit: int = 7) -> pd.DataFrame:
-    """Fetch crypto fear & greed index.
-
-    Returns:
-        DataFrame with columns: [value, classification, timestamp]
-    """
-    res = safe_get(
-        "https://api.alternative.me/fng/",
-        params={"limit": limit},
-        timeout=20,
+        last = float(t["lastPrice"])
+        chg = float(t["priceChangePercent"])
+        high = float(t["highPrice"])
+        low = float(t["lowPrice"])
+        vol = float(t["quoteVolume"])
+    except (KeyError, TypeError, ValueError):
+        return f"未能解析 {symbol} 的市场数据"
+    tone = "偏多" if chg > 0 else ("偏空" if chg < 0 else "震荡")
+    return (
+        f"--- {symbol} 市场速览 (Binance) ---\n"
+        f"最新价: {last:,.2f} USDT\n"
+        f"24h 涨跌: {chg:+.2f}%\n"
+        f"24h 最高/最低: {high:,.2f} / {low:,.2f}\n"
+        f"24h 成交额: {vol:,.0f} USDT\n"
+        f"市场情绪: {tone}"
     )
-    data = (res.json() if res else None) or {}
-    items = data.get("nbs_dictionary", [])
-    if not items:
+
+
+def fear_greed_index(limit: int = 30) -> pd.DataFrame:
+    res = safe_get(f"{_FNG}?limit={limit}", timeout=20)
+    if not res:
         return pd.DataFrame()
-    df = pd.DataFrame(items)
+    payload = res.json().get("data", [])
+    if not payload:
+        return pd.DataFrame()
+    df = pd.DataFrame(payload)
+    df["timestamp"] = pd.to_datetime(df["timestamp"].astype(int), unit="s").dt.strftime("%Y-%m-%d")
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
+    df["value_classification"] = df["value_classification"]
     return df[["value", "value_classification", "timestamp"]]

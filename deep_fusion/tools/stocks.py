@@ -207,6 +207,26 @@ def individual_hist(
     return "\n".join(output) if output else f"未获取到 {symbol} 的历史行情"
 
 
+def _stock_a_daily_robust(symbol, market, period, start_date):
+    """A股日线：腾讯源优先（稳定），东方财富回退。返回含中文列名的 df。"""
+    try:
+        df = ak_cache(ak.stock_zh_a_daily, symbol=f"{market}{symbol}", adjust="qfq", ttl=3600)
+        if df is not None and not df.empty:
+            df = df.rename(columns={
+                "date": "日期", "open": "开盘", "high": "最高", "low": "最低",
+                "close": "收盘", "volume": "成交量",
+            })
+            if "amount" in df.columns:
+                df = df.drop(columns=["amount"])
+            if "成交额" not in df.columns:
+                df["成交额"] = None
+            return df
+    except Exception:
+        pass
+    return ak_cache(ak.stock_zh_a_hist, symbol=symbol, period=period,
+                    start_date=start_date, end_date="22220101", ttl=3600)
+
+
 @mcp.tool(
     title="获取市场历史价格",
     description="统一获取股票/ETF历史价格及技术指标，输出标准化行情字段。支持A股/H股/美股及ETF",
@@ -264,20 +284,23 @@ def market_prices(
             continue
         if m[3] != asset:
             continue
-        extra = m[2] if isinstance(m[2], dict) else {}
-        kws = {"period": period, "start_date": start_date, **extra}
-        dfs = ak_cache(m[1], symbol=symbol, ttl=3600, **kws)
+        if m[3] == "equity" and market in ("sh", "sz"):
+            dfs = _stock_a_daily_robust(symbol, market, period, start_date)
+        else:
+            extra = m[2] if isinstance(m[2], dict) else {}
+            kws = {"period": period, "start_date": start_date, **extra}
+            dfs = ak_cache(m[1], symbol=symbol, ttl=3600, **kws)
         if dfs is None or dfs.empty:
             continue
-        add_technical_indicators(dfs, dfs["收盘"], dfs["最低"], dfs["最高"])
+        add_technical_indicators(dfs, "收盘", "最低", "最高")
         currency_map = {"sh": "CNY", "sz": "CNY", "hk": "HKD", "us": "USD"}
         currency = currency_map.get(market, "CNY")
         return normalize_price_df(dfs, {"date": "日期", "open": "开盘", "high": "最高", "low": "最低", "close": "收盘",
                                         "volume": "成交量", "amount": "成交额"}, source="akshare", currency=currency,
-                                  limit=limit, float_format="%.2f", date_unit=str, indicator_map={
+                                  limit=limit, float_format="%.2f", indicator_map={
                 "macd": "MACD", "dif": "DIF", "dea": "DEA",
                 "kdj_k": "KDJ.K", "kdj_d": "KDJ.D", "kdj_j": "KDJ.J",
                 "rsi": "RSI",
                 "boll_u": "BOLL.U", "boll_m": "BOLL.M", "boll_l": "BOLL.L",
             })
-    return normalize_price_df(None, {}, source="akshare", currency="", limit=limit, date_unit=str)
+    return normalize_price_df(None, {}, source="akshare", currency="", limit=limit)

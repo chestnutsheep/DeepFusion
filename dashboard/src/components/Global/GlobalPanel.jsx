@@ -6,6 +6,7 @@ import DataCard from '../common/DataCard';
 import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
+import SectionHeader from '../common/SectionHeader';
 
 // ── CSV 解析工具 ──
 
@@ -65,22 +66,7 @@ function stressBg(level) {
 
 // ── 区块标题 ──
 
-function SectionHeader({ badge, title, highlight, desc }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <span style={{
-        display: 'inline-flex', padding: '4px 12px',
-        background: 'rgba(123,94,123,0.12)', border: '1px solid rgba(123,94,123,0.2)',
-        borderRadius: 16, fontSize: 'var(--fs-2xs)', fontWeight: 600,
-        color: 'var(--accent-rose)', marginBottom: 6,
-      }}>{badge}</span>
-      <h2 style={{ fontSize: 18, fontWeight: 700 }}>
-        {title} <span style={{ color: 'var(--accent-gold)' }}>{highlight}</span>
-      </h2>
-      {desc && <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginTop: 2 }}>{desc}</p>}
-    </div>
-  );
-}
+
 
 // ══════════════════════════════════════════
 // 金融压力指数 — 核心仪表盘

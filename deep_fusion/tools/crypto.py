@@ -37,13 +37,13 @@ def crypto_prices(
     df = okx_candles(symbol, period, max(300, limit + 62))
     currency = symbol.split("-")[-1] if "-" in symbol else "USDT"
     if df.empty:
-        return normalize_price_df(None, {}, source="okx", currency=currency, limit=limit, date_unit=str)
+        return normalize_price_df(None, {}, source="okx", currency=currency, limit=limit)
     df = df.sort_values("时间")
-    add_technical_indicators(df, df["收盘"], df["最低"], df["最高"])
+    add_technical_indicators(df, "收盘", "最低", "最高")
     return normalize_price_df(df, {
         "date": "时间", "open": "开盘", "high": "最高", "low": "最低",
         "close": "收盘", "volume": "成交量", "amount": "成交额",
-    }, source="okx", currency=currency, limit=limit, float_format="%.4f", date_unit=str,
+    }, source="okx", currency=currency, limit=limit, float_format="%.4f",
                               indicator_map={
                                   "macd": "MACD", "dif": "DIF", "dea": "DEA",
                                   "kdj_k": "KDJ.K", "kdj_d": "KDJ.D", "kdj_j": "KDJ.J",
@@ -88,9 +88,9 @@ def binance_ai_report(
     description="获取OKX永续合约的资金费率，正费率表示多头付费给空头",
 )
 def crypto_funding_rate(
-        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH 或 BTC-USDT"),
 ):
-    inst_id = f"{symbol}-USDT-SWAP"
+    inst_id = f"{symbol.split('-')[0]}-USDT-SWAP"
     data = okx_funding_rate(inst_id)
     if not data:
         return f"未找到 {symbol} 的资金费率数据"
@@ -105,12 +105,12 @@ def crypto_funding_rate(
 
 @mcp.tool(
     title="获取合约持仓量",
-    description="获取OKX永续合约的持仓量数据",
+    description="获取Binance永续合约的持仓量数据",
 )
 def crypto_open_interest(
-        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH"),
+        symbol: str = Field("BTC", description="币种，格式: BTC 或 ETH 或 BTC-USDT"),
 ):
-    inst_id = f"{symbol}-USDT-SWAP"
+    inst_id = f"{symbol.split('-')[0]}-USDT-SWAP"
     data = okx_open_interest(inst_id)
     if not data:
         return f"未找到 {symbol} 的持仓量数据"
@@ -156,8 +156,8 @@ async def crypto_composite_diagnostic(
     inst_id = f"{symbol}-USDT"
     loop = asyncio.get_event_loop()
 
-    price_task = loop.run_in_executor(None, crypto_prices.fn, inst_id, "4H", 10)
-    sentiment_task = loop.run_in_executor(None, crypto_sentiment_metrics.fn, symbol, "1H", "SPOT")
+    price_task = loop.run_in_executor(None, crypto_prices, inst_id, "4H", 10)
+    sentiment_task = loop.run_in_executor(None, crypto_sentiment_metrics, symbol, "1H", "SPOT")
     ai_task = loop.run_in_executor(None, _binance_report, symbol)
 
     price_data, sentiment_data, ai_report = await asyncio.gather(price_task, sentiment_task, ai_task)
@@ -181,7 +181,7 @@ def draw_crypto_chart(
         bar: str = Field("1D", description="K线周期: 1H/4H/1D"),
 ):
     inst_id = f"{symbol}-USDT"
-    data = crypto_prices.fn(symbol=inst_id, period=bar, limit=20)
+    data = crypto_prices(symbol=inst_id, period=bar, limit=20)
     if not isinstance(data, str) or not data:
         return "数据不足，无法绘图"
     try:
@@ -225,7 +225,7 @@ def backtest_crypto_strategy(
         limit: int = Field(200, description="回测K线数量", strict=False),
 ):
     inst_id = f"{symbol}-USDT"
-    data = crypto_prices.fn(symbol=inst_id, period=bar, limit=limit)
+    data = crypto_prices(symbol=inst_id, period=bar, limit=limit)
     if not isinstance(data, str) or not data:
         return f"未找到可回测数据: {symbol}"
     try:

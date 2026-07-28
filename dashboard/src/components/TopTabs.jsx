@@ -36,36 +36,19 @@ export default function TopTabs() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 4,
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: 0,
-        marginBottom: 'var(--sp-md)',
-      }}
-    >
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => handleTabClick(tab)}
-          style={{
-            flex: 1,
-            padding: 'var(--sp-md) 0',
-            fontSize: 'var(--fs-base)',
-            fontWeight: activeTab === tab.key ? 700 : 500,
-            color: activeTab === tab.key ? 'var(--accent-gold)' : 'var(--text-secondary)',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === tab.key ? '2px solid var(--accent-gold)' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            letterSpacing: 1,
-          }}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="top-tab-track">
+      {TABS.map((tab) => {
+        const active = activeTab === tab.key;
+        return (
+          <button
+            key={tab.key}
+            onClick={() => handleTabClick(tab)}
+            className={`top-tab${active ? ' active' : ''}`}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

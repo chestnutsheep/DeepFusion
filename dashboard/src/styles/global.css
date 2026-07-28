@@ -46,6 +46,21 @@
   --sp-lg:  clamp(12px, 0.35vw + 8px,  18px);
   --sp-xl:  clamp(16px, 0.45vw + 10px, 24px);
   --sp-2xl: clamp(20px, 0.55vw + 14px, 30px);
+
+  /* ── 动效缓动曲线（Refined motion） ── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition: 0.35s var(--ease-out-expo);
+
+  /* ── 层级阴影（Linear/Vercel：细边 + 柔和投影） ── */
+  --elev-1: 0 1px 2px rgba(0,0,0,0.4), 0 6px 18px -6px rgba(0,0,0,0.45);
+  --elev-2: 0 2px 4px rgba(0,0,0,0.45), 0 14px 34px -8px rgba(0,0,0,0.55);
+  --ring: 0 0 0 2px rgb(var(--bg-r),var(--bg-g),var(--bg-b)), 0 0 0 4px rgba(212,168,83,0.5);
+
+  /* ── 展示型字号阶梯 ── */
+  --fs-3xl: clamp(24px, 1.2vw + 18px, 30px);
+  --fs-4xl: clamp(30px, 1.8vw + 22px, 40px);
 }
 
 /* 各主题仅设置独有变量：背景色 RGB 分量 + 面板色 + 辅色 + 背景图 */
@@ -110,12 +125,19 @@
 html { scroll-behavior: smooth; }
 body {
   font-family: var(--font-sans);
-  background: rgb(var(--bg-r), var(--bg-g), var(--bg-b));
+  background:
+    radial-gradient(110% 70% at 50% -12%, rgba(212,168,83,0.07), transparent 55%),
+    radial-gradient(80% 60% at 100% 0%, rgba(0,150,136,0.05), transparent 50%),
+    rgb(var(--bg-r), var(--bg-g), var(--bg-b));
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
   transition: background 0.4s ease;
   font-size: var(--fs-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
 }
 
 /* ── 背景图像层 ── */
@@ -271,9 +293,12 @@ body::after {
   box-shadow: 0 16px 48px rgba(0,0,0,0.3);
 }
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--accent-purple); border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(212,168,83,0.22); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(212,168,83,0.42); background-clip: padding-box; }
+* { scrollbar-width: thin; scrollbar-color: rgba(212,168,83,0.3) transparent; }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--radius); }
 
 /* ── 金线底边装饰 ── */
 .card-gold-line {
@@ -351,6 +376,133 @@ body > #root::before {
 .section-block > h2:first-child,
 .section-block > .section-title:first-child {
   margin-top: 0;
+}
+
+/* ── 顶部分段标签栏（Refined segmented tabs） ── */
+.top-tab-track {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--sp-lg);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.top-tab {
+  flex: 1;
+  padding: 10px 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+.top-tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.04); }
+.top-tab.active {
+  color: var(--accent-gold);
+  font-weight: 700;
+  background: linear-gradient(180deg, rgba(212,168,83,0.18), rgba(212,168,83,0.07));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 10px rgba(212,168,83,0.15);
+}
+
+/* ── 内容区头部品牌条 ── */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  flex-wrap: wrap;
+  padding: var(--sp-xs) 0 var(--sp-md);
+  margin-bottom: var(--sp-xs);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.app-brand { display: flex; align-items: baseline; gap: 10px; }
+.brand-mark { color: var(--accent-gold); font-size: var(--fs-lg); line-height: 1; text-shadow: 0 0 12px rgba(212,168,83,0.5); }
+.brand-name { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); }
+.brand-sub { font-size: var(--fs-2xs); color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+.brand-status { display: flex; align-items: center; gap: 6px; font-size: var(--fs-2xs); color: var(--text-secondary); letter-spacing: 1px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #5bba57; animation: livePulse 2.4s var(--ease-out-quint) infinite; }
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 rgba(91,186,87,0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(91,186,87,0); }
+  100% { box-shadow: 0 0 0 0 rgba(91,186,87,0); }
+}
+
+/* ── 区块小标题（统一 eyebrow 风格） ── */
+.df-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+}
+.df-eyebrow::before {
+  content: '';
+  width: 14px; height: 2px;
+  background: var(--accent-gold);
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+/* ── 区块标题（统一 refined section header） ── */
+.df-section-header { margin-bottom: var(--sp-md); }
+.df-section-header .sh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(212,168,83,0.10);
+  border: 1px solid rgba(212,168,83,0.22);
+  border-radius: 999px;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent-gold);
+  margin-bottom: 8px;
+}
+.df-section-header .sh-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.df-section-header .sh-title .hl { color: var(--accent-gold); }
+.df-section-header .sh-desc {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+/* ── 图表模式切换按钮（与分段标签栏一致） ── */
+.chart-toggle {
+  padding: 3px 10px;
+  font-size: var(--fs-2xs);
+  border-radius: 6px;
+  border: 1px solid rgba(212,168,83,0.2);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-weight: 400;
+  transition: all var(--transition);
+}
+.chart-toggle:hover { color: var(--text-secondary); border-color: rgba(212,168,83,0.4); }
+.chart-toggle.active {
+  background: rgba(212,168,83,0.32);
+  color: var(--accent-gold);
+  border-color: rgba(212,168,83,0.45);
+  font-weight: 700;
 }
 
 /* ── 移动端浮动汉堡按钮（默认隐藏，≤768px 显示） ── */

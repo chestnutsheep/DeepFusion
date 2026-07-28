@@ -2,8 +2,6 @@ import {useMemo} from 'react';
 import {useMCP} from '../../hooks/useMCP.js';
 import DataChart from '../common/DataChart.jsx';
 import DataGrid from '../common/DataGrid.jsx';
-import StatusBar from '../common/StatusBar.jsx';
-import PhaseWheel from '../common/PhaseWheel.jsx';
 import CardWrapper from '../common/CardWrapper.jsx';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 
@@ -116,40 +114,25 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
   return (
     <div>
       <UpdateTimestamp updatedAt={updatedAt} />
-      {showTitle && <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>{showTitle}</h2>}
-
-      {/* 相位概览：PhaseWheel + 关键指标 */}
-      <CardWrapper style={{ padding: 'var(--sp-lg) var(--sp-xl)', marginBottom: 'var(--sp-lg)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-xl)', flexWrap: 'wrap' }}>
-          <PhaseWheel phase={phaseValue} phaseName={phaseName} cycleName={config.title} size={160} />
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <StatusBar phase={phaseName} period={latest.period} />
-            {/* 相位详情行 */}
-            {phaseValue > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  background: badge.bg, border: `1.5px solid ${badge.border}`, borderRadius: 'var(--radius-sm)',
-                  padding: '4px 14px', fontSize: 'var(--fs-md)', fontWeight: 700, color: badge.color,
-                  letterSpacing: 0.5,
-                }}>
-                  {badge.icon} {phaseName}
+      {showTitle && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--sp-lg)', marginTop: 'var(--sp-md)' }}>
+          <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, margin: 0 }}>{showTitle}</h2>
+          {phaseValue > 0 && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: 'var(--radius-sm)',
+              padding: '3px 12px', fontSize: 'var(--fs-sm)', fontWeight: 700, color: badge.color,
+            }}>
+              {badge.icon} {phaseName}
+              {latest.confidence != null && (
+                <span style={{ opacity: 0.8, fontWeight: 500, marginLeft: 2 }}>
+                  · {(latest.confidence * 100).toFixed(0)}%
                 </span>
-                {latest.confidence != null && (
-                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
-                    置信度 <b style={{ color: 'var(--accent-gold)' }}>{(latest.confidence * 100).toFixed(0)}%</b>
-                  </span>
-                )}
-                {latest.dominant_period != null && (
-                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
-                    主周期 <b style={{ color: 'var(--text-primary)' }}>{latest.dominant_period.toFixed(1)}年</b>
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </span>
+          )}
         </div>
-      </CardWrapper>
+      )}
 
       {/* 主内容区：图表全宽 + 指标卡下方横排 */}
       {(() => {
@@ -177,6 +160,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
               zoomEnd={DEFAULT_WINDOW.end}
               annotations={config.turningPoints}
               enableReturnMode={false}
+              yearAxis
             />
           </CardWrapper>
         );
@@ -195,7 +179,7 @@ export default function CyclePage({ config, showTitle, tableIndex }) {
           <div style={{ marginBottom: 'var(--sp-2xl)' }}>
             {chartContent}
             <div style={{ marginTop: 'var(--sp-lg)' }}>
-              <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={gridCols} gap="var(--sp-lg)" />
+              <DataGrid config={metrics} data={metricsLatest} prevData={prev} columns={gridCols} gap="var(--sp-lg)" square />
             </div>
           </div>
         );

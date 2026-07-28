@@ -399,8 +399,9 @@ def _industry_sw_tree(keyword: str = "") -> list:
 
 
 def _industry_sw_constituents_detail(industry_code: str, limit: int = 50) -> list:
-    """申万行业成分股"""
-    df = ak_cache(ak.index_component_sw, symbol=industry_code, ttl=86400)
+    """申万行业成分股（复用 industry_sw.get_constituents，统一走健壮的获取路径）"""
+    from ...data.sources.industry_sw import get_constituents
+    df = get_constituents(industry_code)
     if df is None or df.empty:
         return []
     return _df_to_records(df.head(limit))
@@ -548,7 +549,11 @@ def tech_invest_data(concept: str, symbols: list, start_year: str = "2020") -> d
     # 解析所有 StockCode
     sc_list = []
     for s in symbols:
-        sc, err = resolve_stock_code(s)
+        try:
+            sc = resolve_stock_code(s)
+            err = None
+        except ValueError as e:
+            sc, err = None, str(e)
         if err:
             sc_list.append((s, None))
         else:
@@ -624,7 +629,11 @@ def anti_fraud_data(symbol: str, concept: str = "") -> dict:
     簇2: 反诈验证 —— 三步交叉验证，复用底层调用结果。
     输入: symbol 股票代码, concept 概念名(用于政策搜索)
     """
-    sc, err = resolve_stock_code(symbol)
+    try:
+        sc = resolve_stock_code(symbol)
+        err = None
+    except ValueError as e:
+        sc, err = None, str(e)
     if err or sc is None:
         return {"symbol": symbol, "error": f"代码解析失败: {err}"}
 
@@ -668,7 +677,11 @@ def bl_pathology_data(symbol: str) -> dict:
     簇3: 暴雷病理学 —— 多维度扫描暴雷信号。
     输入: symbol 股票代码
     """
-    sc, err = resolve_stock_code(symbol)
+    try:
+        sc = resolve_stock_code(symbol)
+        err = None
+    except ValueError as e:
+        sc, err = None, str(e)
     if err or sc is None:
         return {"symbol": symbol, "error": f"代码解析失败: {err}"}
 

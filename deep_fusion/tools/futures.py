@@ -9,6 +9,22 @@ from ..shared.normalize import normalize_price_df
 from ..shared.schema import format_error_csv
 from ..shared.utils import ak_cache
 
+
+def _dominant_contract(code: str):
+    """根据品种代码(如 'RB')查询东方财富主力连续合约代码(如 'rb2510')。"""
+    try:
+        df = ak_cache(ak.futures_display_main_sina, ttl=86400)
+    except Exception:
+        df = None
+    if df is None or not hasattr(df, "empty") or df.empty:
+        return None
+    code_u = code.upper()
+    for _, row in df.iterrows():
+        sym = str(row.get("symbol", ""))
+        if sym and sym.upper().startswith(code_u):
+            return sym
+    return None
+
 # 期货品种映射：中文名 → {code: 合约代码, sina: 新浪品种编号}
 # akshare 各接口的 symbol 格式不同：
 #   futures_main_sina   → 新浪编号 (如 "RB0")
@@ -129,16 +145,15 @@ def futures_basis(
         ),
         date: str = Field("", description="日期YYYYMMDD，留空自动推算"),
 ):
-    if not date:
-        from datetime import datetime
-        date = datetime.now().strftime("%Y%m%d")
     info = FUTURES_SYMBOLS.get(symbol)
     code = info["code"] if info else symbol
-    # futures_spot_price 期望合约品种代码列表
-    df = ak_cache(ak.futures_spot_price, date=date, vars_list=[code])
+    # futures_spot_price 近期该品种多返回空；改用每日现货-期货基差序列
+    df = ak_cache(ak.futures_spot_price_daily, vars_list=[code])
     if df is None or df.empty:
         return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
-    return df.to_csv(index=False, float_format="%.2f")
+    keep = [c for c in ["date", "symbol", "spot_price", "dominant_contract",
+                        "dominant_contract_price", "near_basis", "dom_basis"] if c in df.columns]
+    return df[keep].to_csv(index=False, float_format="%.2f")
 
 
 @mcp.tool(
@@ -163,7 +178,7 @@ def futures_positions(
     info = FUTURES_SYMBOLS.get(symbol)
     code = info["code"] if info else symbol
     if not contract:
-        contract = code
+        contract = _dominant_contract(code) or code
     # futures_hold_pos_sina: symbol 是持仓类型(成交量/多单持仓/空单持仓)，contract 是合约代码
     df = ak_cache(ak.futures_hold_pos_sina, symbol=position_type, contract=contract, date=date)
     if df is None or df.empty:

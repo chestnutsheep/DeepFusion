@@ -39,7 +39,24 @@
 .favorites-count { font-size: 48px; font-weight: 800; color: var(--secondary); line-height: 1; margin: 8px 0; }
 
 .timeline-section { margin-bottom: 30px; }
-.section-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--text); }
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent-gold), rgba(212,168,83,0.3));
+  box-shadow: 0 0 10px rgba(212,168,83,0.4);
+}
 
 /* ── 时间线（线穿圆心 + 翻年箭头） ── */
 .annual-timeline { position: relative; padding: 16px 40px; }

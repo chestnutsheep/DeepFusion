@@ -172,7 +172,7 @@ def get_daily_analysis(
         end_date=end_date,
         ttl=300,  # 5min — 日行情收盘后更新，与前端 staleTime 对齐
     )
-    if df.empty:
+    if df is None or df.empty:
         df = pd.DataFrame()
 
     # ── DB 补充：若 akshare 最新日期滞后于本地 DB，补上 DB 的最新日期行 ──
@@ -236,15 +236,96 @@ def get_daily_analysis(
 #  成分股查询
 # ═══════════════════════════════════════════════════════
 
+# 申万指数成份股 API（境内站点，不走代理）
+_SW_COMPONENTS_URL = "https://www.swsresearch.com/institute-sw/api/index_publish/details/component_stocks/"
+_SW_COMPONENTS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "application/json",
+}
+
+
+def _fetch_sw_constituents(code: str) -> pd.DataFrame:
+    """直接调用申万指数成份股 API，绕过 akshare 的脆弱实现。
+
+    akshare 1.18.64 的 ``ak.index_component_sw`` 在申万 API 返回空 ``results``
+    时会抛 ``KeyError``（见 ``akshare/index/index_research_sw.py:157``）。
+    本函数健壮处理空 results，并防御性重命名字段。
+
+    Args:
+        code: 申万指数代码（纯数字，如 "801011"）
+
+    Returns:
+        DataFrame with columns: stock_code, stock_name, weight, added_date.
+        空 results 或异常时返回空 DataFrame（列齐全），不抛错。
+    """
+    import requests
+
+    empty = pd.DataFrame(columns=["stock_code", "stock_name", "weight", "added_date"])
+    # trust_env=False → 不读 HTTP_PROXY/HTTPS_PROXY 环境变量，绕过 Clash 代理
+    # 申万是境内站点，经代理时间歇性返回空 results（bug 诱因）
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        resp = session.get(
+            _SW_COMPONENTS_URL,
+            params={"swindexcode": code, "page": "1", "page_size": "10000"},
+            headers=_SW_COMPONENTS_HEADERS,
+            timeout=15,
+            verify=False,
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        results = (data.get("data") or {}).get("results") or []
+        if not results:
+            return empty
+        df = pd.DataFrame(results)
+        # 防御性 rename：字段名若漂移则跳过，不抛错
+        rename = {}
+        for src, dst in (
+            ("stockcode", "stock_code"),
+            ("stockname", "stock_name"),
+            ("newweight", "weight"),
+            ("beginningdate", "added_date"),
+        ):
+            if src in df.columns:
+                rename[src] = dst
+        df = df.rename(columns=rename)
+        # 只保留统一后的列（缺失的补 NaN）
+        for col in ["stock_code", "stock_name", "weight", "added_date"]:
+            if col not in df.columns:
+                df[col] = pd.NA
+        df = df[["stock_code", "stock_name", "weight", "added_date"]]
+        # 类型转换
+        df["weight"] = pd.to_numeric(df["weight"], errors="coerce")
+        df["added_date"] = pd.to_datetime(df["added_date"], errors="coerce").dt.date
+        return df
+    except Exception:
+        return empty
+
+
 def get_constituents(industry_code: str) -> pd.DataFrame:
     """查询申万指数成分股。
+
+    优先用 ``_fetch_sw_constituents``（健壮 + 绕过代理），失败时 fallback
+    到 ``ak.index_component_sw``（用 try/except 防御 akshare 内部 KeyError）。
 
     Args:
         industry_code: 申万指数代码，如 "801010"(一级) "801011"(二级) "850111"(三级)
                        或不带 .SI 后缀
     """
     code = industry_code.replace(".SI", "")
-    df = ak_cache(ak.index_component_sw, symbol=code, ttl=86400)
+    # 优先自实现（健壮 + 绕过代理）
+    df = ak_cache(
+        _fetch_sw_constituents, code, ttl=86400,
+        key=f"_fetch_sw_constituents-('{code}',)-{{}}",
+    )
+    if df is not None and not df.empty:
+        return df
+    # Fallback: akshare（防御性 try/except，避免内部 KeyError 上抛）
+    try:
+        df = ak_cache(ak.index_component_sw, symbol=code, ttl=86400)
+    except Exception:
+        df = None
     if df is None or df.empty:
         return pd.DataFrame()
     rename = {}

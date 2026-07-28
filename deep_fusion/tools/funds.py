@@ -1,13 +1,54 @@
 """基金数据工具模块"""
 
+import re
 from datetime import datetime
 
 import akshare as ak
+import pandas as pd
 from pydantic import Field
 
 from ..server import mcp
 from ..shared.schema import format_error_csv
 from ..shared.utils import ak_cache
+
+
+def _eastmoney_fund_holdings(code: str) -> pd.DataFrame:
+    """直接抓取东方财富基金 F10 前十大持仓(html 表格)，避免 fund_portfolio_hold_em 接口失效。"""
+    import io
+    import os
+    import requests
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+               "Referer": "https://fundf10.eastmoney.com/"}
+    px = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    proxies = {"http": px, "https": px} if px else None
+    for month in (3, 6, 9, 12):
+        try:
+            r = requests.get(
+                "https://fundf10.eastmoney.com/FundArchivesDatas.aspx",
+                params={"type": "jjcc", "code": code, "year": str(datetime.now().year), "month": str(month)},
+                headers=headers, proxies=proxies, timeout=20, verify=False,
+            )
+        except Exception:
+            continue
+        if not r.ok:
+            continue
+        m = re.search(r'content:\"(.*?)\"', r.text, re.S)
+        if not m:
+            continue
+        html = m.group(1).replace('\\"', '"').replace("\\/", "/").replace("\\r", "").replace("\\n", "")
+        try:
+            tables = pd.read_html(io.StringIO(html))
+        except Exception:
+            continue
+        if not tables:
+            continue
+        df = tables[0]
+        if df is None or df.empty:
+            continue
+        df.columns = [str(c).split("(")[0].strip() for c in df.columns]
+        return df
+    return pd.DataFrame()
 
 
 @mcp.tool(
@@ -61,7 +102,12 @@ def fund_nav(
 def fund_holdings(
         code: str = Field(description="基金代码，例如: 000001(华夏成长)"),
 ):
-    df = ak_cache(ak.fund_portfolio_hold_em, symbol=code, date=str(datetime.now().year), ttl=43200)
+    try:
+        df = ak_cache(ak.fund_portfolio_hold_em, symbol=code, date=str(datetime.now().year), ttl=43200)
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        df = _eastmoney_fund_holdings(code)
     if df is None or df.empty:
         return format_error_csv("empty nbs_dictionary", "akshare", fallback=code)
     return df.to_csv(index=False, float_format="%.2f")
