@@ -169,3 +169,6 @@ cython_debug/
 
 # output reports
 output/industry_themes/
+
+# CodeBuddy 工作记忆与本地配置（含 memory/ 工作日志、plans、settings，不纳入版本控制）
+.codebuddy/
