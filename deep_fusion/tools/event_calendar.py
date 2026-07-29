@@ -12,12 +12,19 @@
 每月需由用户/定时任务补充更新（calendar_add）。
 """
 import json
-from datetime import date, datetime
+import os
+import subprocess
+from datetime import date, datetime, timedelta
+
+import akshare as ak
 
 from ..server import mcp
 from ..reports.store import (
     seed_calendar, add_calendar_event, get_calendar_upcoming, get_calendar_range,
+    get_calendar_event,
 )
+from ..data.sources import industry_sw
+from ..shared import realtime
 from ..shared.utils import recent_trade_date
 
 
@@ -28,11 +35,29 @@ def _val(v, default=""):
     return v if v is not None else default
 
 
+def _val_list(v, default=None):
+    """解包 domains/targets 参数：MCP 传入 FieldInfo 或 JSON 字符串，统一解析为 list。"""
+    if default is None:
+        default = []
+    raw = _val(v)
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, list) else default
+        except json.JSONDecodeError:
+            return default
+    return default
+
+
 def ensure_seeded():
     """若日历为空，自动导入 PART 02 种子（部署后首次调用保障前端有埋伏数据）。"""
     if not get_calendar_upcoming(3650):
         events = [{"date": d, "name": n, "sector": s, "rating": r, "category": c,
-                  "source": "html_part2"} for (d, n, s, r, c) in EVENTS_HTML]
+                   "source": "html_part2",
+                   "domains": [{"name": s, "type": "auto"}] if s else []}
+                  for (d, n, s, r, c) in EVENTS_HTML]
         seed_calendar(events)
 
 
@@ -123,13 +148,20 @@ def calendar_upcoming(days: int = 14, as_of: str = ""):
 )
 def calendar_add(
         date: str = "", name: str = "", sector: str = "",
-        rating: int = 3, category: str = ""):
+        rating: int = 3, category: str = "",
+        domains: str = "", targets: str = ""):
     date = _val(date)
     if not date or not name:
         return json.dumps({"ok": False, "error": "date 与 name 必填"}, ensure_ascii=False)
-    add_calendar_event(date, name, sector, int(rating), category)
+    dom = _val_list(domains)
+    if not dom and sector:
+        dom = [{"name": sector, "type": "auto"}]
+    tg = _val_list(targets)
+    add_calendar_event(date, name, sector, int(rating), category,
+                       domains=dom, targets=tg)
     return json.dumps({"ok": True, "event": {"date": date, "name": name,
-                       "sector": sector, "rating": int(rating), "category": category}},
+                       "sector": sector, "rating": int(rating), "category": category,
+                       "domains": dom, "targets": tg}},
                       ensure_ascii=False)
 
 
@@ -164,3 +196,249 @@ def calendar_month(year: int = 0, month: int = 0):
     rows = get_calendar_range(start, end)
     return json.dumps({"year": year, "month": month, "count": len(rows), "events": rows},
                       ensure_ascii=False)
+
+
+# ===========================================================================
+# 关联领域 → 成分股（盘中实时 / 收盘用最近交易日）— 用户要求的"新增实时行情工具"
+# ===========================================================================
+
+# 抢跑着色阈值（累计涨幅 from anchor，区间 [event-30td, today]）。
+# 注意：以下阈值属展示口径，待量化分析师校准（见 AGENT_BOARD 留言）。
+FRONTRUN_RED = 0.30      # 累计涨 ≥30% → 红色：无补涨空间
+FRONTRUN_ORANGE = 0.12   # 12%~30% → 橙色：抢跑，尚有空间
+FRONTRUN_GREEN = 0.03    # 3%~12% → 绿色：正常进行
+# <3% → 蓝色：未被注意 / 仍被低估
+
+_FRONTRUN_COLORS = {
+    "red": {"color": "#E25C5C", "label": "已无补涨空间"},
+    "orange": {"color": "#E0913C", "label": "抢跑中·尚有空间"},
+    "green": {"color": "#4FA86A", "label": "正常进行"},
+    "blue": {"color": "#4A78C4", "label": "未被注意·低估"},
+}
+
+
+def _frontrun_status(change: float | None) -> str:
+    if change is None:
+        return "blue"
+    if change >= FRONTRUN_RED:
+        return "red"
+    if change >= FRONTRUN_ORANGE:
+        return "orange"
+    if change >= FRONTRUN_GREEN:
+        return "green"
+    return "blue"
+
+
+def _sw_name_map():
+    """构建 申万 全层级 名称→代码 映射（用于关联领域名称解析）。"""
+    try:
+        tree = industry_sw.get_tree()
+    except Exception:
+        return {}
+    m = {}
+
+    def walk(nodes):
+        for n in nodes:
+            if n.get("name") and n.get("code"):
+                m[n["name"]] = n["code"]
+            if n.get("children"):
+                walk(n["children"])
+    walk(tree)
+    return m
+
+
+def _resolve_constituents(domain: str, dtype: str, limit: int):
+    """解析 关联领域 → [(code, name, weight)]。dtype ∈ industry/concept/sector/auto。"""
+    domain = (domain or "").strip()
+    if not domain:
+        return []
+    # 1) 申万行业（industry）：优先用 code，否则用 tree 名称映射
+    if dtype in ("industry", "auto"):
+        code = domain if domain.isdigit() else ""
+        if not code:
+            try:
+                nm = _sw_name_map()
+                code = nm.get(domain, "")
+                if not code:  # 模糊：包含匹配
+                    for n, c in nm.items():
+                        if domain in n or n in domain:
+                            code = c
+                            break
+            except Exception:
+                code = ""
+        if code:
+            try:
+                df = industry_sw.get_constituents(code)
+                if df is not None and not df.empty:
+                    rows = []
+                    for _, r in df.iterrows():
+                        rows.append((str(r.get("stock_code", "")),
+                                     str(r.get("stock_name", "")),
+                                     float(r.get("weight") or 0)))
+                    rows.sort(key=lambda x: x[2], reverse=True)
+                    return rows[:limit]
+            except Exception:
+                pass
+    # 2) 概念板块（concept）
+    if dtype in ("concept", "auto"):
+        try:
+            df = ak.stock_board_concept_cons_em(symbol=domain)
+            return [(str(r["代码"]), str(r["名称"]), 0.0) for _, r in df.iterrows()][:limit]
+        except Exception:
+            pass
+    # 3) 行业板块（sector，东方财富行业分类）
+    if dtype in ("sector", "auto"):
+        try:
+            df = ak.stock_board_industry_cons_em(symbol=domain)
+            return [(str(r["代码"]), str(r["名称"]), 0.0) for _, r in df.iterrows()][:limit]
+        except Exception:
+            pass
+    return []
+
+
+@mcp.tool(
+    title="日历-关联领域成分股(实时)",
+    description="解析关联领域(概念/行业/板块)为成分股，盘中取腾讯实时快照、收盘取最近交易日收盘。"
+    "返回 constituents=[{code,name,price,change_pct,turnover,pe,pb}] 与 mode(盘中实时/最近交易日收盘)。",
+)
+def domain_constituents(domain: str = "", dtype: str = "auto", limit: int = 30):
+    domain = _val(domain)
+    dtype = _val(dtype) or "auto"
+    rows = _resolve_constituents(domain, dtype, int(limit))
+    if not rows:
+        return json.dumps({"ok": False, "domain": domain, "type": dtype,
+                           "error": "未解析到成分股（领域名称可能不匹配申万/概念/行业板块）"},
+                          ensure_ascii=False)
+    codes = [c for c, _, _ in rows]
+    snap = realtime.tencent_realtime(codes)
+    mode = realtime.as_of_label()
+    cons = []
+    for code, name, _ in rows:
+        q = snap.get(code, {})
+        cons.append({
+            "code": code, "name": name,
+            "price": q.get("price"), "change_pct": q.get("change_pct"),
+            "turnover": q.get("turnover"), "pe": q.get("pe"), "pb": q.get("pb"),
+        })
+    return json.dumps({"ok": True, "domain": domain, "type": dtype, "mode": mode,
+                       "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                       "count": len(cons), "constituents": cons}, ensure_ascii=False)
+
+
+# ===========================================================================
+# 事件详情 + 抢跑进度
+# ===========================================================================
+
+@mcp.tool(
+    title="日历-事件详情",
+    description="按 id 返回单条事件完整信息（含 domains 关联领域、targets 抢跑标的）。",
+)
+def calendar_event_detail(event_id: int = 0):
+    e = get_calendar_event(int(event_id))
+    if e is None:
+        return json.dumps({"ok": False, "error": "事件不存在"}, ensure_ascii=False)
+    return json.dumps({"ok": True, "event": e}, ensure_ascii=False)
+
+
+@mcp.tool(
+    title="日历-抢跑进度",
+    description="计算事件关联标的(event-30交易日 → 今天)的累计涨幅，按蓝/绿/橙/红着色判定抢跑程度。"
+    "返回 timeline(进度条锚点/事件日/今天位置) 与 targets(每标的累计涨幅+状态)。无 targets 时返回提示。",
+)
+def calendar_frontrun(event_id: int = 0, as_of: str = ""):
+    e = get_calendar_event(int(event_id))
+    if e is None:
+        return json.dumps({"ok": False, "error": "事件不存在"}, ensure_ascii=False)
+    targets = e.get("targets") or []
+    event_date = e["date"]
+    as_of = _val(as_of) or date.today().isoformat()
+    if not targets:
+        return json.dumps({"ok": True, "event_date": event_date, "as_of": as_of,
+                           "targets": [],
+                           "note": "该事件未标注抢跑标的（人工事件）。自动采集的解禁/新股/业绩预告事件会带真实标的。"},
+                          ensure_ascii=False)
+
+    # 以首个标的的交易日序列构建时间轴（A股交易日历一致）
+    base_hist = _hist_close(targets[0]["code"], event_date)
+    if base_hist is None or len(base_hist) < 2:
+        return json.dumps({"ok": True, "event_date": event_date, "as_of": as_of,
+                           "targets": [], "note": "暂无历史行情，无法计算抢跑进度。"},
+                          ensure_ascii=False)
+    dates = [d for d, _ in base_hist]
+    event_idx = next((i for i, d in enumerate(dates) if d >= event_date), len(dates) - 1)
+    anchor_idx = max(0, event_idx - 30)
+    end_idx = min(event_idx + 30, len(dates) - 1)
+    current_idx = len(dates) - 1
+    span = max(1, end_idx - anchor_idx)
+
+    out_targets = []
+    for tg in targets:
+        h = _hist_close(tg["code"], event_date)
+        if h is None or len(h) <= anchor_idx:
+            out_targets.append({**tg, "change_pct": None, "status": "blue",
+                                "label": _FRONTRUN_COLORS["blue"]["label"],
+                                "anchor_price": None, "current_price": None})
+            continue
+        hd = [d for d, _ in h]
+        hp = [p for _, p in h]
+        ai = min(anchor_idx, len(hp) - 1)
+        ci = min(current_idx, len(hp) - 1)
+        anchor_p, cur_p = hp[ai], hp[ci]
+        chg = (cur_p / anchor_p - 1) if anchor_p else None
+        st = _frontrun_status(chg)
+        out_targets.append({**tg, "change_pct": round(chg, 4) if chg is not None else None,
+                            "status": st, "color": _FRONTRUN_COLORS[st]["color"],
+                            "label": _FRONTRUN_COLORS[st]["label"],
+                            "anchor_price": round(anchor_p, 2),
+                            "current_price": round(cur_p, 2)})
+
+    return json.dumps({
+        "ok": True,
+        "event_date": event_date, "as_of": as_of,
+        "timeline": {
+            "start": dates[anchor_idx], "event": event_date, "end": dates[end_idx],
+            "event_pos": round((event_idx - anchor_idx) / span, 3),
+            "today_pos": round((current_idx - anchor_idx) / span, 3),
+            "total": span + 1,
+        },
+        "targets": out_targets,
+    }, ensure_ascii=False)
+
+
+def _hist_close(code: str, event_date: str):
+    """取个股 qfq 日线收盘序列（覆盖 event_date 前后 ~80 自然日）。返回 [(date,close)]。"""
+    try:
+        ed = datetime.strptime(event_date, "%Y-%m-%d")
+        start = (ed - timedelta(days=90)).strftime("%Y%m%d")
+        end = (ed + timedelta(days=90)).strftime("%Y%m%d")
+        df = ak.stock_zh_a_hist(symbol=code, period="daily", start_date=start,
+                                end_date=end, adjust="qfq")
+        if df is None or df.empty:
+            return None
+        return [(str(r["日期"]), float(r["收盘"])) for _, r in df.iterrows()]
+    except Exception:
+        return None
+
+
+# ===========================================================================
+# 半自动采集：触发 scripts/calendar_collect.py（定时任务全自动 + 手动刷新按钮）
+# ===========================================================================
+
+@mcp.tool(
+    title="日历-刷新采集",
+    description="手动触发自动采集脚本 scripts/calendar_collect.py，从解禁/新股/业绩预告等公开日历拉取"
+    "事件写入 reports.db。返回采集统计。定时任务也会每日自动跑。",
+)
+def calendar_refresh_collect():
+    script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "calendar_collect.py")
+    script = os.path.abspath(script)
+    if not os.path.exists(script):
+        return json.dumps({"ok": False, "error": f"采集脚本不存在: {script}"}, ensure_ascii=False)
+    try:
+        import sys
+        proc = subprocess.run([sys.executable, script], capture_output=True, text=True, timeout=180)
+        out = (proc.stdout or "") + (proc.stderr or "")
+        return json.dumps({"ok": proc.returncode == 0, "returncode": proc.returncode,
+                           "log": out[-2000:]}, ensure_ascii=False)
+    except Exception as ex:
+        return json.dumps({"ok": False, "error": str(ex)}, ensure_ascii=False)
