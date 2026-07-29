@@ -60,6 +60,67 @@ function LimitUpCard({ s }) {
   );
 }
 
+function CalibrationCard({ c }) {
+  const p = c?.payload || c;
+  if (!p || typeof p !== 'object') {
+    return (
+      <CardWrapper hoverable>
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 8 }}>
+          连板评分 · 校准透明
+        </div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          {c?.note || '暂无校准数据。运行 limit_up_calibrate（或收盘后流水线）后展示实证权重与因子判别力。'}
+        </div>
+      </CardWrapper>
+    );
+  }
+  const n = p.n;
+  const base = p.base_rate;
+  const fa = p.factor_auc || {};
+  // 因子判别力 AUC（三类来源合并；封单比/换手率/流通市值在 factor_auc，连板数/封板时间单独字段）
+  const aucList = [
+    { label: '封单比', auc: fa['封单比(%)'] },
+    { label: '连板数', auc: p.board_height_auc },
+    { label: '换手率', auc: fa['换手率'] },
+    { label: '流通市值', auc: fa['流通市值(亿)'] },
+    { label: '封板时间', auc: p.seal_time_auc },
+  ].filter((x) => typeof x.auc === 'number');
+  // 实证权重 vs 初版变化
+  const rec = p.recommended_weights || {};
+  const init = p.initial_weights || {};
+  const wChanges = Object.keys(rec)
+    .map((k) => ({ k, from: init[k], to: rec[k], delta: (rec[k] ?? 0) - (init[k] ?? 0) }))
+    .filter((x) => x.from != null && x.to !== x.from);
+  return (
+    <CardWrapper hoverable>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--accent-gold)' }}>连板评分 · 校准透明</span>
+        <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>
+          {c?.source === 'file_default' ? '默认校准' : (c?.date || '实时')}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 10, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
+        {n != null && <span>样本 <b style={{ color: 'var(--text-primary)' }}>{n}</b></span>}
+        {base != null && <span>次日连板基准率 <b style={{ color: 'var(--text-primary)' }}>{(base * 100).toFixed(1)}%</b></span>}
+      </div>
+      <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginBottom: 4 }}>因子判别力 AUC（0.5 = 随机线）</div>
+      {aucList.map((x) => <ScoreBar key={x.label} label={x.label} score={x.auc * 100} />)}
+      {wChanges.length > 0 && (
+        <>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', margin: '10px 0 4px' }}>实证权重 vs 初版</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {wChanges.map((w) => (
+              <span key={w.k} style={chip(w.delta > 0 ? '#C9A861' : '#C07C7C')}>
+                {w.k} {w.from}→{w.to}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </CardWrapper>
+  );
+}
+
 function CalendarCard({ e }) {
   const stars = '★'.repeat(e.rating);
   const dateStr = e.date ? e.date.slice(5) : '';
@@ -135,6 +196,8 @@ export default function DailyBoardPage() {
   const cal = useMCP('calendar_upcoming', { days: 21, as_of: '' });
   const luData = parse(lu.data);
   const calData = parse(cal.data);
+  const calib = useMCP('limit_up_calibration_latest', {});
+  const calibData = parse(calib.data);
   const luStocks = luData?.stocks || [];
   const calEvents = calData?.events || [];
 
@@ -161,6 +224,15 @@ export default function DailyBoardPage() {
         <div style={gridStyle}>
           {luStocks.slice(0, 12).map((s) => <LimitUpCard key={s.code} s={s} />)}
         </div>
+
+        {/* 区1.5：连板评分校准透明 */}
+        <SectionTitle hint="实证校准 · 封单比判别力最强 · 权重由真实样本驱动">连板评分 · 校准透明</SectionTitle>
+        {calib.isLoading && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>加载中…</div>}
+        {!calib.isLoading && (
+          <div style={gridStyle}>
+            <CalibrationCard c={calibData} />
+          </div>
+        )}
 
         {/* 区2：大事日历埋伏 */}
         <SectionTitle hint={`未来 21 天 · 共 ${calEvents.length} 个催化 · 红色为提前埋伏窗口`}>金融大事日历 · 埋伏提醒</SectionTitle>

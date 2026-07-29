@@ -247,9 +247,20 @@ def limit_up_calibrate(days: int = 40):
 )
 def limit_up_calibration_latest():
     r = get_latest("score_calibration")
-    if r is None:
-        return json.dumps({"ok": True, "date": None,
-                           "note": "暂无校准结果，请先运行 limit_up_calibrate（或收盘后流水线）"},
-                          ensure_ascii=False)
-    return json.dumps({"ok": True, "date": r["date"], "created_at": r.get("created_at"),
-                       "payload": r["payload"]}, ensure_ascii=False)
+    if r is not None:
+        return json.dumps({"ok": True, "date": r["date"], "created_at": r.get("created_at"),
+                           "source": "reports_db", "payload": r["payload"]}, ensure_ascii=False)
+    # 回退：reports.db 无校准记录时，读 data/score_calibration.json（量化已实跑的默认校准），
+    # 保证前端看板在 limit_up_calibrate 跑过之前也能展示真实校准结果。
+    try:
+        if os.path.exists(_CALIB_PATH):
+            with open(_CALIB_PATH, encoding="utf-8") as f:
+                rep = json.load(f)
+            return json.dumps({"ok": True, "date": None, "source": "file_default",
+                               "note": "reports.db 暂无校准记录，展示 data/score_calibration.json 默认校准",
+                               "payload": rep}, ensure_ascii=False)
+    except Exception:
+        pass
+    return json.dumps({"ok": True, "date": None,
+                       "note": "暂无校准结果，请先运行 limit_up_calibrate（或收盘后流水线）"},
+                      ensure_ascii=False)
