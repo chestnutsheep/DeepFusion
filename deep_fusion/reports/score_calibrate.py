@@ -348,6 +348,134 @@ def per_item_hit_rate(rows):
     return res
 
 
+def fit_posterior(rows, calib):
+    """对 §E naive 贝叶斯 posterior 做 logistic 再校准（Platt scaling on posterior）。
+
+    动机：§E 把 4 个因子按条件独立连乘似然比，但封单比/封板时间/流通市值/换手率高度
+    同源（早封板往往同时高封单比、小流通、低换手），重复计数使强股 posterior 冲到
+    0.7+（单因子 top 命中率仅 0.24–0.29）。本函数把样本上算出的 naive posterior z 作为
+    特征，拟合 p = 1/(1+exp(A*logit(z)+B))，压缩到经验续板率。
+
+    返回 {A, B, brier_naive, brier_cal, n}。brier_naive = 原 posterior 的 Brier（应偏高），
+    brier_cal = 再校准后的 Brier（应下降）。
+    """
+    import math
+    if _scoremod is None or not calib:
+        return {}
+    xs, ys = [], []
+    for r in rows:
+        m = r.get("seal_time_min")
+        fmv = r.get("float_mv_yi")
+        sr = r.get("seal_ratio")
+        if m is None or fmv is None or sr is None:
+            continue
+        feats = {
+            "board_height": r.get("board_height"),
+            "turnover_1": r.get("turnover"),
+            "seal_time": f"{int(m) // 60:02d}:{int(m) % 60:02d}",
+            "seal_amount": sr / 100.0 * fmv * 10000.0,  # 还原万元，使 _seal_ratio_pct 回得 seal_ratio
+            "float_mv": fmv,
+            "sectors": r.get("sectors") or [],
+        }
+        try:
+            res = _scoremod.calibrated_probability(feats, calib, proxy_score=None)
+        except Exception:
+            continue
+        z = res.get("prob")
+        if z is None or z <= 0 or z >= 1:
+            continue
+        xs.append(math.log(z / (1.0 - z)))
+        ys.append(r["label"])
+    if len(xs) < 10:
+        return {}
+    # Newton-Raphson 单变量 logistic
+    A, B = 0.0, 0.0
+    for _ in range(200):
+        gA = gB = hAA = hBB = hAB = 0.0
+        for x, y in zip(xs, ys):
+            z = A * x + B
+            p = 1.0 / (1.0 + math.exp(-z)) if z > -700 else 0.0
+            gA += (p - y) * x
+            gB += (p - y)
+            hAA += p * (1 - p) * x * x
+            hBB += p * (1 - p)
+            hAB += p * (1 - p) * x
+        det = hAA * hBB - hAB * hAB
+        if abs(det) < 1e-12:
+            break
+        dA = (gA * hBB - gB * hAB) / det
+        dB = (hAA * gB - hAB * gA) / det
+        A -= dA
+        B -= dB
+        if abs(dA) < 1e-7 and abs(dB) < 1e-7:
+            break
+    brier_naive = brier_cal = 0.0
+    for x, y in zip(xs, ys):
+        pn = 1.0 / (1.0 + math.exp(-x))  # = z
+        brier_naive += (pn - y) ** 2
+        z = A * x + B
+        pc = 1.0 / (1.0 + math.exp(-z)) if z > -700 else 0.0
+        brier_cal += (pc - y) ** 2
+    brier_naive /= len(xs)
+    brier_cal /= len(xs)
+    return {
+        "A": round(A, 4), "B": round(B, 4),
+        "brier_naive": round(brier_naive, 4), "brier_cal": round(brier_cal, 4),
+        "n": len(xs),
+    }
+
+
+def _recalibrate(z, pf):
+    """§E-2 再校准：p = 1/(1+exp(A*logit(z)+B))。与 score.py 接线公式一致（验收 oracle）。"""
+    import math
+    if not pf or "A" not in pf or "B" not in pf or not (0 < z < 1):
+        return z
+    lo = math.log(z / (1.0 - z))
+    zc = pf["A"] * lo + pf["B"]
+    if zc <= -700:
+        return 0.0
+    if zc >= 700:
+        return 1.0
+    return 1.0 / (1.0 + math.exp(-zc))
+
+
+def demo_posterior(calib):
+    """抽样校验：强/中/弱三档的 naive posterior → 再校准值对照表（供接线验收）。纯函数。
+
+    直接用 score.calibrated_probability 算 naive z，再套 §E-2 再校准，输出与接线后
+    前端卡片 'prob' 应完全一致。强股样例刻意贴近代码维护抽样（4板/高封单比/早盘/小盘/低换手/有题材）。
+    """
+    if _scoremod is None:
+        return []
+    cases = [
+        ("强股(4板/封单比8%/09:35早/25亿小盘/换手2%/有题材)", {
+            "board_height": 4, "turnover_1": 2.0, "seal_time": "09:35",
+            "seal_amount": 8.0 / 100.0 * 25.0 * 10000.0, "float_mv": 25.0, "sectors": ["题材"]}),
+        ("中强(2板/封单比3%/10:30/120亿/换手6%/有题材)", {
+            "board_height": 2, "turnover_1": 6.0, "seal_time": "10:30",
+            "seal_amount": 3.0 / 100.0 * 120.0 * 10000.0, "float_mv": 120.0, "sectors": ["题材"]}),
+        ("普通股(1板/封单比1%/13:00/300亿/换手10%/无题材)", {
+            "board_height": 1, "turnover_1": 10.0, "seal_time": "13:00",
+            "seal_amount": 1.0 / 100.0 * 300.0 * 10000.0, "float_mv": 300.0, "sectors": []}),
+        ("弱股(1板/封单比0.4%/14:50尾/800亿大/换手18%/无题材)", {
+            "board_height": 1, "turnover_1": 18.0, "seal_time": "14:50",
+            "seal_amount": 0.4 / 100.0 * 800.0 * 10000.0, "float_mv": 800.0, "sectors": []}),
+    ]
+    pf = calib.get("posterior_fit") or {}
+    out = []
+    for name, feats in cases:
+        try:
+            res = _scoremod.calibrated_probability(feats, calib, proxy_score=None)
+        except Exception:
+            continue
+        z = res.get("prob")
+        if z is None:
+            continue
+        zc = _recalibrate(z, pf)
+        out.append((name, z, zc, res.get("verdict")))
+    return out
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--days", type=int, default=40)
@@ -364,10 +492,18 @@ def main():
     # Platt scaling 与逐项似然（量化校准增强：见 AGENT_BOARD.md 共识 ②）
     rep["platt_fit"] = fit_platt(rows, rep.get("recommended_weights")) or {}
     rep["per_item_hit_rate"] = per_item_hit_rate(rows)
+    # naive 贝叶斯 posterior 再校准（解决 §E 因子同源导致的 posterior 偏高）
+    rep["posterior_fit"] = fit_posterior(rows, rep) or {}
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(rep, f, ensure_ascii=False, indent=2)
     print(json.dumps(rep, ensure_ascii=False, indent=2))
+    # 抽样校验表（验收 oracle：接线后前端 prob 应与此一致）
+    print("\n=== §E-2 抽样校验：naive posterior → 再校准 prob（verdict 按再校准值）===")
+    for name, z, zc, _ in demo_posterior(rep):
+        import math
+        verdict = ("重点" if zc >= 0.50 else "可埋伏" if zc >= 0.35 else "不参与" if zc < 0.10 else "观察")
+        print(f"  {name}\n    naive={z:.3f}  →  recalib={zc:.3f}   verdict={verdict}")
 
 
 if __name__ == "__main__":

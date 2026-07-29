@@ -16,6 +16,13 @@ See README.md for project overview.
 ### Version Control
 This project uses Git. See .gitignore for excluded files.
 
+## Cross-Agent Handoff Board（跨 Agent 异步交接）
+
+**量化分析师** 与 **代码维护Agent**（CodeBuddy 任务 agent，任务对话「修复前端数据指标显示」）通过固定文件异步交接，不实时对话：
+
+- **留言板**：[`AGENT_BOARD.md`](./AGENT_BOARD.md) — 双方按其中 §1 格式 append 留言，动手前先读、确认有无 `@收件:你` 的待处理项。
+- 职责边界：量化只动数值口径/因子/校准，构建只动通道/骨架/编排；跨界数值改动先 `@对方` 确认。
+
 ## Guidelines
 
 - Follow existing code style and patterns

@@ -338,7 +338,9 @@ def calibrated_probability(features, calib, proxy_score=None):
                board_height_rate / base_rate）。
     proxy_score : 4 因子加权代理分（供 Platt），由调用方用 recommended_weights 计算后传入。
 
-    返回 {prob, p_cal, prior, lr, verdict}。任何必需校准项缺失时 prob=None（调用方回落到 score）。
+    返回 {prob, prob_naive, p_cal, prior, lr, verdict}。prob 为 posterior_fit
+    再校准值；prob_naive 为再校准前的 naive posterior，供交叉校验。任何必需校准项
+    缺失时 prob=None（调用方回落到 score）。
     """
     if not calib:
         return {"prob": None, "p_cal": None, "prior": None, "lr": None, "verdict": None}
@@ -378,6 +380,17 @@ def calibrated_probability(features, calib, proxy_score=None):
     posterior_odds = prior_odds * lr
     posterior = posterior_odds / (1 + posterior_odds)
     posterior = min(1.0, max(0.0, posterior))
+    posterior_naive = posterior
+
+    # 2.5) 后验再校准（logistic on posterior）：§E naive 把同源封板强度重复计数，
+    # 强股被错误放大（→0.78）。用 posterior_fit(A,B) 做 Platt scaling 再校准，
+    # 不硬封顶（保留排序），仅压缩中段/拦伪强股。见 AGENT_BOARD.md 第155-183行。
+    pf = calib.get("posterior_fit") or {}
+    if "A" in pf and "B" in pf and 0 < posterior < 1:
+        lo = math.log(posterior / (1 - posterior))
+        zc = pf["A"] * lo + pf["B"]
+        posterior = (1.0 / (1.0 + math.exp(-zc))
+                     if -700 < zc < 700 else (1.0 if zc >= 0 else 0.0))
 
     # 3) Platt p_cal（辅助交叉校验）
     p_cal = None
@@ -388,6 +401,7 @@ def calibrated_probability(features, calib, proxy_score=None):
 
     return {
         "prob": round(posterior, 3),
+        "prob_naive": round(posterior_naive, 3),
         "p_cal": round(p_cal, 3) if p_cal is not None else None,
         "prior": round(prior, 3),
         "lr": round(lr, 3) if used else None,

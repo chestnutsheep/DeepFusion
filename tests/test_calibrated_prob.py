@@ -65,3 +65,21 @@ def test_seal_time_direction(calib):
     early = _feat(seal_ratio=1.0, seal_min=540, fmv=100, turnover=8, bh=2)   # 早盘
     late = _feat(seal_ratio=1.0, seal_min=900, fmv=100, turnover=8, bh=2)    # 尾盘
     assert calibrated_probability(early, calib)["prob"] > calibrated_probability(late, calib)["prob"]
+
+
+def test_posterior_recallibration_lowers_strong(calib):
+    """强股 naive posterior 被同源封板强度重复计数放大，posterior_fit 再校准须压回。
+
+    验收点（AGENT_BOARD.md 第155-183行）：强股 naive≈0.78 → recalib≈0.55–0.66，
+    且 recalib < naive；普通股(≈0.15)基本不变。
+    """
+    strong = _feat(seal_ratio=2.5, seal_min=540, fmv=50, turnover=7, bh=4)
+    res = calibrated_probability(strong, calib)
+    assert res["prob_naive"] is not None
+    assert res["prob"] is not None
+    assert res["prob"] < res["prob_naive"]            # 再校准压缩伪强股
+    assert 0.50 <= res["prob"] <= 0.70                # 强股再校准落入合理区间
+    # 普通股：naive≈0.15 再校准后基本不变
+    ordinary = _feat(seal_ratio=0.3, seal_min=600, fmv=150, turnover=12, bh=2)
+    r2 = calibrated_probability(ordinary, calib)
+    assert abs(r2["prob"] - r2["prob_naive"]) < 0.05
