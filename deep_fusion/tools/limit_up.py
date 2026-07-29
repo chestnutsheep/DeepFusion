@@ -21,6 +21,8 @@ import json
 import os
 from datetime import date
 
+import pandas as pd
+
 from ..server import mcp
 from ..shared.utils import ak_cache, recent_trade_date
 from ..reports.store import save_limit_up, get_limit_up, save_report, get_latest
@@ -105,7 +107,9 @@ def _recent_trade_dates(n=6):
         df = ak_cache(ak.tool_trade_date_hist_sina, ttl=43200)
         if df is None or df.empty:
             return []
-        dates = sorted(df["trade_date"].dt.strftime("%Y%m%d").tolist())
+        # trade_date 列是 object(datetime.date)，必须先用 to_datetime 转换，
+        # 否则 .dt 访问器对 object 列抛 AttributeError（被 except 吞掉 → 返回 []）。
+        dates = sorted(pd.to_datetime(df["trade_date"]).dt.strftime("%Y%m%d").tolist())
         # 过滤未来占位日期：sina 交易日历常延伸到 2026-12-31 等未来，
         # 不过滤会拉到空涨停池、污染连板高度回溯（量化校准已同步过滤）。
         today = date.today().strftime("%Y%m%d")
