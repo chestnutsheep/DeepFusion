@@ -1,6 +1,7 @@
 import { useMCP } from '../hooks/useMCP.js';
 import CardWrapper from '../components/common/CardWrapper.jsx';
 import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
+import CalendarMonth from '../components/Calendar/CalendarMonth.jsx';
 
 function parse(raw) {
   if (!raw) return null;
@@ -38,6 +39,16 @@ function LimitUpCard({ s }) {
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: gradeColor, lineHeight: 1 }}>{s.score ?? '—'}</div>
           <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>综合评分</div>
+          {s.calibrated_prob != null && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 'var(--fs-md)', fontWeight: 800, color: calColor(s.calibrated_prob), lineHeight: 1 }}>
+                {(s.calibrated_prob * 100).toFixed(0)}%
+              </div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>
+                校准概率{calVerdict(s.calibrated_prob) ? `·${calVerdict(s.calibrated_prob)}` : ''}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -121,36 +132,6 @@ function CalibrationCard({ c }) {
   );
 }
 
-function CalendarCard({ e }) {
-  const stars = '★'.repeat(e.rating);
-  const dateStr = e.date ? e.date.slice(5) : '';
-  return (
-    <CardWrapper hoverable style={{
-      border: e.bury_window ? '1px solid rgba(192,124,124,0.6)' : '1px solid var(--border-subtle)',
-      background: e.bury_window ? 'linear-gradient(160deg, rgba(192,124,124,0.12), rgba(26,23,38,0.4))' : undefined,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{dateStr}</span>
-        <span style={{ color: '#C9A861', fontSize: 'var(--fs-sm)', letterSpacing: 1 }}>{stars}</span>
-      </div>
-      <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, lineHeight: 1.35 }}>
-        {e.name}
-      </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        {e.sector && <span style={chip('#9C82B4')}>{e.sector}</span>}
-        <span style={{ fontSize: 'var(--fs-xs)', color: e.days_until <= 0 ? '#C07C7C' : 'var(--text-secondary)' }}>
-          T-{e.days_until}天
-        </span>
-        {e.bury_window && (
-          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: '#C07C7C', border: '1px solid rgba(192,124,124,0.6)', borderRadius: 4, padding: '1px 6px' }}>
-            提前埋伏
-          </span>
-        )}
-      </div>
-    </CardWrapper>
-  );
-}
-
 function ReportSlot({ rtype, label }) {
   const { data, isLoading } = useMCP('report_latest', { rtype });
   const d = parse(data);
@@ -182,6 +163,23 @@ function chip(color) {
   };
 }
 
+// 校准概率着色：≥0.50 重点(绿) / ≥0.35 可埋伏(金) / <0.10 不参与(红) / 其余观察(中性)
+function calColor(p) {
+  if (p == null) return 'var(--text-muted)';
+  if (p >= 0.50) return '#6FA088';
+  if (p >= 0.35) return '#C9A861';
+  if (p < 0.10) return '#C07C7C';
+  return 'var(--text-secondary)';
+}
+
+function calVerdict(p) {
+  if (p == null) return '';
+  if (p >= 0.50) return '重点';
+  if (p >= 0.35) return '可埋伏';
+  if (p < 0.10) return '不参与';
+  return '观察';
+}
+
 function SectionTitle({ children, hint }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: 'var(--sp-xl) 0 var(--sp-md)' }}>
@@ -193,13 +191,10 @@ function SectionTitle({ children, hint }) {
 
 export default function DailyBoardPage() {
   const lu = useMCP('limit_up_latest', {});
-  const cal = useMCP('calendar_upcoming', { days: 21, as_of: '' });
   const luData = parse(lu.data);
-  const calData = parse(cal.data);
   const calib = useMCP('limit_up_calibration_latest', {});
   const calibData = parse(calib.data);
   const luStocks = luData?.stocks || [];
-  const calEvents = calData?.events || [];
 
   return (
     <ErrorBoundary>
@@ -234,12 +229,9 @@ export default function DailyBoardPage() {
           </div>
         )}
 
-        {/* 区2：大事日历埋伏 */}
-        <SectionTitle hint={`未来 21 天 · 共 ${calEvents.length} 个催化 · 红色为提前埋伏窗口`}>金融大事日历 · 埋伏提醒</SectionTitle>
-        {cal.isLoading && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>加载中…</div>}
-        <div style={gridStyle}>
-          {calEvents.map((e) => <CalendarCard key={e.id || e.date + e.name} e={e} />)}
-        </div>
+        {/* 区2：大事日历月历 */}
+        <SectionTitle hint="月历点击看当日事件 · 关联领域弹成分股 · 抢跑进度蓝绿橙红 · 刷新采集自动收录">金融大事日历 · 月历埋伏</SectionTitle>
+        <CalendarMonth />
 
         {/* 区3：每日报告四区（定时任务写入后自动填充） */}
         <SectionTitle hint="四个定时任务最新一份 · 每日刷新">每日报告</SectionTitle>

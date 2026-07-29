@@ -57,6 +57,8 @@ def _create_tables(con):
             stage TEXT,
             sectors TEXT,
             rationale TEXT,
+            calibrated_prob REAL,
+            calibrated_p_cal REAL,
             created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             UNIQUE(date, code)
         );
@@ -69,6 +71,8 @@ def _create_tables(con):
             category TEXT,
             source TEXT,
             note TEXT,
+            domains TEXT,
+            targets TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
             UNIQUE(date, name)
         );
@@ -77,6 +81,21 @@ def _create_tables(con):
         CREATE INDEX IF NOT EXISTS idx_calendar_date ON calendar_events(date);
         """
     )
+    _migrate(con)
+
+
+def _migrate(con):
+    """增量迁移：旧库缺 domains/targets 列时补上（幂等）。"""
+    cols = {r[1] for r in con.execute("PRAGMA table_info(calendar_events)")}
+    for col in ("domains", "targets"):
+        if col not in cols:
+            con.execute(f"ALTER TABLE calendar_events ADD COLUMN {col} TEXT")
+    # 连板表：补校准概率列（幂等）
+    lu_cols = {r[1] for r in con.execute("PRAGMA table_info(limit_up_stocks)")}
+    for col in ("calibrated_prob", "calibrated_p_cal"):
+        if col not in lu_cols:
+            con.execute(f"ALTER TABLE limit_up_stocks ADD COLUMN {col} REAL")
+    con.commit()
 
 
 def init_db(db_path=None):
@@ -140,7 +159,8 @@ def get_by_date(rtype, rdate, db_path=None):
 
 _COLS = ["code", "name", "board_height", "turnover_1", "turnover_2",
          "volume_ratio", "amplitude", "seal_time", "seal_amount",
-         "float_mv", "score", "stage", "sectors", "rationale"]
+         "float_mv", "score", "stage", "sectors", "rationale",
+         "calibrated_prob", "calibrated_p_cal"]
 
 
 def save_limit_up(rdate, rows, db_path=None):
@@ -152,15 +172,17 @@ def save_limit_up(rdate, rows, db_path=None):
                 "INSERT OR REPLACE INTO limit_up_stocks"
                 "(date, code, name, board_height, turnover_1, turnover_2, "
                 " volume_ratio, amplitude, seal_time, seal_amount, float_mv, "
-                " score, stage, sectors, rationale, created_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+                " score, stage, sectors, rationale, calibrated_prob, "
+                " calibrated_p_cal, created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (
                     rdate, r.get("code"), r.get("name"), r.get("board_height"),
                     r.get("turnover_1"), r.get("turnover_2"), r.get("volume_ratio"),
                     r.get("amplitude"), r.get("seal_time"), r.get("seal_amount"),
                     r.get("float_mv"), r.get("score"), r.get("stage"),
                     json.dumps(r.get("sectors") or [], ensure_ascii=False),
-                    r.get("rationale"),
+                    r.get("rationale"), r.get("calibrated_prob"),
+                    r.get("calibrated_p_cal"),
                 ),
             )
         con.commit()
@@ -184,18 +206,25 @@ def get_limit_up(rdate, db_path=None):
 # ---------- calendar_events 大事日历表 ----------
 
 def seed_calendar(events, db_path=None):
-    """批量导入日历事件（幂等按 date+name）。events: list[dict]。"""
+    """批量导入日历事件（幂等按 date+name）。events: list[dict]。
+
+    每条事件可带 domains(关联领域列表) 与 targets(抢跑标的列表)，均为 JSON。
+    domains: [{"name": "半导体", "type": "industry|concept|sector", "code": "801081"}]
+    targets: [{"code": "600519", "name": "贵州茅台"}]
+    """
     con = _conn(db_path)
     try:
         for e in events:
             con.execute(
                 "INSERT OR REPLACE INTO calendar_events"
-                "(date, name, sector, rating, category, source, note, created_at) "
-                "VALUES(?,?,?,?,?,?,?,datetime('now','localtime'))",
+                "(date, name, sector, rating, category, source, note, domains, targets, created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (
                     e.get("date"), e.get("name"), e.get("sector"),
                     int(e.get("rating", 3)), e.get("category"),
                     e.get("source", "manual"), e.get("note", ""),
+                    json.dumps(e.get("domains") or [], ensure_ascii=False),
+                    json.dumps(e.get("targets") or [], ensure_ascii=False),
                 ),
             )
         con.commit()
@@ -204,18 +233,42 @@ def seed_calendar(events, db_path=None):
 
 
 def add_calendar_event(rdate, name, sector="", rating=3, category="",
-                       source="manual", note="", db_path=None):
+                       source="manual", note="", domains=None, targets=None,
+                       db_path=None):
     con = _conn(db_path)
     try:
         con.execute(
             "INSERT OR REPLACE INTO calendar_events"
-            "(date, name, sector, rating, category, source, note, created_at) "
-            "VALUES(?,?,?,?,?,?,?,datetime('now','localtime'))",
-            (rdate, name, sector, int(rating), category, source, note),
+            "(date, name, sector, rating, category, source, note, domains, targets, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+            (rdate, name, sector, int(rating), category, source, note,
+             json.dumps(domains or [], ensure_ascii=False),
+             json.dumps(targets or [], ensure_ascii=False)),
         )
         con.commit()
     finally:
         con.close()
+
+
+def get_calendar_event(event_id, db_path=None):
+    """按 id 取单条事件（含 domains/targets JSON）。"""
+    row = _conn(db_path).execute(
+        "SELECT * FROM calendar_events WHERE id=?", (int(event_id),)
+    ).fetchone()
+    if row is None:
+        return None
+    return _row_to_event(row)
+
+
+def _row_to_event(r):
+    return {
+        "id": r["id"], "date": r["date"], "name": r["name"],
+        "sector": r["sector"], "rating": r["rating"], "category": r["category"],
+        "source": r["source"], "note": r["note"],
+        "domains": json.loads(r["domains"]) if r["domains"] else [],
+        "targets": json.loads(r["targets"]) if r["targets"] else [],
+        "created_at": r["created_at"],
+    }
 
 
 def _bury_window(days_until, rating):
@@ -233,13 +286,11 @@ def get_calendar_upcoming(days=14, as_of=None, db_path=None):
     ).fetchall()
     out = []
     for r in rows:
+        e = _row_to_event(r)
         du = (date.fromisoformat(r["date"]) - date.fromisoformat(as_of)).days
-        out.append({
-            "id": r["id"], "date": r["date"], "name": r["name"],
-            "sector": r["sector"], "rating": r["rating"], "category": r["category"],
-            "source": r["source"], "note": r["note"],
-            "days_until": du, "bury_window": _bury_window(du, r["rating"]),
-        })
+        e["days_until"] = du
+        e["bury_window"] = _bury_window(du, r["rating"])
+        out.append(e)
     return out
 
 
@@ -248,8 +299,4 @@ def get_calendar_range(start, end, db_path=None):
         "SELECT * FROM calendar_events WHERE date >= ? AND date <= ? ORDER BY date ASC",
         (start, end),
     ).fetchall()
-    return [{
-        "id": r["id"], "date": r["date"], "name": r["name"], "sector": r["sector"],
-        "rating": r["rating"], "category": r["category"], "source": r["source"],
-        "note": r["note"],
-    } for r in rows]
+    return [_row_to_event(r) for r in rows]

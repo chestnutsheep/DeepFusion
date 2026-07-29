@@ -24,7 +24,7 @@ from datetime import date
 from ..server import mcp
 from ..shared.utils import ak_cache, recent_trade_date
 from ..reports.store import save_limit_up, get_limit_up, save_report, get_latest
-from ..reports.score import evaluate_limit_up
+from ..reports.score import evaluate_limit_up, calibrated_probability
 
 
 # 实证校准结果落盘位置（score_calibrate.py 默认输出），limit_up_scan 自动采用。
@@ -50,6 +50,35 @@ def _load_calibration_weights():
     except Exception:
         pass
     return None
+
+
+def _load_calibration():
+    """读取 data/score_calibration.json 完整 dict（platt_fit/per_item_hit_rate/board_height_rate/base_rate）。"""
+    try:
+        if os.path.exists(_CALIB_PATH):
+            with open(_CALIB_PATH, encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
+def _proxy_score(items, weights):
+    """4 因子加权代理分（供 Platt）：items 为名次(score,weight)-list，weights 为权重表。"""
+    if not weights:
+        return None
+    num = den = 0.0
+    for it in items:
+        wt = weights.get(it["name"])
+        if wt:
+            num += it["score"] * wt
+            den += wt
+    return num / den if den else None
+
+
+# Platt 训练用的 4 因子权重，须与 score_calibrate.fit_platt 的 wmap 保持一致
+# （仅可驱动因子：换手率/封板时间/流通市值/封单比），否则 p_cal 与训练分布不符
+_PLATT_WMAP = {"换手率": 18, "封板时间": 18, "流通市值": 9, "封单比": 9}
 
 
 def _ak_symbol(code):
@@ -161,6 +190,7 @@ def limit_up_scan(date: str = ""):
 
     iso_date = recent_trade_date().isoformat()
     calib_weights = _load_calibration_weights()   # 无 calibrated 权重则回退默认
+    calib_full = _load_calibration()              # 完整校准（贝叶斯/Platt 用）
     rows = []
     for code, r in today_pool.items():
         bh = _board_height(code, dt, dates, pools)
@@ -178,12 +208,18 @@ def limit_up_scan(date: str = ""):
                     volume_ratio=vr, amplitude=amp, seal_time=seal_time,
                     seal_amount=seal_amount_wan, float_mv=float_mv, sectors=sectors)
         ev = evaluate_limit_up(feat, weights=calib_weights)
+        # 校准概率：贝叶斯 posterior（主）+ Platt（辅）
+        proxy = _proxy_score(ev["items"], _PLATT_WMAP) if calib_full else None
+        cal = calibrated_probability(feat, calib_full, proxy) if calib_full else None
         rows.append({
             "code": code, "name": r.get("名称"), "board_height": bh,
             "turnover_1": t1, "turnover_2": t2, "volume_ratio": vr,
             "amplitude": amp, "seal_time": seal_time, "seal_amount": seal_amount_wan,
             "float_mv": float_mv, "score": ev["score"], "stage": ev["stage"],
             "sectors": sectors, "rationale": ev["rationale"], "items": ev["items"],
+            "calibrated_prob": cal["prob"] if cal else None,
+            "calibrated_p_cal": cal["p_cal"] if cal else None,
+            "calibrated_verdict": cal["verdict"] if cal else None,
         })
 
     rows.sort(key=lambda x: (x["score"] or 0), reverse=True)

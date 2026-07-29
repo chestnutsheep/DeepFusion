@@ -43,6 +43,7 @@ features 字段与单位（与 akshare stock_zt_pool_em 对齐）：
   turn20/vr12/shrink18/seal_time14/amp10/seal_ratio10/theme6/fmv10 = 100
   —— 经 score_calibrate.py 实证后，建议以「信息值(IV)归一化」重赋权（见校准报告）。
 """
+import math
 from datetime import datetime
 
 # 默认权重（初版启发式，与测试契约一致）。校准后由校准脚本输出并注入。
@@ -261,3 +262,134 @@ def evaluate_limit_up(features, weights=None):
                  f"最弱项：{worst['name']}({worst['zone']})。")
     return {"score": score, "grade": grade, "stage": stage,
             "items": items, "rationale": rationale}
+
+
+# ---------------------------------------------------------------------------
+# 校准概率：贝叶斯 posterior（主）+ Platt scaling（辅）
+# 见 agents/skills/confidence-calibration/SKILL.md §C / §E 与 AGENT_BOARD.md 共识。
+# ---------------------------------------------------------------------------
+
+# 无三分位边界时的回退判档（阈值对齐复跑得到的 q1/q2；top/mid/bot 对应高/中/低原始值）
+_FALLBACK_TERCILE = {
+    "封单比(%)": lambda v: "top_rate" if v >= 1.09 else ("mid_rate" if v >= 0.47 else "bot_rate"),
+    "封板时间(分)": lambda v: "top_rate" if v >= 809 else ("mid_rate" if v >= 605 else "bot_rate"),
+    "流通市值(亿)": lambda v: "top_rate" if v > 200 else ("mid_rate" if v > 80 else "bot_rate"),
+    "换手率": lambda v: "top_rate" if v > 103 else ("mid_rate" if v >= 44 else "bot_rate"),
+}
+
+# 似然用到的 4 个连续因子（与 per_item_hit_rate 的键一致）
+_LIKELIHOOD_FACTORS = ("封单比(%)", "封板时间(分)", "流通市值(亿)", "换手率")
+
+
+def _seal_ratio_pct(features):
+    """封单比(%) = 封单资金(万元) / 流通市值(亿元) / 10000 * 100。"""
+    sa = features.get("seal_amount")
+    fmv = features.get("float_mv")
+    if not sa or not fmv:
+        return None
+    return sa / (fmv * 10000.0) * 100.0
+
+
+def _prior_for_height(h, bh_rate, base_rate):
+    """连板高度分层先验；缺失或≥6 时回退相邻可信档/总基准率。"""
+    if h is None:
+        return base_rate
+    key = f"{float(h):.1f}"
+    if key in bh_rate and bh_rate[key] is not None:
+        return bh_rate[key]
+    if h >= 6:
+        for fb in ("5.0", "4.0"):
+            if fb in bh_rate and bh_rate[fb] is not None:
+                return bh_rate[fb]
+    return base_rate
+
+
+def _bucket_rate(info, key, val):
+    """按个股真实值取该因子命中率（top/mid/bot_rate）。优先用校准边界，缺失则回退。"""
+    q1, q2 = info.get("q1"), info.get("q2")
+    if q1 is not None and q2 is not None:
+        rate_key = "top_rate" if val >= q2 else ("mid_rate" if val >= q1 else "bot_rate")
+    else:
+        fb = _FALLBACK_TERCILE.get(key)
+        if fb is None:
+            return None
+        rate_key = fb(val)
+    return info.get(rate_key)
+
+
+def _cal_verdict(p):
+    if p is None:
+        return None
+    if p >= 0.50:
+        return "重点"
+    if p >= 0.35:
+        return "可埋伏"
+    if p < 0.10:
+        return "不参与"
+    return "观察"
+
+
+def calibrated_probability(features, calib, proxy_score=None):
+    """校准概率：贝叶斯 posterior（主）+ Platt p_cal（辅）。纯函数，无网络。
+
+    features : limit_up 的 features dict（board_height/turnover_1/seal_time/
+               seal_amount/float_mv/sectors）。
+    calib    : data/score_calibration.json 解析 dict（含 platt_fit / per_item_hit_rate /
+               board_height_rate / base_rate）。
+    proxy_score : 4 因子加权代理分（供 Platt），由调用方用 recommended_weights 计算后传入。
+
+    返回 {prob, p_cal, prior, lr, verdict}。任何必需校准项缺失时 prob=None（调用方回落到 score）。
+    """
+    if not calib:
+        return {"prob": None, "p_cal": None, "prior": None, "lr": None, "verdict": None}
+    base_rate = float(calib.get("base_rate") or 0.153)
+    bh_rate = calib.get("board_height_rate") or {}
+    pihr = calib.get("per_item_hit_rate") or {}
+
+    # 1) 先验：连板高度分层 + 题材热度调节
+    h = features.get("board_height")
+    prior_h = _prior_for_height(h, bh_rate, base_rate)
+    sector_heat = 0.7 if (features.get("sectors") or []) else 0.4  # 对齐 _score_theme 70/40
+    sector_adj = 1.15 if sector_heat >= 0.6 else (0.9 if sector_heat < 0.3 else 1.0)
+    prior = min(0.999, max(0.001, prior_h * sector_adj))
+    prior_odds = prior / (1 - prior)
+
+    # 2) 似然比：4 连续因子，按个股真实值判档取 hit_rate
+    raw = {
+        "封单比(%)": _seal_ratio_pct(features),
+        "封板时间(分)": _parse_minutes(features.get("seal_time")),
+        "流通市值(亿)": features.get("float_mv"),
+        "换手率": features.get("turnover_1"),
+    }
+    lr = 1.0
+    used = 0
+    for key in _LIKELIHOOD_FACTORS:
+        val = raw.get(key)
+        if val is None:
+            continue
+        info = pihr.get(key)
+        if not info:
+            continue
+        rate = _bucket_rate(info, key, val)
+        if rate is None:
+            continue
+        lr *= rate / base_rate
+        used += 1
+    posterior_odds = prior_odds * lr
+    posterior = posterior_odds / (1 + posterior_odds)
+    posterior = min(1.0, max(0.0, posterior))
+
+    # 3) Platt p_cal（辅助交叉校验）
+    p_cal = None
+    platt = calib.get("platt_fit") or {}
+    if "A" in platt and "B" in platt and proxy_score is not None:
+        z = platt["A"] * proxy_score + platt["B"]
+        p_cal = 1.0 / (1.0 + math.exp(-z)) if -700 < z < 700 else (1.0 if z >= 0 else 0.0)
+
+    return {
+        "prob": round(posterior, 3),
+        "p_cal": round(p_cal, 3) if p_cal is not None else None,
+        "prior": round(prior, 3),
+        "lr": round(lr, 3) if used else None,
+        "verdict": _cal_verdict(posterior),
+    }

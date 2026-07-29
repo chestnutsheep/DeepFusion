@@ -29,6 +29,23 @@ try:
 except Exception:
     ak = None
 
+try:
+    from deep_fusion.reports import score as _scoremod
+except Exception:
+    _scoremod = None
+if _scoremod is None:
+    # 兜底：直接按文件加载 score.py，避免触发 deep_fusion 包 __init__（fastmcp 等重依赖）
+    try:
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location(
+            "deep_fusion_reports_score",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "score.py"),
+        )
+        _scoremod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_scoremod)
+    except Exception:
+        _scoremod = None
+
 
 def _auc(y, x):
     """无依赖 AUC（Mann-Whitney）。y:0/1, x:连续。缺失成对丢弃。"""
@@ -211,6 +228,126 @@ def calibrate(rows):
     }
 
 
+def _row_item_scores(r):
+    """把 _collect_labeled 的 row 映射为 score.py 各项打分 (name -> score)。
+    仅用涨停池直接可得因子；量比/振幅/二板缩量/题材热度因取数成本未收集，跳过。
+    """
+    if _scoremod is None:
+        return {}
+    sm = r.get("seal_time_min")
+    seal_ts = f"{sm // 60:02d}:{sm % 60:02d}" if sm is not None else None
+    fmv = r.get("float_mv_yi")
+    sr = r.get("seal_ratio")
+    seal_amount = (sr / 100.0 * fmv * 10000.0) if (sr is not None and fmv) else None
+    out = {}
+    out["换手率"] = _scoremod._score_turnover(r.get("turnover"))[0]
+    out["封板时间"] = _scoremod._score_seal_time(seal_ts)[0]
+    out["流通市值"] = _scoremod._score_float_mv(fmv)[0]
+    if seal_amount is not None and fmv:
+        out["封单比"] = _scoremod._score_seal_ratio(seal_amount, fmv)[0]
+    return out
+
+
+def fit_platt(rows, weights=None):
+    """对可得因子加权分做 Platt scaling，拟合 p = 1/(1+exp(A*score+B))。
+    返回 {A, B, k, score_mid, brier, n}。
+
+    注意：score 为可得因子子集的代理分（量比/振幅/二板缩量/题材热度因取数成本
+    未纳入），A/B 应随日K批量校准（纳入量比/振幅）后升级。k=-A，score_mid=-B/A
+    为逻辑中点（对应 p=0.5）。
+    """
+    import math
+    wmap = weights or {"换手率": 18.0, "封板时间": 18.0, "流通市值": 9.0, "封单比": 9.0}
+    xs, ys = [], []
+    for r in rows:
+        items = _row_item_scores(r)
+        num = den = 0.0
+        for name, sc in items.items():
+            wt = wmap.get(name)
+            if wt is None:
+                continue
+            num += sc * wt
+            den += wt
+        if den == 0:
+            continue
+        xs.append(num / den)
+        ys.append(r["label"])
+    if len(xs) < 10:
+        return None
+    # 单变量 logistic 回归：Newton-Raphson
+    A, B = 0.0, 0.0
+    for _ in range(200):
+        gA = gB = hAA = hBB = hAB = 0.0
+        for x, y in zip(xs, ys):
+            z = A * x + B
+            p = 1.0 / (1.0 + math.exp(-z)) if z > -700 else (1.0 if z >= 0 else 0.0)
+            gA += (p - y) * x
+            gB += (p - y)
+            hAA += p * (1 - p) * x * x
+            hBB += p * (1 - p)
+            hAB += p * (1 - p) * x
+        det = hAA * hBB - hAB * hAB
+        if abs(det) < 1e-12:
+            break
+        dA = (gA * hBB - gB * hAB) / det
+        dB = (hAA * gB - hAB * gA) / det
+        A -= dA
+        B -= dB
+        if abs(dA) < 1e-7 and abs(dB) < 1e-7:
+            break
+    brier = 0.0
+    for x, y in zip(xs, ys):
+        z = A * x + B
+        p = 1.0 / (1.0 + math.exp(-z)) if z > -700 else (1.0 if z >= 0 else 0.0)
+        brier += (p - y) ** 2
+    brier /= len(xs)
+    k = -A
+    score_mid = (-B / A) if abs(A) > 1e-9 else 50.0
+    return {
+        "A": round(A, 5), "B": round(B, 5), "k": round(k, 5),
+        "score_mid": round(score_mid, 2), "brier": round(brier, 4), "n": len(xs),
+    }
+
+
+def per_item_hit_rate(rows):
+    """对可得因子/连板数，按 tercile 算连板延续率，供贝叶斯似然。
+    返回 {factor: {top_rate, mid_rate, bot_rate, auc}}。
+    """
+    if not rows:
+        return {}
+    y = [r["label"] for r in rows]
+    cols = {
+        "换手率": [r.get("turnover") for r in rows],
+        "流通市值(亿)": [r.get("float_mv_yi") for r in rows],
+        "封单比(%)": [r.get("seal_ratio") for r in rows],
+        "封板时间(分)": [r.get("seal_time_min") for r in rows],
+        "连板数": [r.get("board_height") for r in rows],
+    }
+    res = {}
+    for name, xs in cols.items():
+        pairs = [(yy, xx) for yy, xx in zip(y, xs) if xx is not None]
+        if len(pairs) < 10:
+            continue
+        ys_p, xs_p = zip(*pairs)
+        xs_p = list(xs_p)
+        n = len(xs_p)
+        q1 = sorted(xs_p)[n // 3]
+        q2 = sorted(xs_p)[2 * n // 3]
+        top = [yy for yy, xx in pairs if xx >= q2]
+        mid = [yy for yy, xx in pairs if q1 <= xx < q2]
+        bot = [yy for yy, xx in pairs if xx < q1]
+        res[name] = {
+            "top_rate": round(sum(top) / len(top), 3) if top else None,
+            "mid_rate": round(sum(mid) / len(mid), 3) if mid else None,
+            "bot_rate": round(sum(bot) / len(bot), 3) if bot else None,
+            "auc": round(_auc(ys_p, xs_p), 3),
+            # 三分位边界（原始单位），供接线层按个股真实值判档取 hit_rate
+            "q1": round(q1, 4),
+            "q2": round(q2, 4),
+        }
+    return res
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--days", type=int, default=40)
@@ -224,6 +361,9 @@ def main():
         print("无样本（可能联网失败或非交易数据缺失），退出。")
         return
     rep = calibrate(rows)
+    # Platt scaling 与逐项似然（量化校准增强：见 AGENT_BOARD.md 共识 ②）
+    rep["platt_fit"] = fit_platt(rows, rep.get("recommended_weights")) or {}
+    rep["per_item_hit_rate"] = per_item_hit_rate(rows)
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(rep, f, ensure_ascii=False, indent=2)
