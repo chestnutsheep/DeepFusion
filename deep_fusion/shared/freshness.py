@@ -116,6 +116,13 @@ DATA_CLASSIFICATION: dict[str, dict] = {
     "industry_sw_tree":        {"kind": "actual", "freq": "一次性", "source": "akshare", "db": "ak_cache"},
     "industry_sw_constituents":{"kind": "actual", "freq": "一次性", "source": "akshare", "db": "ak_cache"},
 
+    # 1.5 公共行情 SQL (market_data.db) — 个股/指数日K 的唯一持久层
+    #     所有上层任务(Claw 定时任务/前端/工具)只读此库；写入仅由
+    #     deep_fusion/data/sources/market_collector.py 完成（详见 docs/data_contract.md）。
+    "market_stock_daily":    {"kind": "actual", "freq": "日频",   "source": "sina",   "db": "market_data"},
+    "market_index_daily":    {"kind": "actual", "freq": "日频",   "source": "sina",   "db": "market_data"},
+    "market_stock_info":     {"kind": "actual", "freq": "一次性", "source": "akshare", "db": "market_data"},
+
     # ═══ 处理/信号数据 (Derived) — 版本号锁定 + TTL 分级 ═══
 
     # 2.1 周期相位/信号 (CacheKey L1+L2)
