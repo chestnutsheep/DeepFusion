@@ -1199,6 +1199,7 @@ function EnergySection() {
 
 export default function MesoLayout() {
   const queryClient = useQueryClient();
+const activeMesoSub = useAppStore((s) => s.activeMesoSub);
   // ── 行情数据刷新状态 ──
   const [dataRefreshing, setDataRefreshing] = useState(false);  // 正在采集+刷新
   const [collectStatus, setCollectStatus] = useState(null);     // 采集结果提示
@@ -1368,7 +1369,7 @@ export default function MesoLayout() {
         />
       </ErrorBoundary>
 
-      {/* ═══ 区块一：趋势与信号 ═══ */}
+      {activeMesoSub === 'signals' && (
       <section id="signals" style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="📡 趋势与信号" title="市场结构" highlight="晴雨表" desc="先行/滞后行业信号 + 因果传导 + 阵营对比" />
         <ErrorBoundary>
@@ -1382,10 +1383,9 @@ export default function MesoLayout() {
           />
         </ErrorBoundary>
       </section>
+      )}
 
-      <hr className="section-divider" />
-
-      {/* ═══ 区块二：行业热力图 ═══ */}
+      {activeMesoSub === 'heatmap' && (
       <section id="heatmap" style={{ paddingBottom: 24, borderBottom: '1px solid rgba(212,168,83,0.04)' }}>
         <SectionHeader badge="行业轮动" title="全行业" highlight="波动率热力图" desc="申万一级行业涨跌幅排行，点击方格下钻二级行业" />
 
@@ -1574,13 +1574,10 @@ export default function MesoLayout() {
             customLevel={effectiveLevel}
           />
         </CardWrapper>
-
-
       </section>
+      )}
 
-      <hr className="section-divider" />
-
-      {/* ═══ 区块三：排名详情 ═══ */}
+      {activeMesoSub === 'ranking' && (
       <section id="ranking" style={{ paddingBottom: 24 }}>
         <SectionHeader badge="📊 行业排名" title="当期" highlight="TOP / BOTTOM" desc="各维度排名前 5 / 后 5 行业" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20, marginBottom: 20 }}>
@@ -1593,27 +1590,25 @@ export default function MesoLayout() {
           <IndustryDetail sel={sel} chartData={chartData} latest={latest} prev={prev} />
         </ErrorBoundary>
       </section>
+      )}
 
-      <hr className="section-divider" />
-
-      {/* ═══ 区块四：产业链穿透 ═══ */}
+      {activeMesoSub === 'chain' && (
       <section id="chain" style={{ paddingBottom: 24 }}>
         <ErrorBoundary><ChainView industries={industries} /></ErrorBoundary>
       </section>
+      )}
 
-      <hr className="section-divider" />
-
-      {/* 区块四附：能源专项 */}
-      <div style={{ paddingBottom: 24 }}>
+      {activeMesoSub === 'energy' && (
+      <section id="energy" style={{ paddingBottom: 24 }}>
         <ErrorBoundary><EnergySection /></ErrorBoundary>
-      </div>
+      </section>
+      )}
 
-      <hr className="section-divider" />
-
-      {/* ═══ 区块五：季节性相关性分析 ═══ */}
+      {activeMesoSub === 'seasonal' && (
       <section id="seasonal" style={{ paddingBottom: 24 }}>
         <ErrorBoundary><SeasonalCorrelation industries={industries} /></ErrorBoundary>
       </section>
+      )}
     </div>
   );
 }

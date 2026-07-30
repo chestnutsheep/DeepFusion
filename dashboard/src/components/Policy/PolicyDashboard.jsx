@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {useMCP} from '../../hooks/useMCP.js';
+import {useAppStore} from '../../store/index.js';
 import {mcp} from '../../services/mcp.js';
 import CardWrapper from '../common/CardWrapper.jsx';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
@@ -22,6 +23,7 @@ export default function PolicyDashboard() {
   });
   const [hoverCard, setHoverCard] = useState({ show: false, x: 0, y: 0, policy: null, keywords: [] });
   const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
+  const activePolicySub = useAppStore((s) => s.activePolicySub);
 
   // ── 动态数据源 ──
   const stats = useMCP('policy_stats');
@@ -173,6 +175,7 @@ export default function PolicyDashboard() {
   return (
     <div className="policy-dashboard-container" onMouseMove={moveHover}>
       {/* ── 顶部卡片 ── */}
+      {activePolicySub === 'stats' && (
       <div className="top-cards">
         {/* 合并卡：十五五规划进度（百分比 + 进度条） — 加宽 */}
         <div className="card progress-card" style={{ flex: '1.6', minWidth: 320 }}>
@@ -240,8 +243,10 @@ export default function PolicyDashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* ── 年度政策时间线 — 数据驱动 ── */}
+      {activePolicySub === 'stats' && (
       <div className="timeline-section">
         <div className="year-label">📋 {timelineYear} 年政策时间线</div>
         <div className="annual-timeline">
@@ -261,8 +266,10 @@ export default function PolicyDashboard() {
           <div className="legend-item"><div className="legend-dot favorite"></div><span>★ 收藏</span></div>
         </div>
       </div>
+      )}
 
       {/* ── 长周期战略节点 — 从后端配置读取 ── */}
+      {activePolicySub === 'stats' && (
       <div className="timeline-section">
         <h2 className="section-title">🔭 长周期战略节点（2025-2030）</h2>
         <div className="long-cycle-timeline">
@@ -284,8 +291,10 @@ export default function PolicyDashboard() {
           <div className="legend-item"><div className="legend-dot minor"></div><span>▲ 专题白皮书</span></div>
         </div>
       </div>
+      )}
 
       {/* ── 最新政策文件 — 从 policy_search 动态获取 ── */}
+      {activePolicySub === 'list' && (
       <div className="timeline-section">
         <h2 className="section-title">📄 {timelineYear} 年政策文件</h2>
         <CardWrapper style={{ maxWidth: '50%', display: 'flex', flexDirection: 'column', gap: 0, padding: 0 }}>
@@ -318,8 +327,10 @@ export default function PolicyDashboard() {
           </div>
         </CardWrapper>
       </div>
+      )}
 
       {/* ── 官方链接 — 从后端配置读取 ── */}
+      {activePolicySub === 'stats' && (
       <div className="links-section">
         <div className="links-header"><h2>🔗 官方直达</h2></div>
         <div className="links-container">
@@ -328,6 +339,40 @@ export default function PolicyDashboard() {
           ))}
         </div>
       </div>
+      )}
+
+      {/* ── 采集管理 ── */}
+      {activePolicySub === 'collect' && (
+      <div className="links-section">
+        <div className="links-header"><h2>🔄 采集管理</h2></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 4 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>📥 政策数据采集</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 0 14px 0' }}>
+              点击下方按钮触发后端采集：遍历国务院 / 财政部 / 发改委等官方源，抓取最新政策文件并入库。
+              采集完成后「政策统计」「文件列表」将自动刷新。
+            </p>
+            <button
+              onClick={() => collectMutation.mutate()}
+              disabled={collectMutation.isPending}
+              style={{
+                fontSize: 14, padding: '8px 20px', borderRadius: 8, cursor: 'pointer',
+                background: 'var(--primary)', color: '#fff', border: 'none',
+                opacity: collectMutation.isPending ? 0.6 : 1, fontWeight: 700,
+              }}
+            >
+              {collectMutation.isPending ? '⏳ 采集中…' : '🔄 立即采集'}
+            </button>
+            {collectMutation.isError && (
+              <div style={{ marginTop: 10, fontSize: 13, color: 'var(--secondary)' }}>采集失败，请稍后重试</div>
+            )}
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+              上次更新：<UpdateTimestamp updatedAt={stats.updatedAt} compact />
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* ── 悬浮卡片 ── */}
       <div className="policy-hover-card" style={{ left: hoverCard.x, top: hoverCard.y, display: hoverCard.show ? 'block' : 'none' }}>

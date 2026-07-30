@@ -1,4 +1,5 @@
 import {useMCP} from '../hooks/useMCP.js';
+import {useAppStore} from '../store/index.js';
 import MacroSnapshot from '../components/Macro/MacroSnapshot.jsx';
 import CyclePage from '../components/Macro/CyclePage.jsx';
 import DataCard from '../components/common/DataCard.jsx';
@@ -652,53 +653,43 @@ function PhaseConsistency() {
   );
 }
 
+const META = {
+  coverage:   { title: '周期速览', desc: '四周期当前相位一览' },
+  kitchin:    { title: '基钦周期', desc: '库存周期 3~5 年：经济短期波动的核心驱动' },
+  juglar:     { title: '朱格拉周期', desc: '设备投资周期 8~10 年：capex 与产能扩张' },
+  kuznets:    { title: '库兹涅茨周期', desc: '建筑/房地产周期 15~25 年：城镇化与地产长波' },
+  kondratiev: { title: '康波周期', desc: '技术革命长波 40~70 年：第六次康波定位' },
+  nesting:    { title: '周期嵌套', desc: '四周期合成 Z 值波动对比：零线以上扩张，以下收缩' },
+  gantt:      { title: '相位分布', desc: '四周期相位演进甘特图：颜色区分相位，纹理区分周期类型' },
+};
+
+const PANELS = {
+  coverage:   () => <CoverageGrid />,
+  kitchin:    () => <CyclePage config={KITCHIN_CONFIG} showTitle="基钦周期" tableIndex={1} />,
+  juglar:     () => <CyclePage config={JUGLAR_CONFIG} showTitle="朱格拉周期" tableIndex={2} />,
+  kuznets:    () => <CyclePage config={KUZNETS_CONFIG} showTitle="库兹涅茨周期" tableIndex={3} />,
+  kondratiev: () => (<><CyclePage config={KONDRATIEV_CONFIG} showTitle="康波周期" tableIndex={4} /><MethodCards /></>),
+  nesting:    () => <CycleNesting />,
+  gantt:      () => (<><CycleGantt /><PhaseConsistency /></>),
+};
+
 export default function MacroPage() {
+  const activeMacroSub = useAppStore((s) => s.activeMacroSub);
+  const Panel = PANELS[activeMacroSub] || PANELS.coverage;
+  const meta = META[activeMacroSub] || META.coverage;
   return (
     <ErrorBoundary>
     <div>
       <MacroSnapshot />
+
       <hr className="section-divider" />
 
-      {/* 周期速览 — 一排四个周期当前相位一览（在具体图表上方） */}
-      <div id="coverage" className="section-block">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期速览</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
-          四周期当前相位一览
-        </p>
-        <ErrorBoundary><CoverageGrid /></ErrorBoundary>
+      <div style={{ marginBottom: 'var(--sp-lg)' }}>
+        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, margin: 0, marginBottom: 6 }}>{meta.title}</h2>
+        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', margin: 0 }}>{meta.desc}</p>
       </div>
 
-      <hr className="section-divider" />
-      {CYCLES.map((c, i) => (
-        <div key={c.id} id={c.id}>
-          <ErrorBoundary>
-            <CyclePage config={c.config} showTitle={c.label} tableIndex={i + 1} />
-          </ErrorBoundary>
-          {c.id === 'kondratiev' && <ErrorBoundary><MethodCards /></ErrorBoundary>}
-          {i < CYCLES.length - 1 && <hr className="section-divider-thin" />}
-        </div>
-      ))}
-
-      {/* 周期嵌套图 — 四周期 composite_z 对比 */}
-      <hr className="section-divider" />
-      <div id="nesting" className="section-block">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>周期嵌套</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
-          四周期合成Z值（composite_z）波动对比：零线以上扩张，以下收缩
-        </p>
-        <ErrorBoundary><CycleNesting /></ErrorBoundary>
-      </div>
-
-      {/* 周期相位甘特图 */}
-      <hr className="section-divider" />
-      <div id="gantt" className="section-block">
-        <h2 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, marginBottom: 'var(--sp-lg)', marginTop: 0 }}>相位分布</h2>
-        <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--sp-lg)' }}>
-          四周期相位演进甘特图：颜色区分相位，纹理区分周期类型
-        </p>
-        <ErrorBoundary><CycleGantt /></ErrorBoundary>
-        <ErrorBoundary><PhaseConsistency /></ErrorBoundary>
-      </div>
+      <ErrorBoundary>{Panel()}</ErrorBoundary>
     </div>
     </ErrorBoundary>
   );
