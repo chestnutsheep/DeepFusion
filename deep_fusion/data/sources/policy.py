@@ -25,6 +25,45 @@ _ORG_MAP: dict[str, str] = {}  # url_pattern → org_name, set in _sites
 
 _DATE_RE = re.compile(r"(\d{4}年\d{1,2}月\d{1,2}日?|\d{4}[-/]\d{1,2}[-/]\d{1,2})")
 _URL_DATE_RE = re.compile(r"/(\d{4})[-_/]?(\d{1,2})(?:[-_/]?(\d{1,2}))?/")
+# 政府站点常见命名：/t20260424_3990465.htm（mof/gov），含精确日，优先采用
+_TDATE_RE = re.compile(r"[tT](\d{4})(\d{2})(\d{2})")
+
+
+def _url_date_parts(url: str):
+    """从 URL 提取发布日期成分 (y, mo, d?)。
+
+    - 优先匹配 tYYYYMMDD（含精确日）；
+    - 其次 /YYYY/MM/DD/（含日）；
+    - 再兜底：URL 中任意 8 位连续数字且构成合法日期（mof PDF 的 P02…20260326…）；
+    - 仅 /YYYYMM/ 这种「无日」路径返回 (y, mo)（长度2），交由 meta/正文补全，
+      绝不占位 day=01，避免把整月文档误标为每月 1 号。
+    无年份命中返回 None。
+    """
+    m = _TDATE_RE.search(url)
+    if m:
+        return (m.group(1), m.group(2), m.group(3))
+    full = None
+    pair = None
+    for mm in _URL_DATE_RE.finditer(url):
+        y, mo = mm.group(1), mm.group(2)
+        if not (2000 <= int(y) <= 2100 and 1 <= int(mo) <= 12):
+            continue
+        if mm.group(3):
+            full = (y, mo, mm.group(3))
+            break
+        if pair is None:
+            pair = (y, mo)
+    if full:
+        return full
+    # 兜底：URL 中任意合法 8 位日期（mof PDF 的 P02…20260326… 内嵌日）。
+    # 用滑动窗口而非 \d{8} 正则，避免非重叠匹配漏掉嵌在更长数字串里的日期。
+    for i in range(len(url) - 7):
+        s = url[i:i + 8]
+        if s.isdigit():
+            y, mo, d = s[:4], s[4:6], s[6:8]
+            if 2000 <= int(y) <= 2100 and 1 <= int(mo) <= 12 and 1 <= int(d) <= 31:
+                return (y, mo, d)
+    return pair
 _KW_SET = {"五年规划", "十五五", "十四五", "改革", "创新", "数字经济",
            "绿色", "碳中和", "新能源", "产业链", "消费", "投资",
            "房地产", "地方债", "专项债", "财政", "货币", "降准", "降息",
@@ -78,13 +117,11 @@ def _extract_detail(entry: dict) -> dict:
 
         # 日期 — 多策略：URL路径 > meta > 正文元素
         date_found = ""
-        # 策略1: 从 URL 路径提取（如 /202606/ 或 /2026/06/02/）
-        url_date_m = _URL_DATE_RE.search(entry["url"])
-        if url_date_m:
-            y, mo = url_date_m.group(1), url_date_m.group(2)
-            d = url_date_m.group(3) or "01"
-            if 2000 <= int(y) <= 2100 and 1 <= int(mo) <= 12:
-                date_found = f"{y}-{mo}-{d}"
+        # 策略1: 从 URL 路径提取（tYYYYMMDD 或 /YYYY/MM/DD/，含精确日才采用；
+        # 仅 /YYYYMM/ 无日时返回 (y,mo)，交 meta/正文补全，绝不占位 day=01）
+        _url_parts = _url_date_parts(entry["url"])
+        if _url_parts and len(_url_parts) == 3:
+            date_found = f"{_url_parts[0]}-{_url_parts[1]}-{_url_parts[2]}"
         # 策略2: meta 标签（发布日期最可靠来源）
         if not date_found:
             for meta_attr in ["article:published_time", "publishdate", "pubdate", "datePublished"]:
@@ -99,6 +136,10 @@ def _extract_detail(entry: dict) -> dict:
                 if m:
                     date_found = m.group(1)
                     break
+        # 兜底：URL 仅有年月、且 meta/正文都未提取到时，退化为「年月-01」
+        # （总比留空导致排序异常好；优先仍以 URL精确日 / meta/正文真实日期为准）
+        if not date_found and _url_parts is not None and len(_url_parts) == 2:
+            date_found = f"{_url_parts[0]}-{_url_parts[1]}-01"
         if date_found:
             # 标准化为 ISO 格式
             from ...shared.policy_db import _normalize_date

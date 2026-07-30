@@ -145,9 +145,8 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: var(--bg-img, url('../assets/matin.JPEG')) bottom center / 100% auto no-repeat;
-  max-height: 80vh;
-  opacity: 0.25;
+  background: var(--bg-img, url('../assets/matin.JPEG')) center / cover no-repeat;
+  opacity: 0.18;
   z-index: -1;
   pointer-events: none;
 }

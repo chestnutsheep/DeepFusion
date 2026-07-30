@@ -108,6 +108,47 @@ class TestUrlDateRegex:
         assert collector._URL_DATE_RE.search("https://example.com/about/contact.html") is None
 
 
+class TestUrlDateParts:
+    """_url_date_parts 应从政府站点 URL 提取日期成分，且不占位 day=01。"""
+
+    def test_t_ymd_full_date(self):
+        """mof 的 /t20260424_xxx.htm 应提取精确日。"""
+        assert collector._url_date_parts(
+            "http://gks.mof.gov.cn/tongjishuju/202604/t20260424_3988324.htm"
+        ) == ("2026", "04", "24")
+
+    def test_slash_ymd(self):
+        """ /2026/06/02/ 斜杠分隔含日。"""
+        assert collector._url_date_parts(
+            "https://example.com/2026/06/02/title.html"
+        ) == ("2026", "06", "02")
+
+    def test_ym_only_returns_pair(self):
+        """ /202606/ 仅年月应返回二元组（交 meta/正文补全，不占位 01）。"""
+        assert collector._url_date_parts(
+            "https://www.gov.cn/zhengce/content/202606/content_7070755.htm"
+        ) == ("2026", "06")
+
+    def test_no_date_returns_none(self):
+        assert collector._url_date_parts("https://example.com/about/contact.html") is None
+
+    def test_invalid_year_rejected(self):
+        """非合理年份不应命中。"""
+        assert collector._url_date_parts("https://example.com/1999/13/99/x.html") is None
+
+    def test_mof_pdf_embedded_ymd(self):
+        """mof PDF 命名 P02…20260326… 应提取嵌入的精确日。"""
+        assert collector._url_date_parts(
+            "http://bgt.mof.gov.cn/gongzuodongtai/202603/P020260326304311439963.pdf"
+        ) == ("2026", "03", "26")
+
+    def test_generic_ymd_fallback(self):
+        """URL 中任意合法 8 位日期应作为兜底命中。"""
+        assert collector._url_date_parts(
+            "http://x/y/P020260723306771605375.pdf"
+        ) == ("2026", "07", "23")
+
+
 # ── 4. 日期标准化（纯逻辑）──────────────────────────
 
 class TestNormalizeDate:
