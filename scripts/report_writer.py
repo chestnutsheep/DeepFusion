@@ -117,30 +117,40 @@ def main():
     p.add_argument("--action", required=True, choices=["save_report", "save_limit_up", "seed_calendar", "calendar_add", "save_calibration"])
     p.add_argument("--rtype", help="报告类型: premarket/noonnews/qualitystock/dailyreview")
     p.add_argument("--date", help="数据日期 YYYY-MM-DD")
-    p.add_argument("--json", help="JSON 字符串（save_report/save_limit_up/seed_calendar 用）")
+    p.add_argument("--json", help="JSON 字符串（save_report/save_limit_up/seed_calendar/save_calibration 用）")
+    p.add_argument("--json-file", help="JSON 文件路径（与 --json 二选一；大 payload 推荐用文件，避免命令行转义问题）")
     p.add_argument("--name", help="calendar_add 事件名")
     p.add_argument("--sector", default="", help="calendar_add 板块")
     p.add_argument("--rating", type=int, default=3, help="calendar_add 评级 1-5")
     p.add_argument("--category", default="", help="calendar_add 类别")
     args = p.parse_args()
 
+    # 解析 JSON：优先 --json，否则尝试 --json-file
+    def _resolve_json(required=True):
+        if args.json:
+            return args.json
+        if args.json_file:
+            with open(args.json_file, "r", encoding="utf-8") as fh:
+                return fh.read()
+        if required:
+            sys.exit("需提供 --json 或 --json-file")
+        return None
+
     con = connect(args.db)
     try:
         if args.action == "save_report":
-            if not args.rtype or not args.date or not args.json:
-                sys.exit("save_report 需 --rtype --date --json")
-            save_report(con, args.rtype, args.date, json.loads(args.json))
+            if not args.rtype or not args.date:
+                sys.exit("save_report 需 --rtype --date [--json|--json-file]")
+            save_report(con, args.rtype, args.date, json.loads(_resolve_json()))
             print(json.dumps({"ok": True, "action": "save_report", "rtype": args.rtype, "date": args.date}))
         elif args.action == "save_limit_up":
-            if not args.date or not args.json:
-                sys.exit("save_limit_up 需 --date --json")
-            rows = json.loads(args.json)
+            if not args.date:
+                sys.exit("save_limit_up 需 --date [--json|--json-file]")
+            rows = json.loads(_resolve_json())
             save_limit_up(con, args.date, rows)
             print(json.dumps({"ok": True, "action": "save_limit_up", "date": args.date, "count": len(rows)}))
         elif args.action == "seed_calendar":
-            if not args.json:
-                sys.exit("seed_calendar 需 --json")
-            events = json.loads(args.json)
+            events = json.loads(_resolve_json())
             seed_calendar(con, events)
             print(json.dumps({"ok": True, "action": "seed_calendar", "count": len(events)}))
         elif args.action == "calendar_add":
@@ -149,10 +159,10 @@ def main():
             add_calendar_event(con, args.date, args.name, args.sector, args.rating, args.category)
             print(json.dumps({"ok": True, "action": "calendar_add", "date": args.date, "name": args.name}))
         elif args.action == "save_calibration":
-            if not args.date or not args.json:
-                sys.exit("save_calibration 需 --date --json")
+            if not args.date:
+                sys.exit("save_calibration 需 --date [--json|--json-file]")
             # 校准结果落 reports 表(rtype=score_calibration)，与 limit_up_calibrate 同口径
-            save_report(con, "score_calibration", args.date, json.loads(args.json))
+            save_report(con, "score_calibration", args.date, json.loads(_resolve_json()))
             print(json.dumps({"ok": True, "action": "save_calibration", "date": args.date}))
     finally:
         con.close()
