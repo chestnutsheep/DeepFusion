@@ -8,14 +8,14 @@ const SUB_NAV = {
   policy: ['stats','list','collect'],
   macro: ['coverage','kitchin','juglar','kuznets','kondratiev','nesting','gantt'],
   meso: ['signals','heatmap','ranking','chain','energy','seasonal'],
-  micro: ['stock','fund','futures','bond','option'],
+  micro: ['standby','stock','fund','futures','bond','option'],
   global: ['stress','debt','capital','bubble','markets'],
 };
 const SUB_LABELS = {
   policy: { stats:'📊 政策统计', list:'📋 文件列表', collect:'🔄 采集管理' },
   macro: { kitchin:'📉 基钦', juglar:'📈 朱格拉', kuznets:'🏠 库兹涅茨', kondratiev:'🌊 康波', coverage:'📊 宏观覆盖', nesting:'🔗 周期嵌套', gantt:'📅 相位分布' },
   meso: { signals:'📡 趋势与信号', heatmap:'🔥 行业热力图', ranking:'📊 排名详情', chain:'⛓️ 产业链', energy:'⚡ 能源脉动', seasonal:'📅 季节性' },
-  micro: { stock:'📈 个股', fund:'📦 基金', futures:'⛽ 期货', bond:'📜 债券', option:'🎯 期权' },
+  micro: { standby:'🖥️ 待机速览', stock:'📈 个股', fund:'📦 基金', futures:'⛽ 期货', bond:'📜 债券', option:'🎯 期权' },
   global: { stress:'⚡ 金融压力', debt:'🏛️ 债务可持续', capital:'💸 资本流动', bubble:'🫧 泡沫监视', markets:'📊 衍生品市场' },
 };
 const SUB_SETTERS = {

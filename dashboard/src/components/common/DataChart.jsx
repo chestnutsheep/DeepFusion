@@ -146,7 +146,11 @@ export default function DataChart({
       series: processedSeries.map((s, sIdx) => {
         // 根据模式选择数据源
         let seriesData;
-        if (isReturnMode) {
+        if (s.type === 'candlestick') {
+          // 蜡烛图：数据形如 [open, close, low, high]
+          const k = s.keys || {};
+          seriesData = data.map(r => [r[k.open], r[k.close], r[k.low], r[k.high]]);
+        } else if (isReturnMode) {
           // 对数收益率模式：计算 ln(v_t/v_{t-1})*100
           const rawVals = data.map(r => r[s.key]);
           seriesData = computeReturnSeries(rawVals);
@@ -154,6 +158,19 @@ export default function DataChart({
           seriesData = s._normData;
         } else {
           seriesData = data.map(r => r[s.key]);
+        }
+        // 蜡烛图：独立 entry（红涨绿跌，中国习惯）
+        if (s.type === 'candlestick') {
+          return {
+            name: s.name,
+            type: 'candlestick',
+            data: seriesData,
+            itemStyle: {
+              color: '#ef232a', color0: '#14b143',
+              borderColor: '#ef232a', borderColor0: '#14b143',
+            },
+            ...(s.yAxisIndex != null ? { yAxisIndex: s.yAxisIndex } : {}),
+          };
         }
         const entry = {
           name: s.name,

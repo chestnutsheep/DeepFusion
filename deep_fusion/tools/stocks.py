@@ -157,6 +157,151 @@ async def individual_info(
 
 
 @mcp.tool(
+    title="个股实时报价",
+    description="获取个股实时报价快照：最新价/涨跌幅/涨跌额/成交额/换手率/市盈率/市净率/总市值/流通市值/今开高低昨收。东财行情优先，新浪回退",
+)
+def stock_quote(
+        symbol: str = Field(description="6位股票代码，如 600519"),
+) -> str:
+    # 东财实时行情（单源即含 PE/PB/市值/换手率，覆盖报价快照全部字段）
+    try:
+        df = ak_cache(ak.stock_zh_a_spot_em, ttl=300, ttl2=600)
+        if df is not None and not df.empty:
+            row = df[df["代码"] == symbol]
+            if not row.empty:
+                r = row.iloc[0]
+                result = {
+                    "symbol": symbol,
+                    "name": str(r.get("名称", "")),
+                    "price": _num(r.get("最新价")),
+                    "change": _num(r.get("涨跌额")),
+                    "change_pct": _num(r.get("涨跌幅")),
+                    "amplitude": _num(r.get("振幅")),
+                    "open": _num(r.get("今开")),
+                    "high": _num(r.get("最高")),
+                    "low": _num(r.get("最低")),
+                    "prev_close": _num(r.get("昨收")),
+                    "volume": _num(r.get("成交量")) * 100 if _num(r.get("成交量")) is not None else None,  # 手→股
+                    "amount": _num(r.get("成交额")),
+                    "turnover": _num(r.get("换手率")),
+                    "pe": _num(r.get("市盈率-动态")),
+                    "pb": _num(r.get("市净率")),
+                    "total_mv": _num(r.get("总市值")),
+                    "float_mv": _num(r.get("流通市值")),
+                    "volume_ratio": _num(r.get("量比")),
+                    "source": "em",
+                }
+                # 跳过全空行（退市/无行情）
+                if result["price"] is not None:
+                    return json.dumps(result, ensure_ascii=False)
+    except Exception:
+        pass
+
+    # 回退：新浪实时行情（含最新价/涨跌/成交额/量，但无 PE/PB/市值）
+    try:
+        df = ak_cache(ak.stock_zh_a_spot, ttl=300, ttl2=600)
+        if df is not None and not df.empty:
+            row = df[df["代码"].str.endswith(symbol)]
+            if not row.empty:
+                r = row.iloc[0]
+                return json.dumps({
+                    "symbol": symbol,
+                    "name": str(r.get("名称", "")),
+                    "price": _num(r.get("最新价")),
+                    "change": _num(r.get("涨跌额")),
+                    "change_pct": _num(r.get("涨跌幅")),
+                    "open": _num(r.get("今开")),
+                    "high": _num(r.get("最高")),
+                    "low": _num(r.get("最低")),
+                    "prev_close": _num(r.get("昨收")),
+                    "volume": _num(r.get("成交量")) * 100 if _num(r.get("成交量")) is not None else None,
+                    "amount": _num(r.get("成交额")),
+                    "source": "sina",
+                }, ensure_ascii=False)
+    except Exception:
+        pass
+
+    return json.dumps({"error": f"无法获取 {symbol} 的实时报价"})
+
+
+def _num(v):
+    """安全转 float，None/空/非数返回 None。"""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+        return f if f == f else None  # 排除 NaN
+    except (ValueError, TypeError):
+        return None
+
+
+@mcp.tool(
+    title="个股概念档案",
+    description="获取个股所属概念标签（概念板块领涨股名称匹配）及全市场概念板块当日强弱榜。东财概念板块优先",
+)
+def stock_concepts(
+        symbol: str = Field(description="6位股票代码，如 600519"),
+        market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
+) -> str:
+    # 取股票名称（用于与概念板块领涨股匹配）
+    name = ""
+    try:
+        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, ttl2=600)
+        if spot is not None and not spot.empty:
+            row = spot[spot["代码"] == symbol]
+            if not row.empty:
+                name = str(row.iloc[0].get("名称", ""))
+    except Exception:
+        pass
+
+    # 全概念板块快照
+    try:
+        boards = ak_cache(ak.stock_board_concept_name_em, ttl=3600, ttl2=7200)
+    except Exception:
+        boards = None
+    if boards is None or boards.empty:
+        return json.dumps({"symbol": symbol, "name": name, "tags": [], "all_concepts": [], "total_boards": 0})
+
+    cols = list(boards.columns)
+    name_c = "板块名称" if "板块名称" in cols else cols[1]
+    code_c = "板块代码" if "板块代码" in cols else None
+    chg_c = "涨跌幅" if "涨跌幅" in cols else None
+    lead_c = "领涨股票" if "领涨股票" in cols else None
+    lead_chg_c = "领涨股票-涨跌幅" if "领涨股票-涨跌幅" in cols else None
+
+    all_concepts = []
+    tags = []
+    for _, r in boards.iterrows():
+        cname = str(r.get(name_c, ""))
+        chg = _num(r.get(chg_c)) if chg_c else None
+        lead = str(r.get(lead_c, "")) if lead_c else ""
+        lead_chg = _num(r.get(lead_chg_c)) if lead_chg_c else None
+        entry = {
+            "name": cname,
+            "code": str(r.get(code_c, "")) if code_c else "",
+            "change_pct": chg,
+            "leader": lead,
+            "leader_change_pct": lead_chg,
+        }
+        all_concepts.append(entry)
+        if name and lead == name:
+            tags.append(entry)
+    # 当日强弱榜：按涨跌幅降序，取前 40
+    all_concepts.sort(
+        key=lambda x: (x["change_pct"] if x["change_pct"] is not None else -1e9),
+        reverse=True,
+    )
+    result = {
+        "symbol": symbol,
+        "name": name,
+        "tags": tags,
+        "all_concepts": all_concepts[:40],
+        "total_boards": len(all_concepts),
+    }
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool(
     title="个股历史行情",
     description="获取个股日/周/月K线、分钟线、分笔数据、盘前数据等综合历史行情",
 )

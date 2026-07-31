@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/index.js';
+import StockStandby from './StockStandby.jsx';
 import StockPanel from './StockPanel.jsx';
 import FundPanel from './FundPanel.jsx';
 import FuturesPanel from './FuturesPanel.jsx';
@@ -6,6 +7,7 @@ import BondPanel from './BondPanel.jsx';
 import OptionPanel from './OptionPanel.jsx';
 
 const PANEL_MAP = {
+  standby: StockStandby,
   stock: StockPanel,
   fund: FundPanel,
   futures: FuturesPanel,
