@@ -671,7 +671,7 @@ function IndustryPicker({ allIndustries, selectedNames, onToggle, level, setLeve
         placeholder="搜索行业名称或代码..."
         style={{
           width: '100%', padding: '5px 10px', borderRadius: 5, fontSize: 'var(--fs-sm)',
-          background: 'var(--bg-primary)', color: 'var(--text-primary)',
+          background: 'var(--bg-panel)', color: 'var(--text-primary)',
           border: '1px solid var(--border-subtle)', outline: 'none',
         }}
       />
@@ -1537,7 +1537,7 @@ const activeMesoSub = useAppStore((s) => s.activeMesoSub);
                       autoFocus
                       style={{
                         padding: '4px 10px', borderRadius: 5, fontSize: 'var(--fs-sm)',
-                        background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                        background: 'var(--bg-panel)', color: 'var(--text-primary)',
                         border: '1px solid #9B7EC844', outline: 'none', width: 160,
                       }}
                     />

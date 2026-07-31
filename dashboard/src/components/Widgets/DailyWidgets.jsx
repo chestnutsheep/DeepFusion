@@ -3,6 +3,7 @@ import { useMCP } from "../../hooks/useMCP.js";
 import CardWrapper from "../common/CardWrapper.jsx";
 import ErrorBoundary from "../common/ErrorBoundary.jsx";
 import CalendarMonth from "../Calendar/CalendarMonth.jsx";
+import ReportModal from "./ReportModal.jsx";
 
 function parse(raw) {
   if (!raw) return null;
@@ -14,17 +15,22 @@ function parse(raw) {
   }
 }
 
-/** 单条评分小条 */
-function ScoreBar({ label, score }) {
-  const color = score >= 80 ? "#6FA088" : score >= 50 ? "#C9A861" : "#C07C7C";
+function scoreTagColor(score) {
+  if (score >= 80) return { bg: "rgba(111,160,136,0.18)", bd: "rgba(111,160,136,0.55)", fg: "#6FA088" };
+  if (score >= 50) return { bg: "rgba(201,168,97,0.18)", bd: "rgba(201,168,97,0.55)", fg: "#C9A861" };
+  return { bg: "rgba(192,124,124,0.18)", bd: "rgba(192,124,124,0.55)", fg: "#C07C7C" };
+}
+
+/** 评分因子 → tag（按分数着色，无文字段落） */
+function FactorTag({ name, score }) {
+  const c = scoreTagColor(score);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--fs-xs)" }}>
-      <span style={{ width: 56, color: "var(--text-muted)", flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ width: `${Math.max(0, Math.min(100, score))}%`, height: "100%", background: color, borderRadius: 3, transition: "width .4s ease" }} />
-      </div>
-      <span style={{ width: 24, textAlign: "right", color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{score}</span>
-    </div>
+    <span style={{
+      fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4,
+      background: c.bg, border: `1px solid ${c.bd}`, color: c.fg, whiteSpace: "nowrap",
+    }}>
+      {name} · {score}
+    </span>
   );
 }
 
@@ -56,6 +62,7 @@ function calVerdict(p) {
 }
 
 export function LimitUpCard({ s }) {
+  const [openLogic, setOpenLogic] = useState(false);
   const bury = (s.score != null && s.score >= 80) || (s.stage && s.stage.includes("加速"));
   const gradeColor = s.score >= 80 ? "#6FA088" : s.score >= 65 ? "#C9A861" : s.score >= 50 ? "#B89B6E" : "#C07C7C";
   return (
@@ -83,20 +90,44 @@ export function LimitUpCard({ s }) {
           )}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+      {/* 全部信息以 tag 呈现：基础属性 + 埋伏关注 + 评分因子 */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
         <span style={chip("#C9A861")}>{s.board_height}连板</span>
         {s.stage && <span style={chip("#8FD6FF")}>{s.stage}</span>}
-        {(s.sectors || []).slice(0, 2).map((x, i) => <span key={i} style={chip("#9C82B4")}>{x}</span>)}
+        {(s.sectors || []).slice(0, 3).map((x, i) => <span key={i} style={chip("#9C82B4")}>{x}</span>)}
+        {bury && (
+          <span style={{ fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4, fontWeight: 700,
+            background: "rgba(192,124,124,0.20)", border: "1px solid rgba(192,124,124,0.55)", color: "#C07C7C", whiteSpace: "nowrap" }}>
+            ⚑ 埋伏关注
+          </span>
+        )}
+        {(s.items || []).map((it) => <FactorTag key={it.name} name={it.name} score={it.score} />)}
       </div>
-      {bury && (
-        <div style={{ fontSize: "var(--fs-xs)", fontWeight: 700, color: "#C07C7C", marginBottom: 8 }}>
-          ⚑ 埋伏关注：量价形态符合黄金组合
-        </div>
-      )}
-      {(s.items || []).map((it) => <ScoreBar key={it.name} label={it.name} score={it.score} />)}
+      {/* 评分逻辑：默认折叠，点开看 rationale（保留"为什么"，但默认不占空间） */}
       {s.rationale && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginTop: 10, lineHeight: 1.5 }}>
-          {s.rationale}
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={() => setOpenLogic((v) => !v)}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              fontSize: "var(--fs-2xs)", color: "var(--text-muted)",
+              padding: 0, display: "flex", alignItems: "center", gap: 4,
+            }}
+          >
+            <span style={{ transform: openLogic ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▶</span>
+            评分逻辑
+          </button>
+          {openLogic && (
+            <div style={{
+              marginTop: 6, fontSize: "var(--fs-xs)", lineHeight: 1.6,
+              color: "var(--text-secondary)",
+              background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "8px 10px",
+              borderLeft: "2px solid var(--border-subtle)",
+            }}>
+              {s.rationale}
+            </div>
+          )}
         </div>
       )}
     </CardWrapper>
@@ -162,29 +193,41 @@ export function CalibrationCard({ c }) {
   );
 }
 
-/** 把报告 payload 拍平成「一行一个字段」的列表（跳过 null/空）。 */
-function flattenPayload(payload) {
-  if (!payload || typeof payload !== "object") return [];
-  if (Array.isArray(payload)) {
-    return payload.slice(0, 12).map((x, i) => ({
-      k: `#${i + 1}`,
-      v: typeof x === "object" ? JSON.stringify(x) : String(x),
-    }));
-  }
-  return Object.entries(payload)
-    .filter(([, v]) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0))
-    .slice(0, 16)
-    .map(([k, v]) => {
-      let val;
-      if (Array.isArray(v)) val = v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join("、");
-      else if (typeof v === "object") val = JSON.stringify(v);
-      else val = String(v);
-      return { k, v: val };
-    });
+/** 卡片预览：展示报告类型 + 日期 + 顶层板块概览，点击展开完整弹窗（不再直接 dump JSON）。 */
+function ReportPreview({ payload }) {
+  if (!payload || typeof payload !== "object") return null;
+  const keys = Object.keys(payload).filter(
+    (k) => !["date", "日期", "报告类型", "generated_at", "gen_time", "rtype", "updated_at"].includes(k)
+  );
+  // 优先展示一段可读摘要文字
+  const summaryKey = keys.find((k) => typeof payload[k] === "string" && payload[k].length > 12);
+  const summary = summaryKey ? payload[summaryKey] : "";
+  const sectionNames = keys.slice(0, 8);
+  return (
+    <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)" }}>
+      {summary && (
+        <div style={{ lineHeight: 1.6, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {summary}
+        </div>
+      )}
+      {sectionNames.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {sectionNames.map((k) => (
+            <span key={k} style={{
+              fontSize: "var(--fs-2xs)", padding: "2px 8px", borderRadius: 4,
+              background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-subtle)",
+              color: "var(--text-muted)",
+            }}>{k}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ReportSlot({ rtype, label, reloadToken }) {
   const [selectedDate, setSelectedDate] = useState(null); // null = 最新
+  const [open, setOpen] = useState(false);
   // 可切换的日期列表（最近 30 份，按日期倒序）
   const history = useMCP("report_history", { rtype, limit: 30 });
   const latest = useMCP("report_latest", { rtype });
@@ -206,47 +249,53 @@ export function ReportSlot({ rtype, label, reloadToken }) {
   const active = parse(selectedDate ? byDate.data : latest.data);
   const isLoading = selectedDate ? byDate.isLoading : latest.isLoading;
   const dateLabel = selectedDate || active?.date || "";
-  const rows = flattenPayload(active?.payload);
+  const hasPayload = !!(active && active.payload && Object.keys(active.payload).length > 0);
 
   return (
-    <CardWrapper hoverable>
-      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span>{label}</span>
-        <select
-          value={selectedDate || ""}
-          onChange={(e) => setSelectedDate(e.target.value || null)}
-          style={{
-            fontSize: "var(--fs-2xs)", color: "var(--text-secondary)",
-            background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-            borderRadius: "var(--radius-sm)", padding: "2px 4px", maxWidth: 130,
-          }}
-        >
-          <option value="">最新{dateLabel ? ` (${dateLabel})` : ""}</option>
-          {dateOptions.filter((d) => d !== dateLabel).map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-      </div>
-      {isLoading && <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>加载中…</div>}
-      {!isLoading && !active?.payload && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1.6 }}>
-          {selectedDate ? "该日期暂无报告。" : "定时任务尚未写入，每日刷新后自动填充。"}
+    <>
+      <CardWrapper hoverable onClick={() => hasPayload && setOpen(true)} style={{ cursor: hasPayload ? "pointer" : "default" }}>
+        <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <span>{label}</span>
+          <div onClick={(e) => e.stopPropagation()}>
+            <select
+              value={selectedDate || ""}
+              onChange={(e) => setSelectedDate(e.target.value || null)}
+              style={{
+                fontSize: "var(--fs-2xs)", color: "var(--text-secondary)",
+                background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+                borderRadius: "var(--radius-sm)", padding: "2px 4px", maxWidth: 130,
+              }}
+            >
+              <option value="">最新{dateLabel ? ` (${dateLabel})` : ""}</option>
+              {dateOptions.filter((d) => d !== dateLabel).map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      )}
-      {!isLoading && active?.payload && rows.length === 0 && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>无可展示字段。</div>
-      )}
-      {!isLoading && rows.length > 0 && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", maxHeight: 200, overflow: "auto" }}>
-          {rows.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, padding: "3px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", lineHeight: 1.4 }}>
-              <span style={{ flexShrink: 0, color: "var(--text-muted)", minWidth: 72, wordBreak: "break-all" }}>{r.k}</span>
-              <span style={{ color: "var(--text-secondary)", wordBreak: "break-word", flex: 1 }}>{r.v}</span>
+        {isLoading && <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>加载中…</div>}
+        {!isLoading && !hasPayload && (
+          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1.6 }}>
+            {selectedDate ? "该日期暂无报告。" : "定时任务尚未写入，每日刷新后自动填充。"}
+          </div>
+        )}
+        {!isLoading && hasPayload && (
+          <>
+            <ReportPreview payload={active.payload} />
+            <div style={{ marginTop: 10, fontSize: "var(--fs-2xs)", color: "var(--accent-gold)", textAlign: "right" }}>
+              点击查看完整报告 →
             </div>
-          ))}
-        </div>
-      )}
-    </CardWrapper>
+          </>
+        )}
+      </CardWrapper>
+      <ReportModal
+        open={open}
+        onClose={() => setOpen(false)}
+        payload={hasPayload ? active.payload : null}
+        label={label}
+        date={dateLabel}
+      />
+    </>
   );
 }
 

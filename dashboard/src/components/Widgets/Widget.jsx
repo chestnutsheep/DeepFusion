@@ -42,6 +42,7 @@ export default function Widget({
 
   return (
     <div
+      className={`widget${dragging ? " dragging" : ""}`}
       draggable
       onDragStart={(e) => {
         if (!allowDrag.current) {
@@ -61,21 +62,12 @@ export default function Widget({
         if (allowDrag.current) onDragEnterWidget?.(id);
       }}
       onDragOver={(e) => e.preventDefault()}
-      style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid #2d3340",
-        borderRadius: 12,
-        padding: 14,
-        opacity: dragging ? 0.5 : 1,
-        boxShadow: dragging ? "0 0 0 2px #58a6ff66" : "none",
-        transition: "opacity .12s",
-        gridColumn: colSpan === "full" ? "1 / -1" : `span ${colSpan}`,
-        minWidth: 0,
-      }}
+      style={{ gridColumn: colSpan === "full" ? "1 / -1" : `span ${colSpan}` }}
     >
       {/* 头部：手柄 + 标题 + 标签操作 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <div className="widget-head">
         <span
+          className="widget-handle"
           onMouseDown={() => {
             allowDrag.current = true;
           }}
@@ -83,18 +75,12 @@ export default function Widget({
             allowDrag.current = false;
           }}
           title="拖动排序"
-          style={{
-            cursor: "grab",
-            color: "#6e7681",
-            fontSize: 16,
-            lineHeight: 1,
-            userSelect: "none",
-          }}
         >
           ⠿
         </span>
         {editing ? (
           <input
+            className="widget-title-input"
             autoFocus
             value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)}
@@ -104,44 +90,26 @@ export default function Widget({
               if (e.key === "Escape") setEditing(false);
             }}
             placeholder={defaultTitle}
-            style={{
-              flex: 1,
-              background: "rgba(0,0,0,0.3)",
-              border: "1px solid #58a6ff",
-              borderRadius: 6,
-              color: "#e6edf3",
-              fontSize: 15,
-              fontWeight: 600,
-              padding: "2px 8px",
-            }}
           />
         ) : (
           <div
+            className="widget-title"
             onDoubleClick={() => {
               setTitleDraft(title || "");
               setEditing(true);
             }}
             title="双击重命名"
-            style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "#e6edf3", cursor: "text" }}
           >
             {title}
           </div>
         )}
         <button
+          className="widget-tag-btn"
           onClick={() => {
             setAdding((a) => !a);
             setTagDraft("");
           }}
           title="添加标签"
-          style={{
-            background: "transparent",
-            border: "1px solid #2d3340",
-            color: "#8b949e",
-            borderRadius: 6,
-            fontSize: 12,
-            padding: "2px 8px",
-            cursor: "pointer",
-          }}
         >
           + 标签
         </button>
@@ -149,26 +117,13 @@ export default function Widget({
 
       {/* 标签行 */}
       {(tags.length > 0 || adding) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10, alignItems: "center" }}>
+        <div className="widget-tag-row">
           {tags.map((t, i) => (
-            <span
-              key={i}
-              style={{
-                background: "rgba(88,166,255,0.12)",
-                border: "1px solid #58a6ff55",
-                color: "#9ecbff",
-                borderRadius: 999,
-                fontSize: 11,
-                padding: "2px 8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
+            <span key={i} className="widget-tag">
               {t}
               <span
+                className="widget-tag-x"
                 onClick={() => removeTag(t)}
-                style={{ cursor: "pointer", color: "#9ecbff", fontWeight: 700 }}
                 title="删除标签"
               >
                 ×
@@ -177,6 +132,7 @@ export default function Widget({
           ))}
           {adding && (
             <input
+              className="widget-tag-input"
               autoFocus
               value={tagDraft}
               onChange={(e) => setTagDraft(e.target.value)}
@@ -186,15 +142,6 @@ export default function Widget({
                 if (e.key === "Escape") setAdding(false);
               }}
               placeholder="输入标签回车"
-              style={{
-                background: "rgba(0,0,0,0.3)",
-                border: "1px solid #58a6ff",
-                borderRadius: 999,
-                color: "#e6edf3",
-                fontSize: 11,
-                padding: "2px 8px",
-                width: 100,
-              }}
             />
           )}
         </div>

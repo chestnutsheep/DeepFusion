@@ -31,7 +31,12 @@ export default function EventCard({ e, updatedAt, onOpenDomain }) {
       <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, lineHeight: 1.35 }}>
         {e.name}
       </div>
-      {e.category && <span style={chip('#6FA088')}>{e.category}</span>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        {e.category && <span style={chip('#6FA088')}>{e.category}</span>}
+        {e.sentiment && e.sentiment !== '中性' && (
+          <span style={chip(e.sentiment === '利好' ? '#5BAE7A' : '#C0584F')}>{e.sentiment}</span>
+        )}
+      </div>
 
       {e.note && (
         <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', margin: '8px 0', lineHeight: 1.5 }}>{e.note}</div>

@@ -296,6 +296,28 @@ export default function PolicyDashboard() {
       {/* ── 最新政策文件 — 从 policy_search 动态获取 ── */}
       {activePolicySub === 'list' && (
       <div className="timeline-section">
+        {/* ── 未来政策日程（统一从日历 Routine/政策会议种子读取）── */}
+        <h2 className="section-title">🔔 未来政策日程</h2>
+        <CardWrapper style={{ maxWidth: '50%', padding: 12, marginBottom: 16 }}>
+          {((timeline.data && timeline.data.upcoming_schedule) || []).slice(0, 12).map((s, i, arr) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0',
+              borderBottom: i < Math.min(arr.length, 12) - 1 ? '1px solid var(--border-subtle)' : 'none',
+            }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11, width: 80, flexShrink: 0 }}>{s.date}</span>
+              <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{s.name}</span>
+              <span style={{
+                fontSize: 10, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                color: s.category === '政策会议' ? '#8FD6FF' : '#C9A861',
+                background: s.category === '政策会议' ? 'rgba(143,214,255,0.13)' : 'rgba(201,168,97,0.13)',
+              }}>{s.category}</span>
+            </div>
+          ))}
+          {((timeline.data && timeline.data.upcoming_schedule) || []).length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>暂无未来政策节点（需先运行 calendar_seed_routine）</div>
+          )}
+        </CardWrapper>
+
         <h2 className="section-title">📄 {timelineYear} 年政策文件</h2>
         <CardWrapper style={{ maxWidth: '50%', display: 'flex', flexDirection: 'column', gap: 0, padding: 0 }}>
           <div style={{ padding: 12 }}>
@@ -308,6 +330,7 @@ export default function PolicyDashboard() {
                 const last = parts[parts.length - 1];
                 return (last && (last.startsWith('http://') || last.startsWith('https://'))) ? last : '';
               })();
+              const sent = doc.match(/〈(利好|利空|中性)〉/)?.[1] || '';
               return (
               <CardWrapper key={i} as="a" href={url || undefined} target={url ? '_blank' : undefined} rel="noopener noreferrer" truncate hoverable={false}
                 style={{ display: 'block', padding: '6px 0', borderBottom: i < Math.min(realDocs.length, 10) - 1 ? '1px solid var(--border-subtle)' : 'none', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, textDecoration: 'none', cursor: url ? 'pointer' : 'default', background: 'transparent', backdropFilter: 'none', border: 'none', borderRadius: 0, margin: 0 }}
@@ -315,6 +338,14 @@ export default function PolicyDashboard() {
                   setHoverCard({ show: true, x: e.clientX + 12, y: e.clientY - 16, policy: { title: doc.substring(0, 40), tag: '政策文件', content: doc, impact: kw.slice(0, 5).join('、') }, keywords: kw });
                 }} onMouseMove={moveHover} onMouseLeave={hideHover}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{date}</span>
+                {sent && sent !== '中性' && (
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, padding: '1px 5px', borderRadius: 3,
+                    color: sent === '利好' ? '#5BAE7A' : '#C0584F',
+                    background: sent === '利好' ? 'rgba(91,174,122,0.15)' : 'rgba(192,88,79,0.15)',
+                    border: `1px solid ${sent === '利好' ? 'rgba(91,174,122,0.5)' : 'rgba(192,88,79,0.5)'}`,
+                  }}>{sent}</span>
+                )}
                 {kw.length > 0 && (
                   <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent-gold)' }}>
                     [{kw.slice(0, 3).join(', ')}{kw.length > 3 ? '…' : ''}]

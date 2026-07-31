@@ -260,7 +260,8 @@ SCHEMA_SQL = """
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
+    # check_same_thread=False：行业采集在后台线程调用，与 policy_db 一致
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")

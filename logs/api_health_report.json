@@ -1,0 +1,39 @@
+{
+  "log_line": "2026-07-31 15:55:02 : 校验成果汇总，当前接口数量共 1 个，异常接口 1 个，良率 0.0 %，异常接口名称如下：stock_zh_a_spot_em。经检修：问题接口共 1 个，现修复 0 个，修复率 0.0 %，仍有 1 个接口无法修复，名称为: [\"stock_zh_a_spot_em\"]",
+  "total": 1,
+  "abnormal_count": 1,
+  "yield_rate": 0.0,
+  "good_count": 0,
+  "fixed_count": 0,
+  "unfixed_count": 1,
+  "fix_rate": 0.0,
+  "abnormal_names": [
+    "stock_zh_a_spot_em"
+  ],
+  "unfixed_names": [
+    "stock_zh_a_spot_em"
+  ],
+  "deep": true,
+  "detail": [
+    {
+      "name": "stock_zh_a_spot_em",
+      "status": "NETWORK",
+      "em": true,
+      "files": [
+        "akshare_adapter.py",
+        "industry.py",
+        "industry_sw.py",
+        "stocks.py"
+      ],
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+      "error_type": "Network",
+      "candidates": [],
+      "fixed": false,
+      "fix_note": "",
+      "transform_needed": false,
+      "transform_stub": null,
+      "columns": null,
+      "shape": null
+    }
+  ]
+}

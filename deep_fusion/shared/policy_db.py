@@ -10,46 +10,8 @@ from typing import Any
 
 DB_PATH = Path.home() / "output" / "data" / "policy_cache.db"
 
-# ── 日期标准化：兼容 "2026-06-02" / "2026年6月2日" / "2026/06/02" ──
-_DATE_PATTERNS = [
-    re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})"),          # ISO: 2026-06-02
-    re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日?"),      # 中文: 2026年6月2日
-    re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})"),           # 斜杠: 2026/06/02
-    re.compile(r"(\d{4})\.(\d{1,2})\.(\d{1,2})"),         # 点号: 2026.06.02
-]
-
-
-def _normalize_date(raw: str) -> str:
-    """将各种日期格式标准化为 ISO 格式 YYYY-MM-DD。"""
-    if not raw:
-        return ""
-    for pat in _DATE_PATTERNS:
-        m = pat.search(raw)
-        if m:
-            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-            if 2000 <= y <= 2100 and 1 <= mo <= 12 and 1 <= d <= 31:
-                return f"{y:04d}-{mo:02d}-{d:02d}"
-    return raw  # 无法解析则保留原值
-
-
-def _parse_year(date_str: str) -> int | None:
-    """从标准化或原始日期字符串中提取年份。"""
-    if not date_str:
-        return None
-    # ISO 格式
-    m = re.match(r"(\d{4})-", date_str)
-    if m:
-        return int(m.group(1))
-    # 中文格式
-    m = re.match(r"(\d{4})年", date_str)
-    if m:
-        return int(m.group(1))
-    # 斜杠/点号
-    m = re.match(r"(\d{4})[/.]", date_str)
-    if m:
-        return int(m.group(1))
-    return None
-
+# ── 日期标准化：提升到共享模块（消除与事件侧的重复定义） ──
+from .date_utils import normalize_date as _normalize_date, parse_year as _parse_year
 
 class PolicyDB:
     def __init__(self):
@@ -58,7 +20,10 @@ class PolicyDB:
     def _connect(self) -> sqlite3.Connection:
         if self._conn is None:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-            self._conn = sqlite3.connect(str(DB_PATH))
+            # check_same_thread=False：PolicyDB 顶层单例连接被后台采集线程跨线程
+            # 复用，低频写、无并发，关闭同线程检查避免 "SQLite objects created in
+            # a thread can only be used in that same thread" 报错。
+            self._conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._ensure_schema()
@@ -103,10 +68,19 @@ class PolicyDB:
                                raw_json
                                TEXT
                                DEFAULT
-                               ''
+                               '',
+                               sentiment
+                               TEXT
+                               DEFAULT
+                               '中性'
                            )
                            """)
         self._conn.commit()
+        # 主题倾向维度：幂等补列（旧库兼容）
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(policy_docs)")}
+        if "sentiment" not in cols:
+            self._conn.execute("ALTER TABLE policy_docs ADD COLUMN sentiment TEXT DEFAULT '中性'")
+            self._conn.commit()
 
     def exists(self, url: str) -> bool:
         conn = self._connect()
@@ -119,8 +93,8 @@ class PolicyDB:
         normalized_date = _normalize_date(entry.get("publish_date", ""))
         conn.execute(
             """INSERT OR REPLACE INTO policy_docs
-               (url, title, source, organization, publish_date, found_at, keywords, body, raw_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (url, title, source, organization, publish_date, found_at, keywords, body, raw_json, sentiment)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 entry.get("url", ""),
                 entry.get("title", ""),
@@ -131,13 +105,14 @@ class PolicyDB:
                 entry.get("keywords", ""),
                 entry.get("body", ""),
                 json.dumps(entry, ensure_ascii=False),
+                entry.get("sentiment", "中性"),
             ),
         )
         conn.commit()
 
     def search(self, keyword: str = "", org: str = "", limit: int = 20, year: int | None = None) -> list[dict]:
         conn = self._connect()
-        sql = "SELECT url, title, source, organization, publish_date, keywords, length(body) as body_len FROM policy_docs WHERE 1=1"
+        sql = "SELECT url, title, source, organization, publish_date, keywords, sentiment, length(body) as body_len FROM policy_docs WHERE 1=1"
         params = []
         if keyword:
             sql += " AND (title LIKE ? OR keywords LIKE ? OR body LIKE ?)"

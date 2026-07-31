@@ -32,31 +32,23 @@ export default function DailyBoardPage() {
   return (
     <div>
       <div style={{ marginBottom: "var(--sp-lg)" }}>
-        <h1 style={{ fontSize: "var(--fs-xl)", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>
+        <h1 className="df-h1" style={{ margin: 0 }}>
           每日看板 · 埋伏提示
         </h1>
-        <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-secondary)", margin: "6px 0 0" }}>
+        <p className="df-body" style={{ margin: "6px 0 0" }}>
           连板潜力股量化评分 + 金融大事日历提前埋伏 + 每日定时报告。可拖拽 / 自定义看板请在「微观 · 待机速览」中编排。
         </p>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <button
+          className="btn-primary"
           onClick={refreshAll}
           disabled={isFetching}
-          style={{
-            background: "rgba(88,166,255,0.15)",
-            border: "1px solid #58a6ff",
-            color: "#58a6ff",
-            borderRadius: 6,
-            padding: "4px 12px",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
         >
           {isFetching ? "刷新中…" : "立即刷新"}
         </button>
-        <span style={{ fontSize: 12, color: "#8b949e" }}>
+        <span className="df-caption">
           <UpdateTimestamp data={lu.updatedAt ? { updatedAt: lu.updatedAt } : null} />
         </span>
       </div>

@@ -28,24 +28,31 @@
   --transition: 0.25s ease;
   --sidebar-slide-duration: 0.35s;
 
-  /* ── 响应式字体阶梯 clamp(min, preferred, max) ── */
-  --fs-2xs:  clamp(12px,  0.2vw + 8px,  13px);
-  --fs-xs:   clamp(13px,  0.25vw + 9px, 14px);
-  --fs-sm:   clamp(14px,  0.3vw + 10px, 15px);
-  --fs-base: clamp(15px,  0.35vw + 11px, 16px);
-  --fs-md:   clamp(16px,  0.4vw + 12px, 17px);
-  --fs-lg:   clamp(17px,  0.5vw + 13px, 18px);
-  --fs-xl:   clamp(19px,  0.65vw + 14px, 20px);
-  --fs-2xl:  clamp(21px,  0.85vw + 16px, 22px);
+  /* ── 用户可调缩放层（视觉微调面板控制，挂在 html 上） ──
+     --font-scale / --space-scale 由 VisualTweakPanel 写入 documentElement，
+     默认 1；面板拖动即实时改变全局字号/间距。 */
+  --font-scale: 1;
+  --space-scale: 1;
 
-  /* ── 响应式间距阶梯 ── */
-  --sp-2xs: clamp(3px,  0.1vw + 1px,   4px);
-  --sp-xs:  clamp(5px,  0.15vw + 3px,  7px);
-  --sp-sm:  clamp(6px,  0.2vw + 4px,   10px);
-  --sp-md:  clamp(8px,  0.25vw + 6px,  14px);
-  --sp-lg:  clamp(12px, 0.35vw + 8px,  18px);
-  --sp-xl:  clamp(16px, 0.45vw + 10px, 24px);
-  --sp-2xl: clamp(20px, 0.55vw + 14px, 30px);
+  /* ── 响应式字体阶梯 clamp(min, preferred, max) ──
+     基准已上调一档（护眼），并乘以 --font-scale 支持面板微调 */
+  --fs-2xs:  calc(clamp(13px, 0.20vw +  9px, 14px) * var(--font-scale));
+  --fs-xs:   calc(clamp(14px, 0.25vw + 10px, 15px) * var(--font-scale));
+  --fs-sm:   calc(clamp(15px, 0.30vw + 11px, 16px) * var(--font-scale));
+  --fs-base: calc(clamp(16px, 0.35vw + 12px, 17px) * var(--font-scale));
+  --fs-md:   calc(clamp(17px, 0.40vw + 13px, 18px) * var(--font-scale));
+  --fs-lg:   calc(clamp(18px, 0.50vw + 14px, 19px) * var(--font-scale));
+  --fs-xl:   calc(clamp(20px, 0.65vw + 15px, 21px) * var(--font-scale));
+  --fs-2xl:  calc(clamp(21px, 0.85vw + 16px, 22px) * var(--font-scale));
+
+  /* ── 响应式间距阶梯（乘以 --space-scale 支持面板微调） ── */
+  --sp-2xs: calc(clamp(4px,  0.10vw + 2px,   5px)  * var(--space-scale));
+  --sp-xs:  calc(clamp(6px,  0.15vw + 4px,   8px)  * var(--space-scale));
+  --sp-sm:  calc(clamp(8px,  0.20vw + 5px,  12px)  * var(--space-scale));
+  --sp-md:  calc(clamp(10px, 0.25vw + 7px,  16px)  * var(--space-scale));
+  --sp-lg:  calc(clamp(14px, 0.35vw + 9px,  20px)  * var(--space-scale));
+  --sp-xl:  calc(clamp(18px, 0.45vw + 11px, 26px) * var(--space-scale));
+  --sp-2xl: calc(clamp(22px, 0.55vw + 15px, 34px) * var(--space-scale));
 
   /* ── 动效缓动曲线（Refined motion） ── */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -58,9 +65,9 @@
   --elev-2: 0 2px 4px rgba(0,0,0,0.45), 0 14px 34px -8px rgba(0,0,0,0.55);
   --ring: 0 0 0 2px rgb(var(--bg-r),var(--bg-g),var(--bg-b)), 0 0 0 4px rgba(212,168,83,0.5);
 
-  /* ── 展示型字号阶梯 ── */
-  --fs-3xl: clamp(24px, 1.2vw + 18px, 30px);
-  --fs-4xl: clamp(30px, 1.8vw + 22px, 40px);
+  /* ── 展示型字号阶梯（同样乘 font-scale） ── */
+  --fs-3xl: calc(clamp(24px, 1.2vw + 18px, 30px) * var(--font-scale));
+  --fs-4xl: calc(clamp(30px, 1.8vw + 22px, 40px) * var(--font-scale));
 }
 
 /* 各主题仅设置独有变量：背景色 RGB 分量 + 面板色 + 辅色 + 背景图 */
@@ -130,7 +137,7 @@ body {
     radial-gradient(80% 60% at 100% 0%, rgba(0,150,136,0.05), transparent 50%),
     rgb(var(--bg-r), var(--bg-g), var(--bg-b));
   color: var(--text-primary);
-  line-height: 1.5;
+  line-height: 1.65;
   min-height: 100vh;
   transition: background 0.4s ease;
   font-size: var(--fs-base);
@@ -600,4 +607,171 @@ body > #root::before {
     margin: 0 auto;
   }
 }
+
+/* ════════════════════════════════════════════════════════════
+   排版层级系统（设计令牌 · 对齐 Apple / Linear / Vercel 规范）
+   目标：清晰的信息层级 + 护眼对比度（正文 CR ≥ 4.5:1）
+   ════════════════════════════════════════════════════════════ */
+
+/* ── 标题权重阶梯（克制使用 800，正文层级用 600/700） ── */
+.df-h1 { font-size: var(--fs-2xl); font-weight: 800; line-height: 1.25; letter-spacing: -0.02em; color: var(--text-primary); }
+.df-h2 { font-size: var(--fs-xl);  font-weight: 700; line-height: 1.3;  letter-spacing: -0.01em; color: var(--text-primary); }
+.df-h3 { font-size: var(--fs-lg);  font-weight: 700; line-height: 1.35; letter-spacing: 0;    color: var(--text-primary); }
+.df-h4 { font-size: var(--fs-md);  font-weight: 600; line-height: 1.4;  letter-spacing: 0;    color: var(--text-secondary); }
+
+/* ── 正文 / 辅助文字（对比度安全：muted 仅用于非关键元信息） ── */
+.df-body   { font-size: var(--fs-base); font-weight: 400; line-height: 1.65; color: var(--text-secondary); }
+.df-body-strong { font-size: var(--fs-base); font-weight: 600; line-height: 1.6; color: var(--text-primary); }
+.df-caption { font-size: var(--fs-xs); font-weight: 400; line-height: 1.5; color: var(--text-muted); }
+.df-label  { font-size: var(--fs-2xs); font-weight: 700; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+
+/* ── 数值 / 强调（等宽数字，tabular-nums 已在 body 开启） ── */
+.df-num     { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-primary); }
+.df-num-lg  { font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); font-size: var(--fs-2xl); line-height: 1.1; }
+
+/* ── 统一段落间距节奏（垂直韵律，4px 基准网格） ── */
+.df-stack > * + * { margin-top: var(--sp-md); }
+.df-stack-sm > * + * { margin-top: var(--sp-sm); }
+
+/* ════════════════════════════════════════════════════════════
+   看板组件（Widget / WidgetBoard）— 统一金色描边 + 圆角 token
+   取代原先散落的 GitHub-dark inline 样式（#2d3340/#e6edf3/#58a6ff）
+   ════════════════════════════════════════════════════════════ */
+.widgetboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--sp-lg);
+  align-items: start;
+}
+
+.widget {
+  position: relative;
+  min-width: 0;
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-lg);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.22);
+  transition: all var(--transition);
+}
+.widget:hover {
+  border-color: rgba(212,168,83,0.4);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 28px rgba(0,0,0,0.3), 0 0 14px rgba(212,168,83,0.08);
+}
+.widget.dragging {
+  opacity: 0.5;
+}
+
+/* 看板工具条 */
+.widgetboard-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
+  flex-wrap: wrap;
+}
+.widgetboard-title { font-size: var(--fs-md); font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.widgetboard-hint  { font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: 0.02em; }
+
+/* 看板卡片头部：手柄 + 标题 + 标签操作 */
+.widget-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-sm);
+}
+.widget-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: var(--fs-lg);
+  line-height: 1;
+  user-select: none;
+  transition: color var(--transition);
+}
+.widget-handle:hover { color: var(--accent-gold); }
+.widget-title {
+  flex: 1;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: text;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.widget-title-input {
+  flex: 1;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--accent-gold);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  padding: 2px var(--sp-sm);
+}
+.widget-tag-btn,
+.widget-reset-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.widget-tag-btn:hover,
+.widget-reset-btn:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+.widget-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(212,168,83,0.12);
+  border: 1px solid rgba(212,168,83,0.32);
+  color: var(--accent-gold);
+  border-radius: 999px;
+  font-size: var(--fs-2xs);
+  padding: 2px 8px;
+}
+.widget-tag-x { cursor: pointer; font-weight: 700; }
+.widget-tag-row { display: flex; flex-wrap: wrap; gap: var(--sp-xs); margin-bottom: var(--sp-sm); align-items: center; }
+.widget-tag-input {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--accent-gold);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: var(--fs-2xs);
+  padding: 2px 10px;
+  width: 110px;
+}
+
+/* ── 通用内容块卡片（marketShared.cardBox 的 token 化替身） ── */
+.content-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: var(--sp-sm) var(--sp-md);
+}
+
+/* ── 主按钮（金色主行动，取代蓝色 #58a6ff 刷新钮） ── */
+.btn-primary {
+  background: rgba(212,168,83,0.16);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  border-radius: 6px;
+  padding: 4px 14px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-primary:hover { background: rgba(212,168,83,0.26); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
 

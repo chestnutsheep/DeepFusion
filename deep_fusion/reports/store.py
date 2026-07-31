@@ -69,6 +69,7 @@ def _create_tables(con):
             sector TEXT,
             rating INTEGER DEFAULT 3,
             category TEXT,
+            sentiment TEXT DEFAULT '中性',
             source TEXT,
             note TEXT,
             domains TEXT,
@@ -90,6 +91,9 @@ def _migrate(con):
     for col in ("domains", "targets"):
         if col not in cols:
             con.execute(f"ALTER TABLE calendar_events ADD COLUMN {col} TEXT")
+    # 大事日历：补利空/利好维度（幂等）
+    if "sentiment" not in cols:
+        con.execute("ALTER TABLE calendar_events ADD COLUMN sentiment TEXT DEFAULT '中性'")
     # 连板表：补校准概率列（幂等）
     lu_cols = {r[1] for r in con.execute("PRAGMA table_info(limit_up_stocks)")}
     for col in ("calibrated_prob", "calibrated_p_cal"):
@@ -217,11 +221,12 @@ def seed_calendar(events, db_path=None):
         for e in events:
             con.execute(
                 "INSERT OR REPLACE INTO calendar_events"
-                "(date, name, sector, rating, category, source, note, domains, targets, created_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+                "(date, name, sector, rating, category, sentiment, source, note, domains, targets, created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (
                     e.get("date"), e.get("name"), e.get("sector"),
                     int(e.get("rating", 3)), e.get("category"),
+                    e.get("sentiment", "中性"),
                     e.get("source", "manual"), e.get("note", ""),
                     json.dumps(e.get("domains") or [], ensure_ascii=False),
                     json.dumps(e.get("targets") or [], ensure_ascii=False),
@@ -233,15 +238,15 @@ def seed_calendar(events, db_path=None):
 
 
 def add_calendar_event(rdate, name, sector="", rating=3, category="",
-                       source="manual", note="", domains=None, targets=None,
-                       db_path=None):
+                       sentiment="中性", source="manual", note="",
+                       domains=None, targets=None, db_path=None):
     con = _conn(db_path)
     try:
         con.execute(
             "INSERT OR REPLACE INTO calendar_events"
-            "(date, name, sector, rating, category, source, note, domains, targets, created_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
-            (rdate, name, sector, int(rating), category, source, note,
+            "(date, name, sector, rating, category, sentiment, source, note, domains, targets, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+            (rdate, name, sector, int(rating), category, sentiment, source, note,
              json.dumps(domains or [], ensure_ascii=False),
              json.dumps(targets or [], ensure_ascii=False)),
         )
@@ -264,6 +269,7 @@ def _row_to_event(r):
     return {
         "id": r["id"], "date": r["date"], "name": r["name"],
         "sector": r["sector"], "rating": r["rating"], "category": r["category"],
+        "sentiment": r["sentiment"] if r["sentiment"] else "中性",
         "source": r["source"], "note": r["note"],
         "domains": json.loads(r["domains"]) if r["domains"] else [],
         "targets": json.loads(r["targets"]) if r["targets"] else [],

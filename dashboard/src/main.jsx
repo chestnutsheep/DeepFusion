@@ -12,6 +12,8 @@ import MicroPage from './pages/MicroPage.jsx';
 import PolicyPage from './pages/PolicyPage.jsx';
 import GlobalPage from './pages/GlobalPage.jsx';
 import DailyBoardPage from './pages/DailyBoardPage.jsx';
+import VisualTweakPanel from './components/VisualTweakPanel.jsx';
+import LogDrawer from './components/LogDrawer.jsx';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -37,6 +39,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               </Route>
             </Routes>
           </ProSidebarProvider>
+          <VisualTweakPanel />
+          <LogDrawer />
         </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>

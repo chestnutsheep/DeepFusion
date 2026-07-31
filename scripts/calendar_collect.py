@@ -94,7 +94,7 @@ def collect_restricted(days: int, today: str):
             continue
         out.append({
             "date": d, "name": f"{name}解禁", "sector": _stock_industry(code),
-            "rating": 3, "category": "解禁", "source": "auto_collect",
+            "rating": 3, "category": "解禁", "sentiment": "利空", "source": "auto_collect",
             "note": f"解禁明细自动采集（{code}）",
             "domains": _domain_for(code, name),
             "targets": [{"code": code, "name": name}],
@@ -120,7 +120,7 @@ def collect_ipo(days: int, today: str):
             continue
         out.append({
             "date": d, "name": f"{name}申购", "sector": _stock_industry(code),
-            "rating": 3, "category": "新股", "source": "auto_collect",
+            "rating": 3, "category": "新股", "sentiment": "中性", "source": "auto_collect",
             "note": f"新股申购自动采集（{code}）",
             "domains": _domain_for(code, name),
             "targets": [{"code": code, "name": name}],
@@ -150,20 +150,131 @@ def collect_yjbb(days: int, today: str):
             continue
         if df is None or df.empty:
             continue
+        # 同报告期业绩预告方向映射：给业绩披露事件补 sentiment 维度
+        ymap = _yjyg_sentiment_map(period)
         for _, r in df.iterrows():
             code = str(r.get("股票代码", "")).strip()
             name = str(r.get("股票简称", "")).strip()
             d = _parse_date(r.get("首次预约") or r.get("实际披露"))
             if not code or not d or d < today or d > horizon:
                 continue
+            sent = ymap.get(code, "中性")
             out.append({
                 "date": d, "name": f"{name}业绩披露", "sector": _stock_industry(code),
-                "rating": 3, "category": "业绩披露", "source": "auto_collect",
-                "note": f"业绩披露预约自动采集（{code}，{period}）",
+                "rating": 3, "category": "业绩披露", "sentiment": sent, "source": "auto_collect",
+                "note": f"业绩披露预约自动采集（{code}，{period}）"
+                         + (f"，预告{sent}" if sent != "中性" else ""),
                 "domains": _domain_for(code, name),
                 "targets": [{"code": code, "name": name}],
             })
     return out
+
+
+# ── 业绩预告方向映射（粗粒度，标注为"主题倾向"）──
+# 预增/扭亏/略增 = 利好；预减/首亏/续亏/略减 = 利空；减亏/不确定 = 中性
+_YJYG_SENTIMENT = {
+    "预增": "利好", "扭亏": "利好", "略增": "利好", "续盈": "利好",
+    "预减": "利空", "首亏": "利空", "续亏": "利空", "略减": "利空",
+    "减亏": "中性", "不确定": "中性",
+}
+
+
+def _yjyg_periods():
+    """业绩预告的报告期候选（akshare 接受 YYYYMMDD 格式）。"""
+    yr = datetime.now().year
+    return [f"{yr-1}1231", f"{yr}0331", f"{yr}0630", f"{yr}0930", f"{yr}1231"]
+
+
+def collect_yjyg(days: int, today: str):
+    """业绩预告采集：带方向维度（预增/扭亏→利好，预减/首亏→利空）。
+
+    数据源 akshare stock_yjyg_em（东方财富，按报告期拉全量预告）。
+    事件日 = 公告日期（预告公开即事件）；同一股票多预测指标行按代码去重，
+    保留公告日期最新的一条。仅保留窗口 [today, today+days] 内公告的预告
+    （已过去的预告埋伏窗口已过，与 collect_yjbb 只取未来窗口一致）。
+    """
+    out = []
+    horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
+    seen: dict[str, dict] = {}
+    for period in _yjyg_periods():
+        try:
+            df = ak.stock_yjyg_em(date=period)
+        except Exception as ex:
+            _LOGGER.warning("yjyg_fetch_failed", period=period, error=str(ex))
+            continue
+        if df is None or df.empty:
+            continue
+        for _, r in df.iterrows():
+            code = str(r.get("股票代码", "")).strip()
+            name = str(r.get("股票简称", "")).strip()
+            gdate = _parse_date(r.get("公告日期"))
+            if not code or not gdate:
+                continue
+            if gdate < today or gdate > horizon:
+                continue
+            ytype = str(r.get("预告类型", "")).strip()
+            sent = _YJYG_SENTIMENT.get(ytype, "中性")
+            chg = r.get("业绩变动幅度")
+            try:
+                chg_txt = f"{float(chg):.0f}%" if chg not in (None, "") else ""
+            except (TypeError, ValueError):
+                chg_txt = str(chg) if chg not in (None, "") else ""
+            ev = {
+                "date": gdate,
+                "name": f"{name}业绩预告·{ytype}",
+                "sector": _stock_industry(code),
+                "rating": 3, "category": "业绩预告", "sentiment": sent,
+                "source": "auto_collect",
+                "note": f"业绩预告（{ytype}{'，变动' + chg_txt if chg_txt else ''}）",
+                "domains": _domain_for(code, name),
+                "targets": [{"code": code, "name": name}],
+            }
+            # 同代码保留公告日期最新的一条
+            if code not in seen or gdate > seen[code]["date"]:
+                seen[code] = ev
+    out.extend(seen.values())
+    return out
+
+
+def _yjyg_date_for(period: str):
+    """yjbb 中文期间 → yjyg 报告期 YYYYMMDD；解析失败返回 None。"""
+    try:
+        y = int(str(period)[:4])
+    except (ValueError, TypeError):
+        return None
+    if "半年报" in str(period):
+        return f"{y}0630"
+    if "年报" in str(period):
+        return f"{y}1231"
+    return None
+
+
+_YJYG_MAP_CACHE: dict[str, dict] = {}
+
+
+def _yjyg_sentiment_map(period: str) -> dict:
+    """该报告期的 股票代码→sentiment 映射（来自业绩预告，带缓存避免重复拉取）。"""
+    yjyg_date = _yjyg_date_for(period)
+    if not yjyg_date:
+        return {}
+    if yjyg_date in _YJYG_MAP_CACHE:
+        return _YJYG_MAP_CACHE[yjyg_date]
+    m: dict = {}
+    try:
+        df = ak.stock_yjyg_em(date=yjyg_date)
+    except Exception as ex:
+        _LOGGER.warning("yjyg_map_failed", period=period, error=str(ex))
+        _YJYG_MAP_CACHE[yjyg_date] = m
+        return m
+    if df is not None and not df.empty:
+        for _, r in df.iterrows():
+            code = str(r.get("股票代码", "")).strip()
+            if not code or code in m:
+                continue
+            ytype = str(r.get("预告类型", "")).strip()
+            m[code] = _YJYG_SENTIMENT.get(ytype, "中性")
+    _YJYG_MAP_CACHE[yjyg_date] = m
+    return m
 
 
 def main():
@@ -178,13 +289,17 @@ def main():
     events += collect_restricted(args.days, today)
     events += collect_ipo(args.days, today)
     events += collect_yjbb(args.days, today)
+    events += collect_yjyg(args.days, today)
 
     n = 0
     for e in events:
         try:
             add_calendar_event(e["date"], e["name"], e.get("sector", ""), e["rating"],
-                               e["category"], e.get("source", "auto_collect"),
-                               e.get("note", ""), e.get("domains"), e.get("targets"),
+                               e["category"],
+                               sentiment=e.get("sentiment", "中性"),
+                               source=e.get("source", "auto_collect"),
+                               note=e.get("note", ""),
+                               domains=e.get("domains"), targets=e.get("targets"),
                                db_path=args.db)
             n += 1
         except Exception as ex:

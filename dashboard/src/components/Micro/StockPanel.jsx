@@ -34,13 +34,18 @@ function parseKline(text) {
   const lines = sec.trim().split("\n").filter(Boolean);
   if (lines.length < 2) return null;
   const header = lines[0].split(",");
+  // 兼容腾讯源(英文列名 date/open/high/low/close/volume)与东财回退(中文列名)
+  const find = (zh, en) => {
+    const i = header.indexOf(zh);
+    return i >= 0 ? i : header.indexOf(en);
+  };
   const idx = {
-    date: header.indexOf("日期"),
-    open: header.indexOf("开盘"),
-    close: header.indexOf("收盘"),
-    high: header.indexOf("最高"),
-    low: header.indexOf("最低"),
-    volume: header.indexOf("成交量"),
+    date: find("日期", "date"),
+    open: find("开盘", "open"),
+    close: find("收盘", "close"),
+    high: find("最高", "high"),
+    low: find("最低", "low"),
+    volume: find("成交量", "volume"),
   };
   if (idx.date < 0 || idx.close < 0) return null;
   const dates = [], opens = [], closes = [], highs = [], lows = [], volumes = [];
@@ -241,11 +246,52 @@ function CsvMiniTable({ csv, title, maxRows = 5, maxCols = 8 }) {
     <div style={{ marginTop: 10 }}>
       <div style={{ fontSize: 13, color: "#c9cdd4", marginBottom: 6 }}>{title}</div>
       <div style={{ overflowX: "auto" }}>
-        <DataGrid
-          columns={header.map((h) => ({ key: h, title: h }))}
-          data={data}
-          maxHeight={180}
-        />
+        <table
+          style={{
+            borderCollapse: "collapse",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+            width: "100%",
+          }}
+        >
+          <thead>
+            <tr>
+              {header.map((h, i) => (
+                <th
+                  key={i}
+                  style={{
+                    textAlign: "left",
+                    padding: "4px 8px",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    color: "var(--text-muted)",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, ri) => (
+              <tr key={ri}>
+                {header.map((h, i) => (
+                  <td
+                    key={i}
+                    style={{
+                      padding: "4px 8px",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row[h]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -419,7 +465,7 @@ export default function StockPanel({ height }) {
 
   const { data: searchData } = useMCP("search", { keyword: symbol, market });
   const { data: klineText, isLoading: klineLoading } = useMCP("individual_hist", {
-    symbol, period: "daily", limit, market,
+    symbol, period: "daily", limit,
   });
   const { data: finText } = useMCP("financial_indicators", { symbol });
   const { data: quoteText } = useMCP("stock_quote", { symbol });
@@ -432,26 +478,27 @@ export default function StockPanel({ height }) {
   const { data: peerText } = useMCP("peer_comparison", { symbol, market });
   const { data: fraudText } = useMCP("anti_fraud_report", { symbol, concept: "" });
 
-  const kline = useMemo(() => parseKline(klineText?.data), [klineText]);
-  const fin = useMemo(() => parseFinancial(finText?.data), [finText]);
-  const basicMap = useMemo(() => parseBasicInfo(finText?.data), [finText]);
-  const fundRows = useMemo(() => parseFundFlow(fundText?.data), [fundText]);
+  // 注意：useMCP 已解包一层（data: query.data?.data），此处 data 即为后端返回字符串，禁止再 .data
+  const kline = useMemo(() => parseKline(klineText), [klineText]);
+  const fin = useMemo(() => parseFinancial(finText), [finText]);
+  const basicMap = useMemo(() => parseBasicInfo(finText), [finText]);
+  const fundRows = useMemo(() => parseFundFlow(fundText), [fundText]);
   const quote = useMemo(() => {
-    try { return quoteText?.data ? JSON.parse(quoteText.data) : null; }
+    try { return quoteText ? JSON.parse(quoteText) : null; }
     catch { return null; }
   }, [quoteText]);
   const tech = useMemo(() => {
     try {
-      const o = techText?.data ? JSON.parse(techText.data) : null;
+      const o = techText ? JSON.parse(techText) : null;
       return o && o.series ? o.series : [];
     } catch { return []; }
   }, [techText]);
   const concepts = useMemo(() => {
-    try { return conceptsText?.data ? JSON.parse(conceptsText.data) : null; }
+    try { return conceptsText ? JSON.parse(conceptsText) : null; }
     catch { return null; }
   }, [conceptsText]);
   const fraud = useMemo(() => {
-    try { return fraudText?.data ? JSON.parse(fraudText.data) : null; }
+    try { return fraudText ? JSON.parse(fraudText) : null; }
     catch { return null; }
   }, [fraudText]);
 
@@ -485,9 +532,9 @@ export default function StockPanel({ height }) {
   const techLatest = tech.length ? tech[tech.length - 1] : {};
   const techDates = tech.map((r) => r.trade_date);
 
-  const name = searchData?.data
+  const name = searchData
     ? (() => {
-        try { return JSON.parse(searchData.data)?.name; } catch { return ""; }
+        try { return JSON.parse(searchData)?.name; } catch { return ""; }
       })()
     : "";
 
@@ -608,11 +655,11 @@ export default function StockPanel({ height }) {
 
       {/* 舆情公告时间线 */}
       <SectionTitle title="舆情公告时间线" />
-      <SentimentTimeline sentimentText={sentimentText?.data} />
+      <SentimentTimeline sentimentText={sentimentText} />
 
       {/* 同业对比 */}
       <SectionTitle title="同业对比（行业内分位）" />
-      <PeerComparison peerText={peerText?.data} />
+      <PeerComparison peerText={peerText} />
 
       {/* 技术指标区 */}
       <SectionTitle title="技术指标（符合图形）" />

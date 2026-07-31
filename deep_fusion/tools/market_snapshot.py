@@ -102,17 +102,17 @@ def _safe(obj) -> str:
 # ---------------------------------------------------------------------------
 # 大盘指数（Sina 直连优先，EM 回退）
 # ---------------------------------------------------------------------------
-def _fetch_indices() -> list:
+def _fetch_indices(force: bool = False) -> list:
     out = []
     df = None
     try:
-        df = ak_cache(ak.stock_zh_index_spot_sina, ttl=120, ttl2=300)
+        df = ak_cache(ak.stock_zh_index_spot_sina, force=force, ttl=120, ttl2=300)
     except Exception:
         df = None
     if df is None or df.empty:
         # 回退东财（注意新版 akshare 用 symbol 而非 market）
         try:
-            df = ak_cache(ak.stock_zh_index_spot_em, symbol="沪深重要指数", ttl=120, ttl2=300)
+            df = ak_cache(ak.stock_zh_index_spot_em, symbol="沪深重要指数", force=force, ttl=120, ttl2=300)
         except Exception:
             df = None
     if df is None or df.empty:
@@ -150,11 +150,11 @@ def _fetch_indices() -> list:
 # ---------------------------------------------------------------------------
 # 板块涨跌（行业资金流：涨跌幅 + 领涨股 + 主力净额）
 # ---------------------------------------------------------------------------
-def _fetch_sectors_and_flow() -> tuple:
+def _fetch_sectors_and_flow(force: bool = False) -> tuple:
     """返回 (sectors, flow_rows)。flow_rows 含 行业/涨跌幅/净额(亿)/领涨股，供多处复用。"""
     sectors, flow_rows = [], []
     try:
-        ind = ak_cache(ak.stock_fund_flow_industry, symbol="即时", ttl=300, ttl2=600)
+        ind = ak_cache(ak.stock_fund_flow_industry, symbol="即时", force=force, ttl=300, ttl2=600)
     except Exception:
         ind = None
     if ind is None or ind.empty:
@@ -208,7 +208,9 @@ def _fetch_turnover(indices: list) -> dict | None:
     if sh_amt is None or sz_amt is None:
         return None
     today_yi = round((sh_amt + sz_amt) / 1e8, 1)  # 元 → 亿
-    today_date = datetime.now().strftime("%Y-%m-%d")
+    # 用交易日而非自然日，避免周末/节假日落盘的基线换行错配
+    from ..shared.utils import recent_trade_date
+    today_date = recent_trade_date().strftime("%Y-%m-%d")
     return {
         "today_yi": today_yi,
         "prev_yi": None,
@@ -381,8 +383,8 @@ def _fetch_capital_flows(sectors_flow_rows: list):
 def market_broad_snapshot(
         force: bool = Field(False, description="绕过缓存强制重新拉取并落盘"),
 ) -> str:
-    indices = _fetch_indices()
-    sectors, _ = _fetch_sectors_and_flow()
+    indices = _fetch_indices(force=force)
+    sectors, _ = _fetch_sectors_and_flow(force=force)
     turnover = _fetch_turnover(indices)
     snap_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = {

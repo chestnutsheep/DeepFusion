@@ -25,9 +25,9 @@ export function safeParse(raw) {
 // 组件内卡片容器样式（Widget 内部内容块复用）
 export const cardBox = {
   background: "rgba(255,255,255,0.03)",
-  border: "1px solid #2d3340",
-  borderRadius: 8,
-  padding: "12px 14px",
+  border: "1px solid var(--border-subtle)",
+  borderRadius: "var(--radius)",
+  padding: "var(--sp-sm) var(--sp-md)",
 };
 
 // ── 悬浮信息卡 ──
@@ -38,25 +38,25 @@ export function InfoCard({ x, y, title, rows }) {
     top: Math.min(y + 14, window.innerHeight - 160),
     zIndex: 9999,
     pointerEvents: "none",
-    background: "rgba(20,24,33,0.96)",
-    border: "1px solid #2d3340",
-    borderRadius: 8,
+    background: "rgba(20,30,30,0.96)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "var(--radius)",
     padding: "10px 12px",
     width: 240,
     boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
     fontSize: 12,
-    color: "#c9d1d9",
+    color: "var(--text-secondary)",
   };
   return (
     <div style={style}>
-      <div style={{ fontWeight: 600, color: "#fff", marginBottom: 6 }}>{title}</div>
+      <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>{title}</div>
       {rows.map((r, i) => (
         <div
           key={i}
           style={{ display: "flex", justifyContent: "space-between", lineHeight: 1.7 }}
         >
-          <span style={{ color: "#8b949e" }}>{r[0]}</span>
-          <span style={{ color: r[2] || "#c9d1d9", fontWeight: 500 }}>{r[1]}</span>
+          <span style={{ color: "var(--text-muted)" }}>{r[0]}</span>
+          <span style={{ color: r[2] || "var(--text-secondary)", fontWeight: 500 }}>{r[1]}</span>
         </div>
       ))}
     </div>
@@ -99,16 +99,16 @@ export function IndexCard({ it, onHover, onLeave }) {
         background: "rgba(255,255,255,0.03)",
         border: `1px solid ${color}33`,
         borderLeft: `3px solid ${color}`,
-        borderRadius: 8,
+        borderRadius: "var(--radius)",
         padding: "10px 12px",
         cursor: "default",
       }}
     >
-      <div style={{ fontSize: 13, color: "#c9d1d9", marginBottom: 4 }}>{it.name}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color }}>
+      <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginBottom: 4 }}>{it.name}</div>
+      <div className="df-num-lg" style={{ color }}>
         {it.price != null ? it.price.toFixed(2) : "--"}
       </div>
-      <div style={{ fontSize: 12, color, marginTop: 2 }}>{fmtPct(pct)}</div>
+      <div style={{ fontSize: "var(--fs-xs)", color, marginTop: 2 }}>{fmtPct(pct)}</div>
     </div>
   );
 }
@@ -130,17 +130,17 @@ export function SectorTile({ s, onHover, onLeave }) {
       onMouseLeave={onLeave}
       style={{
         background: bg,
-        border: "1px solid #2d3340",
-        borderRadius: 6,
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--radius-sm)",
         padding: "8px 6px",
         textAlign: "center",
         cursor: "default",
       }}
     >
-      <div style={{ fontSize: 12, color: "#e6edf3", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {s.name}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color }}>{fmtPct(pct)}</div>
+      <div style={{ fontSize: "var(--fs-xs)", fontWeight: 600, color }}>{fmtPct(pct)}</div>
     </div>
   );
 }
@@ -152,12 +152,12 @@ export function FlowCard({ title, data, valueLabel, note }) {
     const isError = !!data.error;
     return (
       <div style={cardBox}>
-        <div style={{ fontSize: 13, color: "#c9d1d9" }}>{title}</div>
-        <div style={{ fontSize: 12, color: isError ? "#f85149" : "#d29922", marginTop: 6 }}>
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)" }}>{title}</div>
+        <div style={{ fontSize: "var(--fs-xs)", color: isError ? "var(--accent-red)" : "var(--accent-gold)", marginTop: 6 }}>
           {isError ? "数据获取失败" : "数据暂不可用"}
         </div>
         {data.note && (
-          <div style={{ fontSize: 10, color: "#6e7681", marginTop: 4 }}>{data.note}</div>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 4 }}>{data.note}</div>
         )}
       </div>
     );
@@ -168,16 +168,16 @@ export function FlowCard({ title, data, valueLabel, note }) {
   const color = tone(v);
   return (
     <div style={cardBox}>
-      <div style={{ fontSize: 13, color: "#c9d1d9", marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color }}>
+      <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginBottom: 6 }}>{title}</div>
+      <div className="df-num-lg" style={{ color, fontSize: "var(--fs-2xl)" }}>
         {v != null ? `${v.toFixed(1)}亿` : "--"}
       </div>
       {d != null && (
-        <div style={{ fontSize: 12, color: tone(d), marginTop: 4 }}>
+        <div style={{ fontSize: "var(--fs-xs)", color: tone(d), marginTop: 4 }}>
           环比 {fmtYi(d)}（{fmtPct(dp)}）
         </div>
       )}
-      <div style={{ fontSize: 11, color: "#8b949e", marginTop: 4 }}>
+      <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 4 }}>
         {data.date || "--"}
         {note ? ` · ${note}` : ""}
       </div>

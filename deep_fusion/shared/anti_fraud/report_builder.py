@@ -493,7 +493,8 @@ def extract_capital_flow(anti_fraud: Dict) -> Dict:
             date = safe_get(item, '日期', f'T-{20-i}')
             days.append(date)
             
-            main = safe_num(safe_get(item, '主力净流入', 0))
+            # akshare stock_individual_fund_flow 真实列为「主力净流入-净额」(无裸列「主力净流入」)
+            main = safe_num(safe_get(item, '主力净流入-净额', safe_get(item, '主力净流入', 0)))
             main_flow.append(main)
             retail_flow.append(-main * 0.8)  # 简化估算
             
@@ -817,7 +818,8 @@ def build_report(symbol: str, concept: str, anti_fraud_data: Dict, bl_pathology_
             },
             "catalysts": extract_catalysts(concept),
             "capital_signals": {
-                "net_inflow_5d": f"{main_flow_total / 10000:.1f}亿",
+                # main_flow 来自 akshare 原始值（元），元→亿元需 ÷1e8
+                "net_inflow_5d": f"{main_flow_total / 1e8:.2f}亿",
                 "northbound_trend": "观察中",
                 "margin_change": "待确认",
                 "signal": "需持续跟踪资金流向",

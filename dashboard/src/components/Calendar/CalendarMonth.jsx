@@ -30,15 +30,39 @@ export default function CalendarMonth() {
   const events = md?.events || [];
   const updatedAt = month.updatedAt;
 
+  // 筛选：利空/利好方向 + 事件类型
+  const [sentFilter, setSentFilter] = useState('全部');
+  const [catFilter, setCatFilter] = useState('全部');
+
+  const categories = useMemo(() => {
+    const s = new Set();
+    for (const e of events) if (e.category) s.add(e.category);
+    return ['全部', ...Array.from(s).sort()];
+  }, [events]);
+
+  const sentCounts = useMemo(() => {
+    const c = { 利好: 0, 利空: 0, 中性: 0 };
+    for (const e of events) c[e.sentiment || '中性'] = (c[e.sentiment || '中性'] || 0) + 1;
+    return c;
+  }, [events]);
+
+  const displayEvents = useMemo(() => {
+    return events.filter((e) => {
+      if (sentFilter !== '全部' && (e.sentiment || '中性') !== sentFilter) return false;
+      if (catFilter !== '全部' && (e.category || '') !== catFilter) return false;
+      return true;
+    });
+  }, [events, sentFilter, catFilter]);
+
   // 按日期分组
   const byDate = useMemo(() => {
     const m = {};
-    for (const e of events) {
+    for (const e of displayEvents) {
       const day = e.date ? parseInt(e.date.slice(8, 10), 10) : 0;
       (m[day] = m[day] || []).push(e);
     }
     return m;
-  }, [events]);
+  }, [displayEvents]);
 
   const daysInMonth = new Date(ym.year, ym.month, 0).getDate();
   const firstJsDay = new Date(ym.year, ym.month - 1, 1).getDay(); // 0=Sun
@@ -86,10 +110,26 @@ export default function CalendarMonth() {
         </div>
       )}
 
+      {/* 筛选：利空/利好方向 + 事件类型 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>方向</span>
+        {['全部', '利好', '利空', '中性'].map((s) => (
+          <FilterChip key={s} label={s} active={sentFilter === s} onClick={() => setSentFilter(s)}
+            color={s === '利好' ? '#5BAE7A' : s === '利空' ? '#C0584F' : undefined} />
+        ))}
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginLeft: 4 }}>类型</span>
+        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={selectStyle()}>
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+          全月 {sentCounts.利好} 利好 · {sentCounts.利空} 利空 · {sentCounts.中性} 中性
+        </span>
+      </div>
+
       {/* 月历网格 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
         {WEEK.map((w) => (
-          <div key={w} style={{ textAlign: 'center', fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', padding: '4px 0' }}>{w}</div>
+          <div key={w} style={{ textAlign: 'center', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', padding: '4px 0' }}>{w}</div>
         ))}
         {cells.map((d, i) => {
           if (d == null) return <div key={`b${i}`} />;
@@ -101,22 +141,26 @@ export default function CalendarMonth() {
               key={d}
               onClick={() => setSelected(d)}
               style={{
-                minHeight: 64, borderRadius: 6, padding: 6, cursor: evs.length ? 'pointer' : 'default',
+                minHeight: 76, borderRadius: 6, padding: 6, cursor: evs.length ? 'pointer' : 'default',
                 background: isSel ? 'rgba(201,168,97,0.14)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${isSel ? 'rgba(201,168,97,0.6)' : 'var(--border-subtle)'}`,
-                display: 'flex', flexDirection: 'column', gap: 3,
+                display: 'flex', flexDirection: 'column', gap: 4,
               }}
             >
-              <div style={{ fontSize: 'var(--fs-xs)', color: evs.length ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: isSel ? 700 : 400 }}>{d}</div>
-              {evs.slice(0, 2).map((e, k) => (
+              <div style={{ fontSize: 'var(--fs-sm)', color: evs.length ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: isSel ? 700 : 400 }}>{d}</div>
+              {evs.slice(0, 2).map((e, k) => {
+                const sentColor = e.sentiment === '利好' ? '#5BAE7A'
+                  : e.sentiment === '利空' ? '#C0584F' : '#C9A861';
+                return (
                 <div key={k} style={{
-                  fontSize: 9, lineHeight: 1.2, color: 'var(--text-secondary)',
-                  background: 'rgba(255,255,255,0.05)', borderRadius: 3, padding: '1px 4px',
+                  fontSize: 'var(--fs-xs)', lineHeight: 1.25, color: 'var(--text-secondary)',
+                  background: 'rgba(255,255,255,0.05)', borderRadius: 3, padding: '2px 5px',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  borderLeft: `2px solid ${hasHigh ? '#C07C7C' : '#C9A861'}`,
+                  borderLeft: `2px solid ${sentColor}`,
                 }}>{e.name}</div>
-              ))}
-              {evs.length > 2 && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>+{evs.length - 2}</div>}
+                );
+              })}
+              {evs.length > 2 && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>+{evs.length - 2}</div>}
             </div>
           );
         })}
@@ -129,7 +173,9 @@ export default function CalendarMonth() {
         </div>
         {month.isLoading && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>加载中…</div>}
         {!month.isLoading && selectedEvents.length === 0 && (
-          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', padding: '12px 0' }}>当日暂无催化事件。</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', padding: '12px 0' }}>
+            {sentFilter !== '全部' || catFilter !== '全部' ? '当前筛选下当日无匹配事件。' : '当日暂无催化事件。'}
+          </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--sp-md)', alignItems: 'start' }}>
           {selectedEvents.map((e) => (
@@ -148,4 +194,22 @@ function navBtn() {
     width: 30, height: 30, borderRadius: 6, cursor: 'pointer', fontSize: 18, lineHeight: 1,
     background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   };
+}
+
+function FilterChip({ label, active, onClick, color }) {
+  const activeStyle = color
+    ? { background: color, borderColor: color, color: '#0b0b0f', fontWeight: 700 }
+    : { background: 'var(--accent-gold)', borderColor: 'var(--accent-gold)', color: '#0b0b0f', fontWeight: 700 };
+  return (
+    <button onClick={onClick} style={{
+      fontSize: 'var(--fs-xs)', padding: '4px 11px', borderRadius: 999, cursor: 'pointer',
+      border: '1px solid var(--border-subtle)', transition: 'all .15s',
+      ...(active ? activeStyle : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)' }),
+    }}>{label}</button>
+  );
+}
+
+function selectStyle() {
+  return { fontSize: 'var(--fs-xs)', padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+    background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' };
 }

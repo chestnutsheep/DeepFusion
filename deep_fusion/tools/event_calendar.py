@@ -51,11 +51,80 @@ def _val_list(v, default=None):
     return default
 
 
+_BEARISH_SEED = {"医药集采续约", "量化私募新规过渡期结束"}
+# 仅标注「已明确落地」的行业利好；政策会议/吹风会/听证会性质的结果未知，不预设方向
+_BULLISH_SEED = {
+    "海南自贸港封关运作启动", "新能源汽车购置税延续政策落地",
+    "新能源汽车下乡启动", "数字货币试点扩围", "数据要素×行动推进",
+}
+
+
+def _seed_sentiment(name):
+    """种子事件利好/利空判定（中性为默认，仅对方向明确的事件标注）。"""
+    if name in _BEARISH_SEED:
+        return "利空"
+    if name in _BULLISH_SEED:
+        return "利好"
+    return "中性"
+
+
+# ── 年度固定政策发布节点（来自 policy_structure.md Routine 类，仅作日程提醒）──
+# (month, day, name, org, category) — 估算日，实际披露以官方为准
+ROUTINE_ANNUAL = [
+    (1, 15, "国家外汇储备数据月度发布", "国家外汇管理局", "政策发布"),
+    (1, 20, "上年四季度国民经济运行情况新闻发布会", "国家统计局", "政策发布"),
+    (2, 10, "CPI/PPI 月度数据发布", "国家统计局", "政策发布"),
+    (3, 15, "1-2月国民经济运行数据发布", "国家统计局", "政策发布"),
+    (4, 15, "一季度GDP初步核算", "国家统计局", "政策发布"),
+    (5, 15, "4月国民经济运行数据发布", "国家统计局", "政策发布"),
+    (7, 15, "二季度GDP初步核算", "国家统计局", "政策发布"),
+    (8, 15, "7月国民经济运行数据发布", "国家统计局", "政策发布"),
+    (10, 15, "三季度GDP初步核算", "国家统计局", "政策发布"),
+    (10, 20, "专业统计年鉴发布", "国家统计局", "政策发布"),
+    (12, 15, "全年国民经济运行情况新闻发布会", "国家统计局", "政策发布"),
+]
+ROUTINE_QUARTERLY = [
+    (3, 20, "货币政策执行报告(季度)", "中国人民银行", "政策发布"),
+    (6, 20, "金融市场发展报告(季度)", "中国人民银行", "政策发布"),
+    (9, 20, "反洗钱报告(季度)", "中国人民银行", "政策发布"),
+]
+# (year, name, org, category, is_major)
+ROUTINE_CYCLE = [
+    (2025, "十五五规划建议", "中国政府网", "政策发布", True),
+    (2026, "十五五规划实施", "中国政府网", "政策发布", True),
+    (2027, "国防白皮书", "国务院新闻办", "政策发布", False),
+    (2028, "人权事业进展白皮书", "国务院新闻办", "政策发布", False),
+    (2029, "航天白皮书", "国务院新闻办", "政策发布", False),
+    (2030, "十六五规划建议", "中国政府网", "政策发布", True),
+]
+
+
+def calendar_seed_routine():
+    """导入年度固定政策发布节点（幂等，可每年重跑以更新次年日程）。
+
+    政策部分的“未来政策节点/倒计时”统一从此读取，避免与工具层硬编码重复。
+    """
+    from datetime import datetime
+    y = datetime.now().year
+    events = []
+    for yy in (y, y + 1):
+        for (mo, day, name, org, cat) in (*ROUTINE_ANNUAL, *ROUTINE_QUARTERLY):
+            events.append({"date": f"{yy}-{mo:02d}-{day:02d}", "name": name,
+                           "sector": org, "rating": 3, "category": cat,
+                           "source": "routine", "sentiment": "中性"})
+    for (yy, name, org, cat, major) in ROUTINE_CYCLE:
+        events.append({"date": f"{yy}-06-01", "name": name, "sector": org,
+                       "rating": 4 if major else 3, "category": cat,
+                       "source": "routine", "sentiment": "中性"})
+    seed_calendar(events)
+    return json.dumps({"ok": True, "count": len(events), "source": "routine"}, ensure_ascii=False)
+
+
 def ensure_seeded():
     """若日历为空，自动导入 PART 02 种子（部署后首次调用保障前端有埋伏数据）。"""
     if not get_calendar_upcoming(3650):
         events = [{"date": d, "name": n, "sector": s, "rating": r, "category": c,
-                   "source": "html_part2",
+                   "source": "html_part2", "sentiment": _seed_sentiment(n),
                    "domains": [{"name": s, "type": "auto"}] if s else []}
                   for (d, n, s, r, c) in EVENTS_HTML]
         seed_calendar(events)
@@ -123,7 +192,8 @@ EVENTS_HTML = [
 )
 def calendar_seed():
     events = [{"date": d, "name": n, "sector": s, "rating": r, "category": c,
-              "source": "html_part2"} for (d, n, s, r, c) in EVENTS_HTML]
+              "source": "html_part2", "sentiment": _seed_sentiment(n)}
+              for (d, n, s, r, c) in EVENTS_HTML]
     seed_calendar(events)
     return json.dumps({"ok": True, "imported": len(events),
                        "range": [EVENTS_HTML[0][0], EVENTS_HTML[-1][0]]},
@@ -148,7 +218,7 @@ def calendar_upcoming(days: int = 14, as_of: str = ""):
 )
 def calendar_add(
         date: str = "", name: str = "", sector: str = "",
-        rating: int = 3, category: str = "",
+        rating: int = 3, category: str = "", sentiment: str = "中性",
         domains: str = "", targets: str = ""):
     date = _val(date)
     if not date or not name:
@@ -157,11 +227,12 @@ def calendar_add(
     if not dom and sector:
         dom = [{"name": sector, "type": "auto"}]
     tg = _val_list(targets)
-    add_calendar_event(date, name, sector, int(rating), category,
+    sentiment = _val(sentiment) or "中性"
+    add_calendar_event(date, name, sector, int(rating), category, sentiment,
                        domains=dom, targets=tg)
     return json.dumps({"ok": True, "event": {"date": date, "name": name,
                        "sector": sector, "rating": int(rating), "category": category,
-                       "domains": dom, "targets": tg}},
+                       "sentiment": sentiment, "domains": dom, "targets": tg}},
                       ensure_ascii=False)
 
 

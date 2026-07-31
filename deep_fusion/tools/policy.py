@@ -9,26 +9,8 @@ from pydantic import Field
 from ..data.sources import policy
 from ..server import mcp
 
-# ── 官方链接（按机构索引，从数据源配置自动派生） ──
-_OFFICIAL_LINKS: dict[str, str] = {
-    "国务院": "https://www.gov.cn",
-    "国家统计局": "https://www.stats.gov.cn",
-    "中国人民银行": "https://www.pbc.gov.cn",
-    "国家发改委": "https://www.ndrc.gov.cn",
-    "财政部": "https://www.mof.gov.cn",
-    "国家外汇管理局": "https://www.safe.gov.cn",
-    "国务院新闻办": "http://www.scio.gov.cn",
-}
-
-# ── 长周期战略节点（按年份索引，从政策关键词自动补充） ──
-_LONG_CYCLE_NODES: list[dict] = [
-    {"year": 2025, "label": "十五五规划建议", "is_major": True},
-    {"year": 2026, "label": "十五五规划实施", "is_major": True},
-    {"year": 2027, "label": "国防/人权白皮书", "is_major": False},
-    {"year": 2028, "label": "人权白皮书", "is_major": False},
-    {"year": 2029, "label": "航天白皮书", "is_major": False},
-    {"year": 2030, "label": "十六五规划建议", "is_major": True},
-]
+# ── 官方链接（机构名 → 官网，统一来源：shared/policy_orgs） ──
+from ..shared.policy_orgs import ORG_OFFICIAL_URLS as _OFFICIAL_LINKS
 
 # ── 月份名称 ──
 _MONTH_NAMES = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
@@ -73,9 +55,11 @@ def policy_search(
     for r in results:
         kw = f" [{r['keywords']}]" if r.get("keywords") else ""
         org = f" ({r['organization']})" if r.get("organization") else ""
+        sent = r.get("sentiment", "中性")
+        sent_tag = f"〈{sent}〉" if sent and sent != "中性" else ""
         date = r.get("publish_date", "") or ""
         url = r.get("url", "") or ""
-        lines.append(f"  {date:12s} {r['title'][:50]}{org}{kw}  {url}")
+        lines.append(f"  {date:12s} {r['title'][:50]}{org}{sent_tag}{kw}  {url}")
     return "\n".join(lines)
 
 
@@ -168,6 +152,18 @@ def policy_timeline(year: int | None = None) -> str:
             ],
         })
 
+    # ── 未来政策节点（统一从日历 Routine/政策会议种子读取，替代硬编码）──
+    from ..reports import store
+    upcoming = store.get_calendar_upcoming(400)  # 未来约13个月
+    upcoming_schedule = [
+        {"date": e["date"], "name": e["name"], "category": e["category"],
+         "sentiment": e.get("sentiment", "中性"), "sector": e.get("sector", "")}
+        for e in upcoming
+        if e.get("category") in ("政策会议", "政策发布")
+    ]
+    # 长周期战略节点（规划/白皮书）从日历周期固定节点派生
+    long_cycle = [s for s in upcoming_schedule if ("规划" in s["name"] or "白皮书" in s["name"])]
+
     # ── 五年规划阶段 ──
     five_year_start = 2026
     five_year_end = 2030
@@ -181,7 +177,8 @@ def policy_timeline(year: int | None = None) -> str:
     result = {
         "year": now_year,
         "months": months_data,
-        "long_cycle": _LONG_CYCLE_NODES,
+        "long_cycle": long_cycle,
+        "upcoming_schedule": upcoming_schedule,
         "official_links": [{"name": k, "url": v} for k, v in _OFFICIAL_LINKS.items()],
         "five_year": {
             "start": five_year_start,

@@ -92,10 +92,17 @@ async def market_data_query(
     ctx: Context | None = None,
 ) -> str:
     def _run():
+        # 带市场前缀（sh/sz/bj）一律先查指数表，查不到再按个股（取后6位）兜底
         if kind == "index" or (kind == "auto" and symbol.startswith(("sh", "sz", "bj")) and len(symbol) > 6):
-            return get_index_daily(symbol, limit=limit, db_path=db)
+            idx = get_index_daily(symbol, limit=limit, db_path=db)
+            if idx:
+                return idx
+            return get_daily(symbol[-6:], limit=limit, db_path=db)
         if symbol.startswith(("sh", "sz", "bj")) and len(symbol) == 8:
-            # 形如 sh600000 的指数式写法，按个股处理（取后6位）
+            # 形如 sh600000：先指数兜底，再个股（取后6位）
+            idx = get_index_daily(symbol, limit=limit, db_path=db)
+            if idx:
+                return idx
             return get_daily(symbol[-6:], limit=limit, db_path=db)
         return get_daily(symbol, limit=limit, db_path=db)
 

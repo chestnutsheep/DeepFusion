@@ -17,9 +17,13 @@ _SESSION.headers.update({"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWeb
 _SESSION.trust_env = False
 
 from ...shared.policy_db import PolicyDB
+from ...shared.policy_orgs import ORG_URL_PATTERNS
+from ...logging_config import get_logger
 
+_LOGGER = get_logger("policy")
 db = PolicyDB()
-_ORG_MAP: dict[str, str] = {}  # url_pattern → org_name, set in _sites
+# 机构 URL 模式 → 机构名（统一来源：shared/policy_orgs）；fetch_* 仍会填充同值
+_ORG_MAP = dict(ORG_URL_PATTERNS)
 
 # ── 通用工具 ─────────────────────────────────────────
 
@@ -68,6 +72,26 @@ _KW_SET = {"五年规划", "十五五", "十四五", "改革", "创新", "数字
            "绿色", "碳中和", "新能源", "产业链", "消费", "投资",
            "房地产", "地方债", "专项债", "财政", "货币", "降准", "降息",
            "人工智能", "数据要素", "国企改革", "民营"}
+
+# ── 主题倾向（粗粒度启发式，标注为"主题倾向"而非精确方向） ──
+# 一篇政策文档常同时利好/利空不同行业，此判定仅作辅助筛选信号。
+_SENT_BULLISH = {"降准", "降息", "补贴", "扶持", "利好", "提振", "扩围",
+                 "延续", "下乡", "稳增长", "宽松", "增发", "提标", "退税", "减免"}
+_SENT_BEARISH = {"调控", "收紧", "处罚", "整治", "压降", "限购", "限贷",
+                 "问责", "收紧", "风险警示", "去杠杆", "压减"}
+
+
+def _classify_sentiment(text: str) -> str:
+    """根据正文关键词粗略判定主题倾向：利好 / 利空 / 中性。"""
+    if not text:
+        return "中性"
+    bull = sum(1 for w in _SENT_BULLISH if w in text)
+    bear = sum(1 for w in _SENT_BEARISH if w in text)
+    if bull > bear:
+        return "利好"
+    if bear > bull:
+        return "利空"
+    return "中性"
 
 
 def _extract_detail(entry: dict) -> dict:
@@ -163,9 +187,11 @@ def _extract_detail(entry: dict) -> dict:
 
         found = [kw for kw in _KW_SET if kw in body_text]
         entry["keywords"] = ",".join(found)
+        # 主题倾向：粗粒度标注，供日历/政策双维度对齐筛选
+        entry["sentiment"] = _classify_sentiment(body_text)
 
     except Exception as e:
-        print(f"  ⚠ 详情失败: {entry.get('url', '?')}: {e}")
+        _LOGGER.warning("detail_failed", url=entry.get('url', '?'), error=str(e))
     return entry
 
 
@@ -216,7 +242,7 @@ def _parse_list(url: str, link_filter: Callable[[str], bool],
                     "keywords": "",
                 })
         except Exception as e:
-            print(f"  ⚠ {page_url}: {e}")
+            _LOGGER.warning("list_parse_failed", url=page_url, error=str(e))
     return results
 
 
@@ -317,10 +343,10 @@ def collect_all(max_pages: int = 2) -> dict[str, dict[str, int]]:
     """全站采集。"""
     totals = {}
     for name, fn in _FETCHERS:
-        print(f"\n── {name} ──")
+        _LOGGER.info("collect_start", site=name)
         try:
             entries = fn(max_pages=max_pages)
-            print(f"  找到 {len(entries)} 条")
+            _LOGGER.info("collect_found", site=name, count=len(entries))
             new = 0
             for e in entries:
                 if db.exists(e["url"]):
@@ -329,17 +355,17 @@ def collect_all(max_pages: int = 2) -> dict[str, dict[str, int]]:
                 db.save(e)
                 new += 1
             totals[name] = {"total": len(entries), "new": new}
-            print(f"  新增 {new} 条")
+            _LOGGER.info("collect_done", site=name, new=new)
         except Exception as ex:
-            print(f"  ❌ {ex}")
+            _LOGGER.error("collect_error", site=name, error=str(ex))
             totals[name] = {"error": str(ex)}
     # 采集后标准化所有日期为 ISO 格式
     try:
         fixed = db.normalize_all_dates()
         if fixed:
-            print(f"  日期标准化: 修正 {fixed} 条")
+            _LOGGER.info("date_normalized", fixed=fixed)
     except Exception as ex:
-        print(f"  ⚠ 日期标准化失败: {ex}")
+        _LOGGER.warning("date_normalize_failed", error=str(ex))
     return totals
 
 

@@ -17,30 +17,13 @@ export default function WidgetBoard({ widgets, headerExtra, title = "我的看�
   return (
     <div>
       {/* 看板工具条 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 14,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#e6edf3" }}>{title}</div>
-        <span style={{ fontSize: 12, color: "#6e7681" }}>拖动 ⠿ 排序 · 双击标题重命名 · + 标签自定义</span>
+      <div className="widgetboard-toolbar">
+        <span className="widgetboard-title">{title}</span>
+        <span className="widgetboard-hint">拖动 ⠿ 排序 · 双击标题重命名 · + 标签自定义</span>
         <button
+          className="widget-reset-btn"
           onClick={resetLayout}
           title="恢复默认布局"
-          style={{
-            marginLeft: "auto",
-            background: "transparent",
-            border: "1px solid #2d3340",
-            color: "#8b949e",
-            borderRadius: 6,
-            fontSize: 12,
-            padding: "4px 10px",
-            cursor: "pointer",
-          }}
         >
           重置布局
         </button>
@@ -48,14 +31,7 @@ export default function WidgetBoard({ widgets, headerExtra, title = "我的看�
 
       {headerExtra}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-          gap: 14,
-          alignItems: "start",
-        }}
-      >
+      <div className="widgetboard">
         {ordered.map((w) => {
           const m = meta[w.id] || {};
           return (

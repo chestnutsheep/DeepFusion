@@ -21,8 +21,11 @@ def get_current_time():
     texts = [f"当前时间: {now.isoformat()}, 星期{week}"]
     dfs = ak_cache(ak.tool_trade_date_hist_sina, ttl=43200)
     if dfs is not None:
-        start = now.date() - timedelta(days=5)
-        ended = now.date() + timedelta(days=5)
+        # 用最近交易日（非自然日）作基准，避免周末/节假日边界漂移
+        latest = recent_trade_date()
+        latest_d = latest.date() if hasattr(latest, "date") else latest
+        start = latest_d - timedelta(days=5)
+        ended = latest_d + timedelta(days=5)
         dates = [d.strftime("%Y-%m-%d") for d in dfs["trade_date"] if start <= d <= ended]
         texts.append(f", 最近交易日有: {','.join(dates)}")
     return "".join(texts)
@@ -105,10 +108,18 @@ def stock_sector_fund_flow_rank(
 ):
     dfs = ak_cache(ak.stock_sector_fund_flow_rank, indicator=days, sector_type=cate, ttl=1200)
     if dfs is None:
+        # 东财 push2 不稳定时的降级：Sina 直连的行业资金流（与 market_snapshot 统一源）
+        try:
+            dfs = ak_cache(ak.stock_fund_flow_industry, symbol="即时", ttl=1200)
+        except Exception:
+            dfs = None
+    if dfs is None:
         return "获取数据失败"
     try:
-        dfs.sort_values("今日涨跌幅", ascending=False, inplace=True)
-        dfs.drop(columns=["序号"], inplace=True)
+        if "今日涨跌幅" in dfs.columns:
+            dfs.sort_values("今日涨跌幅", ascending=False, inplace=True)
+        if "序号" in dfs.columns:
+            dfs.drop(columns=["序号"], inplace=True)
     except Exception:
         pass
     try:

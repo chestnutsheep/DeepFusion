@@ -221,7 +221,10 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
                 cache.set(all_df)
         except Exception as exc:
             _LOGGER.warning("ak_cache failed: %s", exc)
-            if _is_em_function(fun) and _has_proxy():
+            # EM 接口（东财域名不稳）失败时一律走去代理重试：
+            # 有代理时去掉代理重试，无代理时（代理未启动）等于直连重试一次，
+            # 避免代理不可达时整链路丢数据（大盘指数/板块资金流整块空白）。
+            if _is_em_function(fun):
                 all_df = _em_fallback_retry(fun, *args, **kwargs)
                 if all_df is not None:
                     cache.set(all_df)

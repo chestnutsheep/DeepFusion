@@ -28,7 +28,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 from deep_fusion import mcp, _load_tools
-from deep_fusion.logging_config import configure_logging, get_logger
+from deep_fusion.logging_config import configure_logging, get_logger, RUNTIME_LOG
 from deep_fusion.metrics import metrics_app
 
 # 触发 @mcp.tool 注册（lazy import 的工具模块）
@@ -53,9 +53,37 @@ async def list_tools(request: Request) -> JSONResponse:
     return JSONResponse({'ok': True, 'tools': [t.name for t in tools]})
 
 
+async def get_logs(request: Request) -> JSONResponse:
+    """返回 runtime.log 尾部，供前端调试抽屉查看运行时 info/warn/error。
+
+    query: ?lines=200 (默认 200, 上限 2000) & ?level=WARNING (可选过滤级别)
+    """
+    try:
+        n = min(int(request.query_params.get('lines', 200)), 2000)
+        min_level = (request.query_params.get('level') or '').upper()
+        if not RUNTIME_LOG.exists():
+            return JSONResponse({'ok': True, 'lines': [], 'path': str(RUNTIME_LOG)})
+        out = []
+        with open(RUNTIME_LOG, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+                if min_level:
+                    # JSON 行含 "level": "WARNING" 字段，做前缀匹配
+                    if f'"level": "{min_level}"' not in line and \
+                       f'"level":"{min_level}"' not in line:
+                        continue
+                out.append(line)
+        return JSONResponse({'ok': True, 'lines': out[-n:], 'path': str(RUNTIME_LOG)})
+    except Exception as e:
+        return JSONResponse({'ok': False, 'error': str(e)}, status_code=500)
+
+
 app = Starlette(routes=[
     Route('/api/tools/call', call_tool, methods=['POST']),
     Route('/api/tools/list', list_tools, methods=['GET']),
+    Route('/api/logs', get_logs, methods=['GET']),
     Mount('/metrics', metrics_app),
 ], middleware=[
     Middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['*'], allow_headers=['*']),
@@ -71,20 +99,20 @@ def _warmup_cycle_cache():
         import json
         from deep_fusion.analysis.macro.cycles.dispatch import _compute
         for cid, ckey in [
-            ("kitchin", "cycles_data_kitchin"),
-            ("juglar", "cycles_data_juglar"),
-            ("kuznets", "cycles_data_kuznets"),
+            ("kitchin", "cycles_data_kitchin_v2"),
+            ("juglar", "cycles_data_juglar_v2"),
+            ("kuznets", "cycles_data_kuznets_v2"),
         ]:
             try:
                 _ck = CacheKey.init(ckey, ttl=604800, ttl2=2592000)
                 if _ck.get() is None:
                     _, _, res = _compute(cid, limit=0)
                     _ck.set(json.dumps(res, ensure_ascii=False))
-                    print(f"  ✅ 预热 {cid} ({len(res)} 期)")
+                    _LOGGER.info("warmup_done", cycle=cid, periods=len(res))
                 else:
-                    print(f"  ✅ {cid} 已有缓存")
+                    _LOGGER.info("warmup_cached", cycle=cid)
             except Exception as e:
-                print(f"  ⚠ {cid} 预热失败: {e}")
+                _LOGGER.warning("warmup_failed", cycle=cid, error=str(e))
         # 康波 — 用 data_kondratiev() 正式路径写入，保证缓存格式一致
         try:
             from deep_fusion.tools.cycles import data_kondratiev
@@ -92,14 +120,14 @@ def _warmup_cycle_cache():
                 _ck = CacheKey.init(f"cycles_data_kondratiev_{m}_v5", ttl=604800, ttl2=2592000)
                 if _ck.get() is None:
                     data_kondratiev(m)
-                    print(f"  ✅ 预热 kondratiev_{m}")
+                    _LOGGER.info("warmup_done", cycle=f"kondratiev_{m}")
                 else:
-                    print(f"  ✅ kondratiev_{m} 已有缓存")
+                    _LOGGER.info("warmup_cached", cycle=f"kondratiev_{m}")
         except Exception as e:
-            print(f"  ⚠ kondratiev 预热失败: {e}")
-        print("  缓存预热完成")
+            _LOGGER.warning("warmup_failed", cycle="kondratiev", error=str(e))
+        _LOGGER.info("warmup_complete")
     except Exception as e:
-        print(f"  ⚠ 缓存预热失败: {e}")
+        _LOGGER.warning("warmup_failed", cycle="all", error=str(e))
 
 
 def _policy_collect_loop():
@@ -110,22 +138,22 @@ def _policy_collect_loop():
     while True:
         try:
             from deep_fusion.data.sources import policy as policy_collector
-            print('  ⟡ 政策采集开始...')
+            _LOGGER.info("policy_collect_start")
             totals = policy_collector.collect_all(max_pages=2)
             for site, r in totals.items():
                 if 'error' in r:
-                    print(f'  ❌ {site}: {r["error"]}')
+                    _LOGGER.error("policy_collect_error", site=site, error=r["error"])
                 else:
-                    print(f'  ✅ {site}: {r["total"]} 条, 新增 {r["new"]}')
-            print('  ⟡ 政策采集完成')
+                    _LOGGER.info("policy_collect_done", site=site, total=r["total"], new=r["new"])
+            _LOGGER.info("policy_collect_complete")
         except Exception as e:
-            print(f'  ⚠ 政策采集失败: {e}')
+            _LOGGER.warning("policy_collect_failed", error=str(e))
         time.sleep(interval)
 
 
 import uvicorn
 
-print(f'  ⟡ Deep Fusion API → http://localhost:5173/api')
+_LOGGER.info("server_start", url="http://localhost:5173/api")
 threading.Thread(target=_warmup_cycle_cache, daemon=True).start()
 threading.Thread(target=_policy_collect_loop, daemon=True).start()
 
