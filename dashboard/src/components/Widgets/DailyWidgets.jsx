@@ -162,12 +162,34 @@ export function CalibrationCard({ c }) {
   );
 }
 
+/** 把报告 payload 拍平成「一行一个字段」的列表（跳过 null/空）。 */
+function flattenPayload(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  if (Array.isArray(payload)) {
+    return payload.slice(0, 12).map((x, i) => ({
+      k: `#${i + 1}`,
+      v: typeof x === "object" ? JSON.stringify(x) : String(x),
+    }));
+  }
+  return Object.entries(payload)
+    .filter(([, v]) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0))
+    .slice(0, 16)
+    .map(([k, v]) => {
+      let val;
+      if (Array.isArray(v)) val = v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join("、");
+      else if (typeof v === "object") val = JSON.stringify(v);
+      else val = String(v);
+      return { k, v: val };
+    });
+}
+
 export function ReportSlot({ rtype, label, reloadToken }) {
   const { data, isLoading, refetch } = useMCP("report_latest", { rtype });
   useEffect(() => {
     if (reloadToken) refetch?.();
   }, [reloadToken]); // eslint-disable-line react-hooks/exhaustive-deps
   const d = parse(data);
+  const rows = flattenPayload(d?.payload);
   return (
     <CardWrapper hoverable>
       <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8 }}>
@@ -180,9 +202,17 @@ export function ReportSlot({ rtype, label, reloadToken }) {
           定时任务尚未写入，每日刷新后自动填充。
         </div>
       )}
-      {d?.payload && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", lineHeight: 1.6, maxHeight: 120, overflow: "auto" }}>
-          {typeof d.payload === "string" ? d.payload.slice(0, 200) : JSON.stringify(d.payload).slice(0, 200)}
+      {!isLoading && d?.payload && rows.length === 0 && (
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>无可展示字段。</div>
+      )}
+      {!isLoading && rows.length > 0 && (
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", maxHeight: 160, overflow: "auto" }}>
+          {rows.map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, padding: "3px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", lineHeight: 1.4 }}>
+              <span style={{ flexShrink: 0, color: "var(--text-muted)", minWidth: 64 }}>{r.k}</span>
+              <span style={{ color: "var(--text-secondary)", wordBreak: "break-word" }}>{r.v}</span>
+            </div>
+          ))}
         </div>
       )}
     </CardWrapper>
