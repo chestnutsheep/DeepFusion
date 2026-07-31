@@ -21,7 +21,7 @@ _TOOL_MODULES = [
     "analysis", "anti_fraud", "bonds", "crypto", "cycles", "forex",
     "funds", "futures", "industry", "international", "macro", "market",
     "policy", "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
-    "tech_indicators", "market_data",
+    "tech_indicators", "market_data", "limit_up",
 ]
 
 # prompts/resources 轻量，顶层 import

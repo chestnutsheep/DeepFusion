@@ -24,6 +24,8 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Iterable, Optional, Sequence
 
+from ...shared.utils import recent_trade_date
+
 # ── 路径 ──────────────────────────────────────────────
 # deep_fusion/data/sources/market_collector.py -> 上溯 4 级到 repo 根
 _REPO_ROOT = os.path.dirname(
@@ -141,7 +143,7 @@ def fetch_stock_daily(
     使用 Sina 直连端点 stock_zh_a_daily（无需代理）。
     """
     ak = _ak()
-    end = end or date.today()
+    end = end or recent_trade_date()
     cal_start = end - timedelta(days=int(days_back * 1.6))  # 日历日缓冲→交易日
     symbol = f"{_market_of(code)}{code[-6:]}"
     df = ak.stock_zh_a_daily(
@@ -182,7 +184,7 @@ def fetch_index_daily(
     symbol 形如 'sh000001' / 'sz399006'。
     """
     ak = _ak()
-    end = end or date.today()
+    end = end or recent_trade_date()
     cal_start = end - timedelta(days=int(days_back * 1.6))
     df = ak.stock_zh_index_daily(symbol=symbol)
     if df is None or df.empty:
@@ -448,7 +450,7 @@ def needs_refresh(
         ld = datetime.strptime(d, "%Y-%m-%d")
     except ValueError:
         return True
-    return (datetime.now() - ld).days > max_age_days
+    return (recent_trade_date() - ld).days > max_age_days
 
 
 def all_stock_codes(db_path: str = DEFAULT_DB) -> list[str]:
