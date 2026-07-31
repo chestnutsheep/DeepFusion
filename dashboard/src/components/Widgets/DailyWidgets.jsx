@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useMCP } from "../../hooks/useMCP.js";
 import CardWrapper from "../common/CardWrapper.jsx";
 import ErrorBoundary from "../common/ErrorBoundary.jsx";
@@ -184,33 +184,64 @@ function flattenPayload(payload) {
 }
 
 export function ReportSlot({ rtype, label, reloadToken }) {
-  const { data, isLoading, refetch } = useMCP("report_latest", { rtype });
+  const [selectedDate, setSelectedDate] = useState(null); // null = 最新
+  // 可切换的日期列表（最近 30 份，按日期倒序）
+  const history = useMCP("report_history", { rtype, limit: 30 });
+  const latest = useMCP("report_latest", { rtype });
+  const byDate = useMCP("report_by_date", selectedDate ? { rtype, rdate: selectedDate } : null);
+
   useEffect(() => {
-    if (reloadToken) refetch?.();
+    if (reloadToken) {
+      latest.refetch?.();
+      history.refetch?.();
+    }
   }, [reloadToken]); // eslint-disable-line react-hooks/exhaustive-deps
-  const d = parse(data);
-  const rows = flattenPayload(d?.payload);
+
+  const histData = parse(history.data);
+  const dateOptions = Array.isArray(histData?.history)
+    ? histData.history.map((h) => h.date)
+    : [];
+
+  // 内容来源：选定日期 → report_by_date；否则 → report_latest
+  const active = parse(selectedDate ? byDate.data : latest.data);
+  const isLoading = selectedDate ? byDate.isLoading : latest.isLoading;
+  const dateLabel = selectedDate || active?.date || "";
+  const rows = flattenPayload(active?.payload);
+
   return (
     <CardWrapper hoverable>
-      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8 }}>
-        {label}
-        {d?.date && <span style={{ float: "right", fontSize: "var(--fs-2xs)", color: "var(--text-muted)", fontWeight: 400 }}>{d.date}</span>}
+      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span>{label}</span>
+        <select
+          value={selectedDate || ""}
+          onChange={(e) => setSelectedDate(e.target.value || null)}
+          style={{
+            fontSize: "var(--fs-2xs)", color: "var(--text-secondary)",
+            background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-sm)", padding: "2px 4px", maxWidth: 130,
+          }}
+        >
+          <option value="">最新{dateLabel ? ` (${dateLabel})` : ""}</option>
+          {dateOptions.filter((d) => d !== dateLabel).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
       </div>
       {isLoading && <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>加载中…</div>}
-      {!isLoading && !d?.payload && (
+      {!isLoading && !active?.payload && (
         <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1.6 }}>
-          定时任务尚未写入，每日刷新后自动填充。
+          {selectedDate ? "该日期暂无报告。" : "定时任务尚未写入，每日刷新后自动填充。"}
         </div>
       )}
-      {!isLoading && d?.payload && rows.length === 0 && (
+      {!isLoading && active?.payload && rows.length === 0 && (
         <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>无可展示字段。</div>
       )}
       {!isLoading && rows.length > 0 && (
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", maxHeight: 160, overflow: "auto" }}>
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", maxHeight: 200, overflow: "auto" }}>
           {rows.map((r, i) => (
             <div key={i} style={{ display: "flex", gap: 8, padding: "3px 0", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", lineHeight: 1.4 }}>
-              <span style={{ flexShrink: 0, color: "var(--text-muted)", minWidth: 64 }}>{r.k}</span>
-              <span style={{ color: "var(--text-secondary)", wordBreak: "break-word" }}>{r.v}</span>
+              <span style={{ flexShrink: 0, color: "var(--text-muted)", minWidth: 72, wordBreak: "break-all" }}>{r.k}</span>
+              <span style={{ color: "var(--text-secondary)", wordBreak: "break-word", flex: 1 }}>{r.v}</span>
             </div>
           ))}
         </div>

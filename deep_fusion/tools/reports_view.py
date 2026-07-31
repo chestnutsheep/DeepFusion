@@ -6,7 +6,7 @@
 import json
 
 from ..server import mcp
-from ..reports.store import get_latest, get_history, _conn
+from ..reports.store import get_latest, get_history, get_by_date, _conn
 from .event_calendar import _val
 
 
@@ -49,3 +49,20 @@ def report_types():
     finally:
         con.close()
     return json.dumps({"ok": True, "types": [r["rtype"] for r in rows]}, ensure_ascii=False)
+
+
+@mcp.tool(
+    title="每日报告-按日期",
+    description="按 (rtype, 日期) 读取某类报告的指定日期内容(reports 表)。rtype: premarket/noonnews/qualitystock/dailyreview；rdate: YYYY-MM-DD",
+)
+def report_by_date(rtype: str = "", rdate: str = ""):
+    rtype = _val(rtype)
+    rdate = _val(rdate)
+    if not rtype or not rdate:
+        return json.dumps({"ok": False, "error": "rtype 与 rdate 必填"}, ensure_ascii=False)
+    row = get_by_date(rtype, rdate)
+    if not row:
+        return json.dumps({"ok": True, "rtype": rtype, "date": rdate, "payload": None,
+                           "note": "该日期暂无报告"}, ensure_ascii=False)
+    return json.dumps({"ok": True, "rtype": rtype, "date": row["date"],
+                       "payload": row["payload"]}, ensure_ascii=False)
