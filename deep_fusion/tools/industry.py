@@ -647,6 +647,220 @@ async def industry_themes(
     )
 
 
+def _load_returns_matrix(window: int = 120, limit: int = 0) -> tuple:
+    """从 industry_db 加载行业日行情 → 收益率矩阵 + code→name 映射。
+
+    Args:
+        window: 收益率回看窗口(交易日)，用于默认 limit 计算。
+        limit: 从数据库加载的日线条数。0 表示自动取 window+30。
+    """
+    import pandas as pd
+
+    codes = db.get_daily_codes()
+    if not codes:
+        return pd.DataFrame(), {}
+
+    # code→name 映射
+    cls = db.get_classify("ths")
+    code2name = {}
+    if cls is not None and not cls.empty:
+        for _, r in cls.iterrows():
+            code2name[r["industry_code"]] = r["industry_name"]
+
+    # 加载日行情 → 收益率
+    fetch_limit = limit if limit > 0 else window + 30
+    all_data = {}
+    for code in codes:
+        df = db.get_daily(industry_code=code, limit=fetch_limit)
+        if df.empty:
+            continue
+        name = code2name.get(code, code)
+        close = df.set_index("trade_date")["close"]
+        if len(close) > 30:
+            all_data[name] = close
+
+    if not all_data:
+        return pd.DataFrame(), code2name
+
+    prices = pd.DataFrame(all_data)
+    prices.index = pd.to_datetime(prices.index)
+    prices = prices.sort_index()
+
+    returns = prices.pct_change().dropna()
+    # 去除 NaN 过多的列
+    valid = returns.columns[returns.isna().mean() < 0.1]
+    returns = returns[valid]
+
+    return returns, code2name
+
+
+def _compute_momentum(returns) -> list:
+    """计算各行业近期动量：5d / 10d / 20d 累计收益。"""
+
+    n = len(returns)
+    momentum = []
+    for ind in returns.columns:
+        m = {"industry": ind}
+        for span, label in [(5, "return_5d"), (10, "return_10d"), (20, "return_20d")]:
+            if n >= span:
+                m[label] = round(float((1 + returns[ind].iloc[-span:]).prod() - 1), 4)
+            else:
+                m[label] = None
+        momentum.append(m)
+
+    momentum.sort(key=lambda x: x.get("return_5d") or -999, reverse=True)
+    return momentum
+
+
+def _enrich_themes(
+        themes_raw: list,
+        momentum: list,
+        fund_flow_df,
+        rolling_trend: dict,
+) -> list:
+    """为基础聚类结果添加动量/资金流/趋势信号 → 综合评分。"""
+    import numpy as np
+
+    # 构建 industry → momentum 映射
+    mom_map = {m["industry"]: m for m in momentum}
+
+    # 构建 industry → fund_flow 映射
+    ff_map = {}
+    if fund_flow_df is not None and not fund_flow_df.empty:
+        for _, r in fund_flow_df.iterrows():
+            name = r.get("industry_name", "")
+            ff_map[name] = {
+                "net_amount": float(r.get("net_amount", 0) or 0),
+                "leader_stock": r.get("leader_stock", ""),
+                "leader_pct_change": float(r.get("leader_pct_change", 0) or 0),
+            }
+
+    enriched = []
+    raw_scores = []  # 先收集原始分，后面做归一化
+
+    for t in themes_raw:
+        members = t["members"]
+        avg_corr = t.get("avg_intra_corr", 0) or 0
+
+        # 簇内动量均值
+        member_moms = [mom_map.get(m, {}) for m in members]
+        avg_5d = np.mean([m.get("return_5d", 0) or 0 for m in member_moms])
+        avg_10d = np.mean([m.get("return_10d", 0) or 0 for m in member_moms])
+        avg_20d = np.mean([m.get("return_20d", 0) or 0 for m in member_moms])
+
+        # 簇内资金流
+        member_ffs = [ff_map.get(m, {}) for m in members]
+        total_net = sum(f.get("net_amount", 0) for f in member_ffs)
+        leaders = [f.get("leader_stock", "") for f in member_ffs if f.get("leader_stock")]
+        leader_pcts = [f.get("leader_pct_change", 0) for f in member_ffs]
+
+        # 趋势
+        trend = rolling_trend.get(t["theme_id"], "stable")
+
+        # 原始评分分量 (归一化前)
+        raw_scores.append({
+            "theme_id": t["theme_id"],
+            "avg_corr": avg_corr,
+            "avg_5d": avg_5d,
+            "total_net": total_net,
+        })
+
+        # 找动量最强的行业
+        best_mom_5d = max(member_moms, key=lambda x: x.get("return_5d") or -999)
+        best_mom_10d = max(member_moms, key=lambda x: x.get("return_10d") or -999)
+
+        enriched.append({
+            "theme_id": t["theme_id"],
+            "label": t["label"],
+            "representative": t["representative"],
+            "members": members,
+            "n_members": len(members),
+            "avg_intra_corr": round(avg_corr, 4),
+            "trend": trend,
+            "momentum": {
+                "avg_5d": round(avg_5d, 4),
+                "avg_10d": round(avg_10d, 4),
+                "avg_20d": round(avg_20d, 4),
+                "best_5d": {"industry": best_mom_5d.get("industry", ""), "return": best_mom_5d.get("return_5d")},
+                "best_10d": {"industry": best_mom_10d.get("industry", ""), "return": best_mom_10d.get("return_10d")},
+            },
+            "fund_flow": {
+                "net_amount_total": round(total_net, 2),
+                "leader_stocks": leaders[:3],
+                "best_leader": leaders[0] if leaders else "",
+                "best_leader_pct": round(max(leader_pcts), 2) if leader_pcts else None,
+            },
+            # score 占位，后面归一化后填充
+            "_raw": raw_scores[-1],
+        })
+
+    # ── 归一化评分 ──
+    if enriched:
+        corrs = [r["avg_corr"] for r in raw_scores]
+        moms = [r["avg_5d"] for r in raw_scores]
+        nets = [r["total_net"] for r in raw_scores]
+
+        def _norm(vals, i):
+            mn, mx = min(vals), max(vals)
+            if mx == mn:
+                return 50.0
+            return (vals[i] - mn) / (mx - mn) * 100
+
+        for idx, t in enumerate(enriched):
+            corr_s = _norm(corrs, idx) * 0.4
+            mom_s = _norm(moms, idx) * 0.35
+            ff_s = _norm(nets, idx) * 0.25
+            t["score"] = round(corr_s + mom_s + ff_s, 1)
+            t["score_detail"] = {
+                "corr_score": round(corr_s, 1),
+                "momentum_score": round(mom_s, 1),
+                "fund_flow_score": round(ff_s, 1),
+            }
+            del t["_raw"]
+
+    # 按评分降序
+    enriched.sort(key=lambda x: x["score"], reverse=True)
+    # 重编号
+    for i, t in enumerate(enriched):
+        t["rank"] = i + 1
+
+    return enriched
+
+
+def _compute_rolling_trends(returns, cluster_result, window: int = 60) -> dict:
+    """计算各簇的滚动相关趋势: strengthening / weakening / stable。"""
+    from ..shared.correlation import rolling_correlation
+    import numpy as np
+
+    if len(returns) < window + 1:
+        return {}
+
+    rolling_result = rolling_correlation(returns, window=window)
+    change = rolling_result.get("correlation_change")
+    if change is None or change.empty:
+        return {}
+
+    trends = {}
+    for c_id, members in cluster_result.get("clusters", {}).items():
+        valid_members = [m for m in members if m in change.index and m in change.columns]
+        if len(valid_members) < 2:
+            trends[c_id] = "stable"
+            continue
+
+        sub = change.loc[valid_members, valid_members]
+        mask = np.triu(np.ones(sub.shape, dtype=bool), k=1)
+        avg_change = float(sub.values[mask].mean()) if mask.any() else 0.0
+
+        if avg_change > 0.02:
+            trends[c_id] = "strengthening"
+        elif avg_change < -0.02:
+            trends[c_id] = "weakening"
+        else:
+            trends[c_id] = "stable"
+
+    return trends
+
+
 def _industry_themes_sync(window: int, n_clusters: int, corr_method: str) -> str:
     import json
     import time

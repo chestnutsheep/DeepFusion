@@ -5,6 +5,24 @@ import ErrorBoundary from "../common/ErrorBoundary.jsx";
 import CalendarMonth from "../Calendar/CalendarMonth.jsx";
 import ReportModal from "./ReportModal.jsx";
 
+/** AUC 判别力进度条（label + 0~100 分横向条） */
+function ScoreBar({ label, score }) {
+  const pct = Math.max(0, Math.min(100, Number(score) || 0));
+  // 0.5 随机线基准，≥0.7 强判别力；颜色随分数由红→金→绿
+  const color = pct >= 70 ? "#6FA088" : pct >= 50 ? "#C9A861" : "#C07C7C";
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-2xs)", color: "var(--text-secondary)", marginBottom: 3 }}>
+        <span>{label}</span>
+        <span style={{ color }}>{pct.toFixed(1)}</span>
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width .3s" }} />
+      </div>
+    </div>
+  );
+}
+
 function parse(raw) {
   if (!raw) return null;
   if (typeof raw !== "string") return raw;
@@ -61,10 +79,57 @@ function calVerdict(p) {
   return "观察";
 }
 
+function boardTypeStyle(bt) {
+  switch (bt) {
+    case "一字板":  return { bg: "rgba(111,160,136,0.20)", bd: "rgba(111,160,136,0.55)", fg: "#6FA088" };
+    case "T字板":   return { bg: "rgba(201,168,97,0.18)", bd: "rgba(201,168,97,0.55)", fg: "#C9A861" };
+    case "厂字板":  return { bg: "rgba(143,214,255,0.18)", bd: "rgba(143,214,255,0.55)", fg: "#8FD6FF" };
+    case "炸板回封": return { bg: "rgba(192,124,124,0.18)", bd: "rgba(192,124,124,0.55)", fg: "#C07C7C" };
+    default:        return { bg: "rgba(255,255,255,0.05)", bd: "rgba(255,255,255,0.12)", fg: "var(--text-secondary)" }; // 换手板
+  }
+}
+
+// 板型一句话行为注脚（给普通人看的直观描述）
+function boardTypeCaption(bt) {
+  switch (bt) {
+    case "一字板":  return "开盘直接涨停，封死不给机会";
+    case "T字板":   return "涨停→开板→极快回封，分歧转一致";
+    case "厂字板":  return "低开→震荡拉升封板，斜率缓于 T 字回封";
+    case "炸板回封": return "多次开板仍回封，换手充分、分歧大";
+    default:        return "平/高开充分换手后涨停"; // 换手板
+  }
+}
+
+function fmtSealTime(ts) {
+  if (!ts) return "—";
+  const s = String(ts).trim();
+  if (/^\d{6}$/.test(s)) return `${s.slice(0, 2)}:${s.slice(2, 4)}`;
+  if (/^\d{1,2}:\d{2}/.test(s)) return s.slice(0, 5);
+  return s;
+}
+
+function BoardInfo({ label, value, accent }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>{label}</span>
+      <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: accent || "var(--text-primary)" }}>{value}</span>
+    </div>
+  );
+}
+
 export function LimitUpCard({ s }) {
-  const [openLogic, setOpenLogic] = useState(false);
+  const items = s.items || [];
   const bury = (s.score != null && s.score >= 80) || (s.stage && s.stage.includes("加速"));
   const gradeColor = s.score >= 80 ? "#6FA088" : s.score >= 65 ? "#C9A861" : s.score >= 50 ? "#B89B6E" : "#C07C7C";
+  // 最强 / 最弱因子（按 score）
+  const scored = items.filter((it) => typeof it.score === "number");
+  const strongest = scored.length ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+  const weakest = scored.length ? scored.reduce((a, b) => (b.score < a.score ? b : a)) : null;
+  const bt = boardTypeStyle(s.board_type);
+  // 封单手数（手 → 万手）
+  const orders = s.seal_orders != null
+    ? (s.seal_orders >= 1e4 ? `${(s.seal_orders / 1e4).toFixed(1)}万手` : `${Math.round(s.seal_orders)}手`)
+    : "—";
   return (
     <CardWrapper hoverable style={{
       border: bury ? "1px solid rgba(192,124,124,0.55)" : "1px solid var(--border-subtle)",
@@ -90,10 +155,21 @@ export function LimitUpCard({ s }) {
           )}
         </div>
       </div>
-      {/* 全部信息以 tag 呈现：基础属性 + 埋伏关注 + 评分因子 */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+      {/* 基础属性 + 板型 + 最强/最弱因子 tag */}
+      {s.board_type && (
+        <div style={{ fontSize: "var(--fs-2xs)", color: bt.fg, marginBottom: 8, fontWeight: 500 }}>
+          {boardTypeCaption(s.board_type)}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
         <span style={chip("#C9A861")}>{s.board_height}连板</span>
         {s.stage && <span style={chip("#8FD6FF")}>{s.stage}</span>}
+        {s.board_type && (
+          <span style={{ fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4, fontWeight: 700,
+            background: bt.bg, border: `1px solid ${bt.bd}`, color: bt.fg, whiteSpace: "nowrap" }}>
+            {s.board_type}
+          </span>
+        )}
         {(s.sectors || []).slice(0, 3).map((x, i) => <span key={i} style={chip("#9C82B4")}>{x}</span>)}
         {bury && (
           <span style={{ fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4, fontWeight: 700,
@@ -101,35 +177,35 @@ export function LimitUpCard({ s }) {
             ⚑ 埋伏关注
           </span>
         )}
+        {strongest && (
+          <span style={{ fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4, fontWeight: 700,
+            background: "rgba(111,160,136,0.18)", border: "1px solid rgba(111,160,136,0.5)", color: "#6FA088", whiteSpace: "nowrap" }}>
+            最强 {strongest.name} {Math.round(strongest.score)}
+          </span>
+        )}
+        {weakest && (
+          <span style={{ fontSize: "var(--fs-2xs)", padding: "2px 7px", borderRadius: 4, fontWeight: 700,
+            background: "rgba(192,124,124,0.18)", border: "1px solid rgba(192,124,124,0.5)", color: "#C07C7C", whiteSpace: "nowrap" }}>
+            最弱 {weakest.name} {Math.round(weakest.score)}
+          </span>
+        )}
         {(s.items || []).map((it) => <FactorTag key={it.name} name={it.name} score={it.score} />)}
       </div>
-      {/* 评分逻辑：默认折叠，点开看 rationale（保留"为什么"，但默认不占空间） */}
-      {s.rationale && (
-        <div style={{ marginTop: 8 }}>
-          <button
-            type="button"
-            onClick={() => setOpenLogic((v) => !v)}
-            style={{
-              background: "transparent", border: "none", cursor: "pointer",
-              fontSize: "var(--fs-2xs)", color: "var(--text-muted)",
-              padding: 0, display: "flex", alignItems: "center", gap: 4,
-            }}
-          >
-            <span style={{ transform: openLogic ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▶</span>
-            评分逻辑
-          </button>
-          {openLogic && (
-            <div style={{
-              marginTop: 6, fontSize: "var(--fs-xs)", lineHeight: 1.6,
-              color: "var(--text-secondary)",
-              background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "8px 10px",
-              borderLeft: "2px solid var(--border-subtle)",
-            }}>
-              {s.rationale}
-            </div>
-          )}
-        </div>
-      )}
+      {/* 板的形式：换手 / 封板时间 / 封单金额 / 封单手数 等（替代折叠文本，结构化常显） */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 10px",
+        padding: "10px 12px", background: "rgba(255,255,255,0.03)",
+        borderRadius: 8, border: "1px solid var(--border-subtle)",
+      }}>
+        <BoardInfo label="首板换手" value={s.turnover_1 != null ? `${s.turnover_1.toFixed(1)}%` : "—"} />
+        <BoardInfo label="封板时间" value={fmtSealTime(s.seal_time)} />
+        <BoardInfo label="封单金额" value={s.seal_amount != null ? `${(s.seal_amount / 10000).toFixed(2)}亿` : "—"} />
+        <BoardInfo label="封单手数" value={orders} accent={s.broken_times ? "#C07C7C" : undefined} />
+        <BoardInfo label="振幅" value={s.amplitude != null ? `${s.amplitude.toFixed(1)}%` : "—"} />
+        <BoardInfo label="量比" value={s.volume_ratio != null ? s.volume_ratio.toFixed(2) : "—"} />
+        <BoardInfo label="流通市值" value={s.float_mv != null ? `${s.float_mv.toFixed(0)}亿` : "—"} />
+        <BoardInfo label="炸板次数" value={s.broken_times != null ? s.broken_times : "—"} accent={s.broken_times ? "#C07C7C" : undefined} />
+      </div>
     </CardWrapper>
   );
 }

@@ -12,6 +12,17 @@ from ..server import mcp
 from ..shared.utils import ak_cache
 
 
+def _val(v, default=0):
+    """解包 Field 默认值——兼容 MCP 框架传入 FieldInfo 与直接 Python 调用。
+
+    与 industry.py / macro.py 的 _val 模式一致。
+    """
+    from pydantic.fields import FieldInfo
+    if isinstance(v, FieldInfo):
+        return v.default if v.default is not None else default
+    return v if v is not None else default
+
+
 @mcp.tool(
     title="获取中美国债收益率曲线",
     description="获取中国和美国国债收益率曲线数据，包含2年/5年/10年/30年期收益率及期限利差。"
@@ -21,6 +32,8 @@ def bond_yields(
         limit: int = Field(10, description="返回最近期数（日频），传0返回全量"),
         china_only: bool = Field(False, description="True=仅中国，False=中美全量"),
 ) -> str:
+    limit = _val(limit)
+    china_only = _val(china_only, False)
     """获取中国+美国国债收益率（一次性拉取，日频缓存）"""
     df = ak_cache(ak.bond_zh_us_rate, ttl=86400, ttl2=172800)
     if df is None or df.empty:
@@ -44,6 +57,7 @@ def bond_yields(
 def option_ivix(
         limit: int = Field(30, description="返回最近天数，传0返回全量"),
 ) -> str:
+    limit = _val(limit)
     """获取QVIX（一次性拉取全量历史，日频缓存）"""
     df = ak_cache(ak.index_option_50etf_qvix, ttl=86400, ttl2=172800)
     if df is None or df.empty:

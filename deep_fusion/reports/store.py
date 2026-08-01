@@ -99,6 +99,14 @@ def _migrate(con):
     for col in ("calibrated_prob", "calibrated_p_cal"):
         if col not in lu_cols:
             con.execute(f"ALTER TABLE limit_up_stocks ADD COLUMN {col} REAL")
+    # 连板表：补板型/炸板次数/最新价/封单手数（2026-08-01，支撑前端板型展示）
+    for col, ctype in (
+        ("board_type", "TEXT"), ("broken_times", "REAL"),
+        ("price", "REAL"), ("seal_orders", "REAL"),
+        ("first_seal_time", "TEXT"),
+    ):
+        if col not in lu_cols:
+            con.execute(f"ALTER TABLE limit_up_stocks ADD COLUMN {col} {ctype}")
     con.commit()
 
 
@@ -162,9 +170,10 @@ def get_by_date(rtype, rdate, db_path=None):
 # ---------- limit_up 连板潜力股表 ----------
 
 _COLS = ["code", "name", "board_height", "turnover_1", "turnover_2",
-         "volume_ratio", "amplitude", "seal_time", "seal_amount",
-         "float_mv", "score", "stage", "sectors", "rationale",
-         "calibrated_prob", "calibrated_p_cal"]
+         "volume_ratio", "amplitude", "seal_time", "first_seal_time",
+         "seal_amount", "float_mv", "broken_times", "price",
+         "board_type", "seal_orders", "score", "stage", "sectors",
+         "rationale", "calibrated_prob", "calibrated_p_cal"]
 
 
 def save_limit_up(rdate, rows, db_path=None):
@@ -175,15 +184,18 @@ def save_limit_up(rdate, rows, db_path=None):
             con.execute(
                 "INSERT OR REPLACE INTO limit_up_stocks"
                 "(date, code, name, board_height, turnover_1, turnover_2, "
-                " volume_ratio, amplitude, seal_time, seal_amount, float_mv, "
+                " volume_ratio, amplitude, seal_time, first_seal_time, seal_amount, "
+                " float_mv, broken_times, price, board_type, seal_orders, "
                 " score, stage, sectors, rationale, calibrated_prob, "
                 " calibrated_p_cal, created_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (
                     rdate, r.get("code"), r.get("name"), r.get("board_height"),
                     r.get("turnover_1"), r.get("turnover_2"), r.get("volume_ratio"),
-                    r.get("amplitude"), r.get("seal_time"), r.get("seal_amount"),
-                    r.get("float_mv"), r.get("score"), r.get("stage"),
+                    r.get("amplitude"), r.get("seal_time"), r.get("first_seal_time"),
+                    r.get("seal_amount"), r.get("float_mv"), r.get("broken_times"),
+                    r.get("price"), r.get("board_type"), r.get("seal_orders"),
+                    r.get("score"), r.get("stage"),
                     json.dumps(r.get("sectors") or [], ensure_ascii=False),
                     r.get("rationale"), r.get("calibrated_prob"),
                     r.get("calibrated_p_cal"),

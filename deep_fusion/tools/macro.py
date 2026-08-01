@@ -13,6 +13,18 @@ from ..shared.utils import ak_cache
 logger = logging.getLogger(__name__)
 
 
+def _val(v, default=0):
+    """解包 Field 默认值——兼容 MCP 框架传入 FieldInfo 与直接 Python 调用。
+
+    与 industry.py 的 _val 模式一致：MCP 框架经 FastMCP 调用时，Field 默认值
+    会以 FieldInfo 对象传入，直接做 `limit > 0` / `df.tail(limit)` 会抛 TypeError。
+    """
+    from pydantic.fields import FieldInfo
+    if isinstance(v, FieldInfo):
+        return v.default if v.default is not None else default
+    return v if v is not None else default
+
+
 def _ensure_ascending(df):
     """确保 DataFrame 按第一列（时间列）升序排列（最旧在前）。
 
@@ -75,6 +87,7 @@ def _fetch_with_priority(
     4. DB 无数据 → 全量拉取并入库
     5. akshare 也失败 → 降级返回 DB 旧数据（data_lake_stale）
     """
+    limit = _val(limit)  # 解包 MCP 框架可能传入的 FieldInfo
     from deep_fusion.shared.freshness import needs_incremental_update
 
     df = None
@@ -133,6 +146,7 @@ def _fetch_with_priority(
 def macro_growth(
         limit: int = Field(20, description="返回期数"),
 ) -> str:
+    limit = _val(limit)
     results = {}
 
     gdp, _ = _fetch_with_priority("GDP", ak.macro_china_gdp, limit=limit)
@@ -164,6 +178,7 @@ def macro_growth(
 def macro_inflation(
         limit: int = Field(24, description="返回期数"),
 ) -> str:
+    limit = _val(limit)
     results = {}
 
     cpi, _ = _fetch_with_priority("CPI", ak.macro_china_cpi, limit=limit)
@@ -197,6 +212,7 @@ def macro_inflation(
 def macro_business(
         limit: int = Field(24, description="返回期数"),
 ) -> str:
+    limit = _val(limit)
     results = {}
 
     pmi, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=limit)
@@ -287,6 +303,7 @@ async def macro_monetary(
 def macro_gdp(
         limit: int = Field(20, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df, _ = _fetch_with_priority("GDP", ak.macro_china_gdp, limit=limit)
     if df is None or df.empty:
         return ""
@@ -300,6 +317,7 @@ def macro_gdp(
 def macro_cpi(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df, _ = _fetch_with_priority("CPI", ak.macro_china_cpi, limit=limit)
     if df is None or df.empty:
         return ""
@@ -313,6 +331,7 @@ def macro_cpi(
 def macro_pmi(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df, _ = _fetch_with_priority("PMI", ak.macro_china_pmi, limit=limit)
     if df is None or df.empty:
         return ""
@@ -326,6 +345,7 @@ def macro_pmi(
 def macro_interest_rate(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df = ak_cache(ak.macro_china_lpr, ttl=86400 * 7)
     if df is None or df.empty:
         df = data_lake.query("LPR", limit=limit)
@@ -345,6 +365,7 @@ def macro_interest_rate(
 def macro_money_supply(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df = ak_cache(ak.macro_china_m2_yearly, ttl=86400 * 7)
     if df is None or df.empty:
         df = data_lake.query("M2", limit=limit)
@@ -364,6 +385,7 @@ def macro_money_supply(
 def macro_industrial_value_add(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df, _ = _fetch_with_priority("INDUSTRIAL_VALUE_ADD", ak.macro_china_industrial_production_yoy,
                                  limit=limit)
     if df is None or df.empty:
@@ -379,6 +401,7 @@ def macro_inventory_growth(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
     # 优先从 NBS API 获取（已修复新接口 stream/esData）
+    limit = _val(limit)
     df, _ = _fetch_with_priority("INVENTORY", None, limit=limit)
     if df is not None and not df.empty:
         return df.to_csv(index=False, float_format="%.2f")
@@ -398,6 +421,7 @@ def macro_inventory_growth(
 def macro_fixed_investment(
         limit: int = Field(24, description="返回数量", strict=False),
 ):
+    limit = _val(limit)
     df, _ = _fetch_with_priority("FIXED_INVESTMENT", ak.macro_china_gdzctz,
                                  limit=limit)
     if df is None or df.empty:

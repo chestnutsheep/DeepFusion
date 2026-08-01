@@ -102,6 +102,35 @@ def _to_float(x):
         return None
 
 
+def _classify_board(broken, amp, first_seal, open_pct=None):
+    """板型分类（纯展示用，不参与评分口径，不触碰红线计算定义）。
+
+    依据当日数据直接判定：
+      一字板  ：未炸板且开盘即封死（open_pct 接近 +10 涨停、振幅极小、无换手）
+      厂字板  ：未炸板、低开(或平开)后拉升封板（open_pct 明显偏低、振幅较大）
+      T字板   ：炸板 1 次（涨停→打开→极快拉回涨停，形似 T；回封斜率快）
+      炸板回封：炸板 ≥2 次（多次开板仍回封，分歧大、换手充分）
+      换手板  ：未炸板、非一字且非厂字（平/高开充分换手涨停，拉升斜率温和）
+    """
+    try:
+        broken = int(broken or 0)
+    except (TypeError, ValueError):
+        broken = 0
+    if broken == 0:
+        # 一字板：开盘即涨停且几乎无波动
+        if open_pct is not None and open_pct >= 9.5 and (amp is None or amp <= 0.5):
+            return "一字板"
+        # 厂字板：低开/平开（开盘位置明显偏下）后拉升封板，振幅通常较大
+        if open_pct is not None and open_pct < -1.5 and (amp is None or amp >= 3.0):
+            return "厂字板"
+        if amp is not None and amp <= 0.5 and (open_pct is None or open_pct >= 9.5):
+            return "一字板"
+        return "换手板"
+    if broken == 1:
+        return "T字板"
+    return "炸板回封"
+
+
 def _recent_trade_dates(n=6):
     try:
         df = ak_cache(ak.tool_trade_date_hist_sina, ttl=43200)
@@ -140,17 +169,18 @@ def _board_height(code, dt, dates, pools):
 
 
 def _daily_features(code, board_height):
-    """从日K一次性取：首板/二板换手率、量比、振幅（补「量比/振幅缺口」）。
+    """从日K一次性取：首板/二板换手率、量比、振幅、开盘位置（补「量比/振幅缺口 / 板型判定」）。
 
-    量比 = 当日成交量 / 前5日均量；振幅 = (最高-最低)/昨收。
+    量比 = 当日成交量 / 前5日均量；振幅 = (最高-最低)/昨收；
+    开盘位置 open_pct = (开盘 - 昨收) / 昨收，用于区分厂字板（低开拉升封板）。
     非交易时段日K仍可用（收盘后运行），故不再依赖盘口 spot。
-    返回 (t1, t2, vr, amp)，任一不可得为 None。
+    返回 (t1, t2, vr, amp, open_pct)，任一不可得为 None。
     """
     try:
         sym = _ak_symbol(code)
         df = ak_cache(ak.stock_zh_a_daily, symbol=sym, adjust="qfq", ttl=1800)
         if df is None or df.empty:
-            return None, None, None, None
+            return None, None, None, None, None
         if "换手率" in df.columns:
             vals = df["换手率"].dropna().tolist()
         else:
@@ -160,19 +190,21 @@ def _daily_features(code, board_height):
             idx1 = -(min(board_height, len(vals)))
             t1 = vals[idx1]            # 首板日换手率
             t2 = vals[-2]             # 昨日换手率（二板日）
-        # 量比 / 振幅
-        vr = amp = None
+        # 量比 / 振幅 / 开盘位置
+        vr = amp = open_pct = None
         vol = df.get("volume")
         if vol is not None and len(vol) >= 6:
             v = vol.astype(float).values
             vr = float(v[-1] / v[-6:-1].mean()) if v[-6:-1].mean() else None
-        hi, lo, cl = df.get("high"), df.get("low"), df.get("close")
+        hi, lo, cl, op = df.get("high"), df.get("low"), df.get("close"), df.get("open")
         if hi is not None and lo is not None and cl is not None and len(cl) >= 2:
             h, l, pc = float(hi.values[-1]), float(lo.values[-1]), float(cl.values[-2])
             amp = (h - l) / pc * 100.0 if pc else None
-        return t1, t2, vr, amp
+            if op is not None and pc:
+                open_pct = (float(op.values[-1]) - pc) / pc * 100.0
+        return t1, t2, vr, amp, open_pct
     except Exception:
-        return None, None, None, None
+        return None, None, None, None, None
 
 
 @mcp.tool(
@@ -198,13 +230,20 @@ def limit_up_scan(date: str = ""):
     rows = []
     for code, r in today_pool.items():
         bh = _board_height(code, dt, dates, pools)
-        t1, t2, vr, amp = _daily_features(code, bh)
+        t1, t2, vr, amp, open_pct = _daily_features(code, bh)
         # 单位修正：akshare 流通市值=元 → 亿元；封板资金=元 → 万元（原「封单量」列不存在）
         raw_mv = _to_float(r.get("流通市值"))            # 元
         float_mv = raw_mv / 1e8 if raw_mv is not None else None   # → 亿元
         raw_seal = _to_float(r.get("封板资金"))           # 元（封单金额）
         seal_amount_wan = raw_seal / 1e4 if raw_seal is not None else None  # → 万元
         seal_time = r.get("最后封板时间") or r.get("封板时间")   # HHMMSS
+        first_seal = r.get("首次封板时间") or r.get("封板时间")  # HHMMSS
+        price = _to_float(r.get("最新价"))                 # 元/股
+        broken = _to_float(r.get("炸板次数")) or 0         # 炸板次数（整数）
+        # 封单手数（单数）= 封板资金(元) / (最新价(元/股) × 100股/手)
+        seal_orders = (raw_seal / (price * 100.0)) if (raw_seal and price) else None
+        # 板型（展示用，不改评分口径）
+        board_type = _classify_board(broken, amp, first_seal, open_pct)
         reason = r.get("原因") or ""
         sectors = [s.strip() for s in str(reason).replace("+", ",").split(",") if s.strip()][:3]
 
@@ -218,8 +257,11 @@ def limit_up_scan(date: str = ""):
         rows.append({
             "code": code, "name": r.get("名称"), "board_height": bh,
             "turnover_1": t1, "turnover_2": t2, "volume_ratio": vr,
-            "amplitude": amp, "seal_time": seal_time, "seal_amount": seal_amount_wan,
-            "float_mv": float_mv, "score": ev["score"], "stage": ev["stage"],
+            "amplitude": amp, "seal_time": seal_time, "first_seal_time": first_seal,
+            "seal_amount": seal_amount_wan, "float_mv": float_mv,
+            "broken_times": broken, "price": price,
+            "board_type": board_type, "seal_orders": seal_orders,
+            "score": ev["score"], "stage": ev["stage"],
             "sectors": sectors, "rationale": ev["rationale"], "items": ev["items"],
             "calibrated_prob": cal["prob"] if cal else None,
             "calibrated_p_cal": cal["p_cal"] if cal else None,
