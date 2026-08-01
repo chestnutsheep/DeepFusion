@@ -278,9 +278,10 @@ export default function PolicyDashboard() {
             {(tl?.long_cycle || []).map((node) => {
               const cls = 'long-cycle-dot' + (node.is_major ? ' major' : ' minor');
               return (
-                <div key={node.year} className="long-cycle-node">
+                <div key={`${node.date}-${node.label}`} className="long-cycle-node">
                   <div className={cls}><span>{node.is_major ? '◆' : '▲'}</span></div>
                   <div className="long-cycle-label">{node.label}</div>
+                  {node.date && <div className="long-cycle-date">{node.date}</div>}
                 </div>
               );
             })}

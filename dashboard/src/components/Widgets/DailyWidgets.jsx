@@ -368,6 +368,7 @@ export function ReportSlot({ rtype, label, reloadToken }) {
         open={open}
         onClose={() => setOpen(false)}
         payload={hasPayload ? active.payload : null}
+        rtype={rtype}
         label={label}
         date={dateLabel}
       />

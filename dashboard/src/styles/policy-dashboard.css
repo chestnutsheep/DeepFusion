@@ -169,6 +169,7 @@
 .long-cycle-dot.major { background-color: var(--primary); border-color: var(--primary); }
 .long-cycle-dot.minor { border-color: var(--secondary); border-style: dashed; }
 .long-cycle-label { font-size: 11px; color: var(--text-muted); margin-top: 6px; font-weight: 600; }
+.long-cycle-date { font-size: 10px; color: var(--text-muted); opacity: 0.7; margin-top: 2px; }
 .long-cycle-legend { display: flex; gap: 16px; margin-top: 16px; }
 .long-cycle-legend .legend-dot.major { background-color: var(--primary); border-color: var(--primary); }
 .long-cycle-legend .legend-dot.minor { border-color: var(--secondary); border-style: dashed; }

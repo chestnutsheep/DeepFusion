@@ -390,7 +390,7 @@ function FallbackBody({ p }) {
 /* ════════════════════════════════════════════════════════════════
  * 主弹窗
  * ════════════════════════════════════════════════════════════════ */
-export default function ReportModal({ open, onClose, payload, label, date }) {
+export default function ReportModal({ open, onClose, payload, rtype, label, date }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -400,19 +400,27 @@ export default function ReportModal({ open, onClose, payload, label, date }) {
 
   if (!open) return null;
 
-  const rtype = (payload && (payload.报告类型 || payload.report_type)) || label || "";
+  // rtype 优先用调用方显式传入（ReportSlot 的英文 key），
+  // 再从 payload 兜底（兼容历史数据含 报告类型/report_type 的情况），最后用 label。
+  const rtypeResolved =
+    rtype ||
+    (payload && (payload.报告类型 || payload.report_type)) ||
+    label || "";
+  const rtypeKey = ["premarket", "noonnews", "qualitystock", "dailyreview"].includes(rtypeResolved)
+    ? rtypeResolved
+    : "";
   const dateStr = (payload && (payload.date || payload.日期)) || date || "";
   const titleMap = {
     premarket: "盘前简报", noonnews: "午间新闻驱动",
     qualitystock: "优质股推送", dailyreview: "每日复盘",
   };
-  const title = titleMap[rtype] || label || "报告";
+  const title = titleMap[rtypeKey] || label || "报告";
 
   let Body = FallbackBody;
-  if (rtype === "premarket") Body = PremarketBody;
-  else if (rtype === "noonnews") Body = NoonBody;
-  else if (rtype === "qualitystock") Body = QualityBody;
-  else if (rtype === "dailyreview") Body = DailyReviewBody;
+  if (rtypeKey === "premarket") Body = PremarketBody;
+  else if (rtypeKey === "noonnews") Body = NoonBody;
+  else if (rtypeKey === "qualitystock") Body = QualityBody;
+  else if (rtypeKey === "dailyreview") Body = DailyReviewBody;
 
   return (
     <div

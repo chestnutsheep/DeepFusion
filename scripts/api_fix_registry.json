@@ -1,12 +1,10 @@
 {
-  "_comment": "DeepFusion AkShare 接口修复注册表。当巡检发现接口被重命名/移除或返回格式变化时，在此登记修复，下次巡检会自动套用并复核。",
+  "version": 1,
   "renames": {
-    "旧接口名": "新接口名"
+    "macro_china_m": "macro_china_m2_yearly"
   },
-  "alternatives": {
-    "损坏的接口名": "替代的 akshare 接口名 或 adapter:模块.函数"
-  },
-  "transforms": {
-    "接口名": "transforms/transform_接口名.py"
+  "alternatives": {},
+  "notes": {
+    "macro_china_m": "旧接口 ak.macro_china_m 在当前 akshare 已移除；唯一消费方 adapter.macro_m2（M2货币供应）语义明确，等价替换为 ak.macro_china_m2_yearly（输出商品/日期/今值/预测值/前值，与 M2 口径一致）。"
   }
 }

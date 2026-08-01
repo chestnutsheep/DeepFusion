@@ -162,7 +162,21 @@ def policy_timeline(year: int | None = None) -> str:
         if e.get("category") in ("政策会议", "政策发布")
     ]
     # 长周期战略节点（规划/白皮书）从日历周期固定节点派生
-    long_cycle = [s for s in upcoming_schedule if ("规划" in s["name"] or "白皮书" in s["name"])]
+    # 输出为前端期望结构：{year, label, is_major, date, category}
+    long_cycle = []
+    for s in upcoming_schedule:
+        if "规划" in s["name"] or "白皮书" in s["name"]:
+            ym = re.match(r"(\d{4})", s.get("date", "") or "")
+            yr = int(ym.group(1)) if ym else now_year
+            is_major = "规划" in s["name"]
+            long_cycle.append({
+                "year": yr,
+                "label": s["name"],
+                "is_major": is_major,
+                "date": s.get("date", ""),
+                "category": s.get("category", ""),
+            })
+    long_cycle.sort(key=lambda x: x["year"])
 
     # ── 五年规划阶段 ──
     five_year_start = 2026
