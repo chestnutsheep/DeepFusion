@@ -45,21 +45,23 @@ def policy_search(
         org: str = "",
         limit: int = 20,
         year: int | None = None,
+        sector: str = "",
 ) -> str:
     from ..shared.policy_db import PolicyDB
     db = PolicyDB()
-    results = db.search(keyword=keyword, org=org, limit=limit, year=year)
+    results = db.search(keyword=keyword, org=org, limit=limit, year=year, sector=sector)
     if not results:
         return "无匹配结果"
     lines = [f"共 {len(results)} 条"]
     for r in results:
         kw = f" [{r['keywords']}]" if r.get("keywords") else ""
+        sc = f" ⟨板块:{r['sector']}⟩" if r.get("sector") else ""
         org = f" ({r['organization']})" if r.get("organization") else ""
         sent = r.get("sentiment", "中性")
         sent_tag = f"〈{sent}〉" if sent and sent != "中性" else ""
         date = r.get("publish_date", "") or ""
         url = r.get("url", "") or ""
-        lines.append(f"  {date:12s} {r['title'][:50]}{org}{sent_tag}{kw}  {url}")
+        lines.append(f"  {date:12s} {r['title'][:50]}{org}{sent_tag}{sc}{kw}  {url}")
     return "\n".join(lines)
 
 
@@ -74,12 +76,13 @@ def policy_detail(
     db = PolicyDB()
     doc = db.get(url)
     if not doc:
-        return "未找到"
+        return json.dumps({"error": "未找到", "found": False}, ensure_ascii=False)
     body = doc.get("body", "")[:2000]
-    return json.dumps(
-        {k: v for k, v in doc.items() if k != "raw_json"},
-        ensure_ascii=False, indent=2,
-    ) + f"\n\n正文(前2000字):\n{body}"
+    out = {k: v for k, v in doc.items() if k != "raw_json"}
+    out["found"] = True
+    out["body"] = body  # 已截断至前2000字
+    out["body_truncated"] = len(doc.get("body", "")) > 2000
+    return json.dumps(out, ensure_ascii=False, indent=2)
 
 
 @mcp.tool(
@@ -115,7 +118,7 @@ def policy_timeline(year: int | None = None) -> str:
 
     # ── 按月聚合 ──
     monthly: dict[int, list[dict]] = defaultdict(list)
-    results = db.search(limit=500, year=now_year)
+    results = db.search(limit=500, year=now_year, with_summary=True)
     for r in results:
         date_str = r.get("publish_date", "") or ""
         # 兼容 ISO 和中文日期格式提取月份
@@ -128,6 +131,7 @@ def policy_timeline(year: int | None = None) -> str:
                     "org": r.get("organization", ""),
                     "date": date_str,
                     "keywords": (r.get("keywords") or "").split(",") if r.get("keywords") else [],
+                    "sector": (r.get("sector") or "").split(",") if r.get("sector") else [],
                     "url": r.get("url", ""),
                 })
 
@@ -146,6 +150,7 @@ def policy_timeline(year: int | None = None) -> str:
                     "org": e["org"],
                     "date": e["date"],
                     "keywords": e["keywords"][:5],
+                    "sector": e.get("sector", [])[:5],
                     "url": e["url"],
                 }
                 for e in top
@@ -178,6 +183,62 @@ def policy_timeline(year: int | None = None) -> str:
             })
     long_cycle.sort(key=lambda x: x["year"])
 
+    # ── 最新政策（细节更多的时间线）──
+    latest_sorted = sorted(
+        results,
+        key=lambda r: (r.get("publish_date", "") or ""),
+        reverse=True,
+    )
+    latest = [
+        {
+            "title": (r.get("title") or "")[:80],
+            "org": r.get("organization", ""),
+            "dept": r.get("organization", ""),
+            "date": r.get("publish_date", "") or "",
+            "time": r.get("publish_date", "") or "",
+            "keywords": (r.get("keywords") or "").split(",") if r.get("keywords") else [],
+            "sector": (r.get("sector") or "").split(",") if r.get("sector") else [],
+            "sentiment": r.get("sentiment", "中性"),
+            "content": (r.get("content") or "").strip(),
+            "url": r.get("url", ""),
+        }
+        for r in latest_sorted[:15]
+    ]
+
+    # ── 按板块(sector)分组叠放 ──
+    from ..shared.policy_sectors import SECTOR_ORDER, sector_color
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for r in results:
+        secs = (r.get("sector") or "").split(",") if r.get("sector") else []
+        if not secs:
+            secs = ["其他"]
+        item = {
+            "title": (r.get("title") or "")[:80],
+            "org": r.get("organization", ""),
+            "dept": r.get("organization", ""),
+            "date": r.get("publish_date", "") or "",
+            "time": r.get("publish_date", "") or "",
+            "keywords": (r.get("keywords") or "").split(",") if r.get("keywords") else [],
+            "sector": (r.get("sector") or "").split(",") if r.get("sector") else [],
+            "sentiment": r.get("sentiment", "中性"),
+            "content": (r.get("content") or "").strip(),
+            "url": r.get("url", ""),
+        }
+        for s in secs:
+            s = s.strip()
+            if s:
+                groups[s].append(item)
+    sector_groups = [
+        {
+            "sector": s,
+            "color": sector_color(s),
+            "count": len(groups[s]),
+            "items": sorted(groups[s], key=lambda x: (x["date"] or ""), reverse=True),
+        }
+        for s in SECTOR_ORDER
+        if s in groups
+    ]
+
     # ── 五年规划阶段 ──
     five_year_start = 2026
     five_year_end = 2030
@@ -191,6 +252,8 @@ def policy_timeline(year: int | None = None) -> str:
     result = {
         "year": now_year,
         "months": months_data,
+        "latest": latest,
+        "sector_groups": sector_groups,
         "long_cycle": long_cycle,
         "upcoming_schedule": upcoming_schedule,
         "official_links": [{"name": k, "url": v} for k, v in _OFFICIAL_LINKS.items()],

@@ -7,6 +7,7 @@ import CardWrapper from '../common/CardWrapper';
 import ErrorBoundary from '../common/ErrorBoundary';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
 import SectionHeader from '../common/SectionHeader';
+import { useDenseDetail } from '../common/DenseDataModal.jsx';
 
 // ── CSV 解析工具 ──
 
@@ -75,6 +76,7 @@ function stressBg(level) {
 function StressSection() {
   const { data: stressRaw, updatedAt } = useMCP('financial_stress_index', {});
   const stress = safeParseJSON(stressRaw);
+  const { button: stressDetailBtn, modal: stressDetailModal } = useDenseDetail(stress, '全球金融压力 · 底层数据');
 
   if (!stress) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载金融压力数据...</p></CardWrapper>;
 
@@ -87,6 +89,7 @@ function StressSection() {
   return (
     <div>
       <SectionHeader badge="⚡ 金融压力" title="全球金融压力" highlight="实时指数" desc="利差 · 汇率异动 · 信用冻结 · 区域预警 — 看出谁快爆了" />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -28, marginBottom: 8 }}>{stressDetailBtn}</div>
       <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* ── 核心评分仪表盘 ── */}
@@ -202,6 +205,7 @@ function StressSection() {
           ))}
         </CardWrapper>
       )}
+      {stressDetailModal}
     </div>
   );
 }
@@ -213,6 +217,7 @@ function StressSection() {
 function DebtSection() {
   const { data: debtRaw, updatedAt } = useMCP('debt_sustainability', { countries: 'CN,JP,KR,US' });
   const debt = safeParseJSON(debtRaw);
+  const { button: debtDetailBtn, modal: debtDetailModal } = useDenseDetail(debt, '债务可持续性 · 底层数据');
 
   if (!debt) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载债务可持续性数据...</p></CardWrapper>;
 
@@ -221,6 +226,7 @@ function DebtSection() {
   return (
     <div>
       <SectionHeader badge="🏛️ 债务" title="债务可持续性" highlight="对比评估" desc="政府债务/GDP · 外汇储备 · 增长率 — 谁还得上债" />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -28, marginBottom: 8 }}>{debtDetailBtn}</div>
       <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 排名总览 */}
@@ -281,6 +287,7 @@ function DebtSection() {
           </div>
         </CardWrapper>
       )}
+      {debtDetailModal}
     </div>
   );
 }
@@ -292,6 +299,7 @@ function DebtSection() {
 function CapitalSection() {
   const { data: capitalRaw, updatedAt } = useMCP('capital_flow_monitor', { focus: 'apac' });
   const capital = safeParseJSON(capitalRaw);
+  const { button: capitalDetailBtn, modal: capitalDetailModal } = useDenseDetail(capital, '资本流动监测 · 底层数据');
 
   if (!capital) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载资本流动数据...</p></CardWrapper>;
 
@@ -306,6 +314,7 @@ function CapitalSection() {
   return (
     <div>
       <SectionHeader badge="💸 资本" title="资本流动" highlight="监测" desc="汇率趋势 · 外储变化 · 美债锚 · 资金在进还是在逃" />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -28, marginBottom: 8 }}>{capitalDetailBtn}</div>
       <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 总体判断 */}
@@ -371,6 +380,7 @@ function CapitalSection() {
           ))}
         </CardWrapper>
       )}
+      {capitalDetailModal}
     </div>
   );
 }
@@ -382,6 +392,7 @@ function CapitalSection() {
 function BubbleSection() {
   const { data: bubbleRaw, updatedAt } = useMCP('asset_bubble_watch', { region: 'all' });
   const bubble = safeParseJSON(bubbleRaw);
+  const { button: bubbleDetailBtn, modal: bubbleDetailModal } = useDenseDetail(bubble, '资产泡沫监视 · 底层数据');
 
   if (!bubble) return <CardWrapper style={{ padding: 24 }}><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>加载泡沫监测数据...</p></CardWrapper>;
 
@@ -391,6 +402,7 @@ function BubbleSection() {
   return (
     <div>
       <SectionHeader badge="🫧 泡沫" title="资产泡沫" highlight="监视" desc="量先跌价后跌 — 交易量萎缩=崩盘前兆" />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -28, marginBottom: 8 }}>{bubbleDetailBtn}</div>
       <UpdateTimestamp updatedAt={updatedAt} />
 
       {/* 总体风险 */}
@@ -445,6 +457,7 @@ function BubbleSection() {
           );
         })}
       </div>
+      {bubbleDetailModal}
     </div>
   );
 }
@@ -475,8 +488,14 @@ function FuturesSection() {
   const prevPrice = priceData[priceData.length - 2]?.close;
   const priceChange = latestPrice && prevPrice ? ((latestPrice - prevPrice) / prevPrice * 100) : null;
 
+  const { button: futuresDetailBtn, modal: futuresDetailModal } = useDenseDetail(
+    { symbol, price: priceData, inventory: invData, basis: basisRaw },
+    `期货 · ${symbol} · 底层数据`
+  );
+
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>{futuresDetailBtn}</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {commonSymbols.map(s => (
           <button key={s.name} onClick={() => setSymbol(s.name)}
@@ -514,6 +533,7 @@ function FuturesSection() {
           <pre style={{ fontSize: 'var(--fs-xs)', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{basisRaw}</pre>
         </CardWrapper>
       )}
+      {futuresDetailModal}
     </div>
   );
 }
@@ -534,6 +554,11 @@ function MetalsSection() {
   const silverLatest = silverData[silverData.length - 1]?.close;
   const ratio = goldLatest && silverLatest ? (goldLatest / silverLatest) : null;
 
+  const { button: metalsDetailBtn, modal: metalsDetailModal } = useDenseDetail(
+    { gold: goldData, silver: silverData, etfHoldings: etfData, comexInventory: comexData, ratio },
+    '贵金属 · 底层数据'
+  );
+
   // 归一化对比：合并黄金白银数据到同一时间轴
   const mergedData = useMemo(() => {
     const goldMap = new Map(goldData.map(d => [d.period, d.close]));
@@ -549,6 +574,7 @@ function MetalsSection() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        {metalsDetailBtn}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <DataCard label="🥇 黄金 Au99.99" value={goldLatest} unit="元/克" decimals={2} higherBetter={null} detail="SGE" />
           <DataCard label="🥈 白银 Ag(T+D)" value={silverLatest} unit="元/千克" decimals={0} higherBetter={null} detail="SGE" />
@@ -593,6 +619,7 @@ function MetalsSection() {
           <DataChart data={comexData} series={[{ key: 'value', name: '库存', color: '#C47B7B', type: 'line' }]} dateKey="period" height={220} />
         </CardWrapper>
       </div>
+      {metalsDetailModal}
     </div>
   );
 }
@@ -622,9 +649,15 @@ function CryptoSection() {
     }));
   }, [btcData, ethData]);
 
+  const { button: cryptoDetailBtn, modal: cryptoDetailModal } = useDenseDetail(
+    { btc: btcData, eth: ethData, sentiment: sentimentRaw, funding: fundingRaw },
+    '加密货币 · 底层数据'
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        {cryptoDetailBtn}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <DataCard label="₿ BTC" value={btcLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
           <DataCard label="Ξ ETH" value={ethLatest} unit="USDT" decimals={0} higherBetter={null} detail="OKX" />
@@ -667,6 +700,7 @@ function CryptoSection() {
           <pre style={{ fontSize: 'var(--fs-xs)', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', margin: 0 }}>{sentimentRaw}</pre>
         </CardWrapper>
       )}
+      {cryptoDetailModal}
     </div>
   );
 }
@@ -693,9 +727,15 @@ function ForexSection() {
     }));
   }, [usdcnyData, eurusdData]);
 
+  const { button: forexDetailBtn, modal: forexDetailModal } = useDenseDetail(
+    { usdcny: usdcnyData, eurusd: eurusdData, us10y: fredData },
+    '外汇与利率 · 底层数据'
+  );
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 10 }}>
+        {forexDetailBtn}
         <button onClick={() => setShowNorm(!showNorm)} style={{
           padding: '4px 12px', borderRadius: 4, fontSize: 'var(--fs-xs)', fontWeight: 600,
           background: showNorm ? 'var(--accent-gold)' : 'transparent',
@@ -728,11 +768,12 @@ function ForexSection() {
         <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>🇺🇸 美国10Y国债收益率 · FRED</h3>
         <DataChart data={fredData} series={[{ key: 'value', name: '10Y收益率', color: '#C47B7B', type: 'line' }]} dateKey="period" height={240} />
       </CardWrapper>
+      {forexDetailModal}
     </div>
   );
 }
 
-// ══════════════════════════════════════════
+// ════════════════════════════════════════════
 // 主组件 — 由 Sidebar 子导航驱动
 // ══════════════════════════════════════════
 

@@ -12,6 +12,7 @@ DB_PATH = Path.home() / "output" / "data" / "policy_cache.db"
 
 # ── 日期标准化：提升到共享模块（消除与事件侧的重复定义） ──
 from .date_utils import normalize_date as _normalize_date, parse_year as _parse_year
+from .policy_sectors import derive_sectors
 
 class PolicyDB:
     def __init__(self):
@@ -81,6 +82,12 @@ class PolicyDB:
         if "sentiment" not in cols:
             self._conn.execute("ALTER TABLE policy_docs ADD COLUMN sentiment TEXT DEFAULT '中性'")
             self._conn.commit()
+        # 板块(sector)维度：纯展示分组，幂等补列（旧库兼容）
+        if "sector" not in cols:
+            self._conn.execute("ALTER TABLE policy_docs ADD COLUMN sector TEXT DEFAULT ''")
+            self._conn.commit()
+        # 旧库回填：将已有文档的 sector 按关键词派生补齐（幂等）
+        self._backfill_sectors()
 
     def exists(self, url: str) -> bool:
         conn = self._connect()
@@ -91,10 +98,12 @@ class PolicyDB:
         conn = self._connect()
         # 保存时标准化日期为 ISO 格式
         normalized_date = _normalize_date(entry.get("publish_date", ""))
+        # 板块：纯展示派生，按关键词映射（不影响任何评分/计算定义）
+        sector = ",".join(derive_sectors(entry.get("keywords", "")))
         conn.execute(
             """INSERT OR REPLACE INTO policy_docs
-               (url, title, source, organization, publish_date, found_at, keywords, body, raw_json, sentiment)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (url, title, source, organization, publish_date, found_at, keywords, body, raw_json, sentiment, sector)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 entry.get("url", ""),
                 entry.get("title", ""),
@@ -106,13 +115,18 @@ class PolicyDB:
                 entry.get("body", ""),
                 json.dumps(entry, ensure_ascii=False),
                 entry.get("sentiment", "中性"),
+                sector,
             ),
         )
         conn.commit()
 
-    def search(self, keyword: str = "", org: str = "", limit: int = 20, year: int | None = None) -> list[dict]:
+    def search(self, keyword: str = "", org: str = "", limit: int = 20, year: int | None = None, sector: str = "", with_summary: bool = False) -> list[dict]:
         conn = self._connect()
-        sql = "SELECT url, title, source, organization, publish_date, keywords, sentiment, length(body) as body_len FROM policy_docs WHERE 1=1"
+        # with_summary=True 时一并取出正文摘要（前200字），供前端列表/悬浮卡展示
+        if with_summary:
+            sql = "SELECT url, title, source, organization, publish_date, keywords, sentiment, sector, body FROM policy_docs WHERE 1=1"
+        else:
+            sql = "SELECT url, title, source, organization, publish_date, keywords, sentiment, sector, length(body) as body_len FROM policy_docs WHERE 1=1"
         params = []
         if keyword:
             sql += " AND (title LIKE ? OR keywords LIKE ? OR body LIKE ?)"
@@ -120,6 +134,10 @@ class PolicyDB:
         if org:
             sql += " AND organization = ?"
             params.append(org)
+        if sector:
+            # 一篇政策可能归属多个板块（sector 用逗号分隔），按子串匹配
+            sql += " AND (sector = ? OR sector LIKE ? OR sector LIKE ?)"
+            params.extend([sector, f"{sector},%", f"%,{sector}"])
         if year:
             # 兼容 ISO 和中文日期格式：STRFTIME 对 ISO 有效，LIKE 对中文有效
             sql += " AND (STRFTIME('%Y', publish_date) = ? OR publish_date LIKE ?)"
@@ -127,7 +145,26 @@ class PolicyDB:
         sql += f" ORDER BY publish_date DESC, found_at DESC LIMIT ?"
         params.append(limit)
         rows = conn.execute(sql, params).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            if with_summary and d.get("body"):
+                d["content"] = d.pop("body")[:200]
+            out.append(d)
+        return out
+
+    def _backfill_sectors(self):
+        """为旧库中没有 sector 的文档按关键词派生补齐（幂等）。"""
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT url, keywords FROM policy_docs WHERE sector IS NULL OR sector = ''"
+        ).fetchall()
+        if not rows:
+            return
+        for r in rows:
+            sector = ",".join(derive_sectors(r["keywords"]))
+            conn.execute("UPDATE policy_docs SET sector=? WHERE url=?", (sector, r["url"]))
+        conn.commit()
 
     def get(self, url: str) -> dict | None:
         conn = self._connect()

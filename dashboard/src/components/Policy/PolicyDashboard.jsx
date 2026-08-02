@@ -15,6 +15,20 @@ function parseTimeline(raw) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
+const safeParse = parseTimeline;
+
+// 板块配色（与 deep_fusion/shared/policy_sectors.py 的 SECTOR_COLORS 保持一致，纯展示）
+const SECTOR_COLORS = {
+  '宏观金融': '#D4A853',
+  '房地产基建': '#C49BA5',
+  '绿色能源': '#5BAE7A',
+  '科技数字': '#5B8FA8',
+  '消费升级': '#C77DA0',
+  '制造产业链': '#B5895B',
+  '改革制度': '#8F7BD6',
+  '其他': '#7A7266',
+};
+function sectorColor(s) { return SECTOR_COLORS[s] || SECTOR_COLORS['其他']; }
 
 export default function PolicyDashboard() {
   const [favorites, setFavorites] = useState(() => {
@@ -22,13 +36,14 @@ export default function PolicyDashboard() {
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   const [hoverCard, setHoverCard] = useState({ show: false, x: 0, y: 0, policy: null, keywords: [] });
+  const [selected, setSelected] = useState(null); // 点击卡片弹出的"收录的政策卡片"
+  const [selectedSector, setSelectedSector] = useState(null); // 点击板块头展开的该板块列表
   const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
   const activePolicySub = useAppStore((s) => s.activePolicySub);
 
   // ── 动态数据源 ──
   const stats = useMCP('policy_stats');
   const timeline = useMCP('policy_timeline', { year: timelineYear });
-  const search = useMCP('policy_search', { limit: 30, year: timelineYear });
 
   // ── 刷新（触发后端采集） ──
   const queryClient = useQueryClient();
@@ -43,7 +58,6 @@ export default function PolicyDashboard() {
 
   const tl = parseTimeline(timeline.data);
   const realStats = stats.data || '';
-  const realDocs = (search.data || '').split('\n').slice(1).filter(Boolean);
 
   // ── 十五五进度 ──
   const now = new Date();
@@ -294,13 +308,13 @@ export default function PolicyDashboard() {
       </div>
       )}
 
-      {/* ── 最新政策文件 — 从 policy_search 动态获取 ── */}
+      {/* ── 政策文件列表 — 最新时间线 + 按板块分类叠放 ── */}
       {activePolicySub === 'list' && (
       <div className="timeline-section">
-        {/* ── 未来政策日程（统一从日历 Routine/政策会议种子读取）── */}
+        {/* ── 未来政策日程 ── */}
         <h2 className="section-title">🔔 未来政策日程</h2>
-        <CardWrapper style={{ maxWidth: '50%', padding: 12, marginBottom: 16 }}>
-          {((timeline.data && timeline.data.upcoming_schedule) || []).slice(0, 12).map((s, i, arr) => (
+        <CardWrapper style={{ maxWidth: '60%', padding: 12, marginBottom: 24 }}>
+          {((tl && tl.upcoming_schedule) || []).slice(0, 12).map((s, i, arr) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0',
               borderBottom: i < Math.min(arr.length, 12) - 1 ? '1px solid var(--border-subtle)' : 'none',
@@ -314,50 +328,47 @@ export default function PolicyDashboard() {
               }}>{s.category}</span>
             </div>
           ))}
-          {((timeline.data && timeline.data.upcoming_schedule) || []).length === 0 && (
+          {((tl && tl.upcoming_schedule) || []).length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>暂无未来政策节点（需先运行 calendar_seed_routine）</div>
           )}
         </CardWrapper>
 
-        <h2 className="section-title">📄 {timelineYear} 年政策文件</h2>
-        <CardWrapper style={{ maxWidth: '50%', display: 'flex', flexDirection: 'column', gap: 0, padding: 0 }}>
-          <div style={{ padding: 12 }}>
-            {realDocs.length > 0 ? realDocs.slice(0, 10).map((doc, i) => {
-              const kw = (doc.match(/\[(.+?)\]/)?.[1] || '').split(',').map(s => s.trim()).filter(Boolean);
-              const date = doc.match(/\d{4}-\d{2}-\d{2}/)?.[0] || '';
-              const filename = doc.replace(/^\s*\d{4}-\d{2}-\d{2}\s*/, '');
-              const url = (() => {
-                const parts = doc.trim().split(/\s+/);
-                const last = parts[parts.length - 1];
-                return (last && (last.startsWith('http://') || last.startsWith('https://'))) ? last : '';
-              })();
-              const sent = doc.match(/〈(利好|利空|中性)〉/)?.[1] || '';
-              return (
-              <CardWrapper key={i} as="a" href={url || undefined} target={url ? '_blank' : undefined} rel="noopener noreferrer" truncate hoverable={false}
-                style={{ display: 'block', padding: '6px 0', borderBottom: i < Math.min(realDocs.length, 10) - 1 ? '1px solid var(--border-subtle)' : 'none', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, textDecoration: 'none', cursor: url ? 'pointer' : 'default', background: 'transparent', backdropFilter: 'none', border: 'none', borderRadius: 0, margin: 0 }}
-                onMouseEnter={(e) => {
-                  setHoverCard({ show: true, x: e.clientX + 12, y: e.clientY - 16, policy: { title: doc.substring(0, 40), tag: '政策文件', content: doc, impact: kw.slice(0, 5).join('、') }, keywords: kw });
-                }} onMouseMove={moveHover} onMouseLeave={hideHover}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{date}</span>
-                {sent && sent !== '中性' && (
-                  <span style={{
-                    marginLeft: 6, fontSize: 10, padding: '1px 5px', borderRadius: 3,
-                    color: sent === '利好' ? '#5BAE7A' : '#C0584F',
-                    background: sent === '利好' ? 'rgba(91,174,122,0.15)' : 'rgba(192,88,79,0.15)',
-                    border: `1px solid ${sent === '利好' ? 'rgba(91,174,122,0.5)' : 'rgba(192,88,79,0.5)'}`,
-                  }}>{sent}</span>
-                )}
-                {kw.length > 0 && (
-                  <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent-gold)' }}>
-                    [{kw.slice(0, 3).join(', ')}{kw.length > 3 ? '…' : ''}]
-                  </span>
-                )}
-                <span style={{ marginLeft: 6 }}>{filename}</span>
-              </CardWrapper>
-              );
-            }) : <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)' }}>该年暂无政策数据</div>}
-          </div>
-        </CardWrapper>
+        {/* ── 最新政策（细节更多的时间线）── */}
+        <h2 className="section-title">📰 最新政策动态</h2>
+        <div className="policy-latest-list">
+          {((tl && tl.latest) || []).map((p, i) => (
+            <PolicyListItem
+              key={p.url || i}
+              policy={p}
+              onHover={showHover}
+              onMove={moveHover}
+              onLeave={hideHover}
+              onClick={() => setSelected(p)}
+            />
+          ))}
+          {((tl && tl.latest) || []).length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>该年暂无政策数据（请先采集）</div>
+          )}
+        </div>
+
+        {/* ── 按板块分类叠放 ── */}
+        <h2 className="section-title" style={{ marginTop: 28 }}>🗂️ 按板块分类叠放</h2>
+        <div className="policy-sector-grid">
+          {((tl && tl.sector_groups) || []).map((g) => (
+            <SectorStack
+              key={g.sector}
+              group={g}
+              onHover={showHover}
+              onMove={moveHover}
+              onLeave={hideHover}
+              onClick={setSelected}
+              onSectorClick={setSelectedSector}
+            />
+          ))}
+          {((tl && tl.sector_groups) || []).length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>暂无可按板块分类的政策</div>
+          )}
+        </div>
       </div>
       )}
 
@@ -418,6 +429,196 @@ export default function PolicyDashboard() {
             {hoverCard.policy.impact && !hoverCard.keywords.length && <div className="policy-impact">影响领域：{hoverCard.policy.impact}</div>}
           </>
         )}
+      </div>
+
+      {/* ── 点击弹出"收录的政策卡片"（密集信息）── */}
+      <PolicyDetailModal policy={selected} onClose={() => setSelected(null)} />
+      <SectorListModal group={selectedSector} onClose={() => setSelectedSector(null)} onPick={(p) => { setSelectedSector(null); setSelected(p); }} />
+
+    </div>
+  );
+}
+
+/* ───────────────────────── 子组件 ───────────────────────── */
+
+function sentimentTag(sent) {
+  if (!sent || sent === '中性') return null;
+  const color = sent === '利好' ? '#5BAE7A' : '#C0584F';
+  return (
+    <span style={{
+      fontSize: 10, padding: '1px 6px', borderRadius: 3, marginLeft: 6,
+      color, background: sent === '利好' ? 'rgba(91,174,122,0.15)' : 'rgba(192,88,79,0.15)',
+      border: `1px solid ${sent === '利好' ? 'rgba(91,174,122,0.5)' : 'rgba(192,88,79,0.5)'}`,
+    }}>{sent}</span>
+  );
+}
+
+function PolicyListItem({ policy, onHover, onMove, onLeave, onClick }) {
+  const seps = (policy.sector || []).filter(Boolean);
+  const kws = (policy.keywords || []).filter(Boolean);
+  return (
+    <div
+      className="policy-list-item"
+      onClick={() => onClick(policy)}
+      onMouseEnter={(e) => onHover(e, {
+        title: policy.title, tag: (seps[0] || '政策'), time: policy.time || policy.date, dept: policy.dept || policy.org,
+        content: (policy.content ? policy.content + '。' : '') + (kws.length ? '关键词：' + kws.join('、') + '。' : '') + (policy.org ? '发布机构：' + policy.org : ''),
+      }, seps)}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+    >
+      <div className="policy-list-main">
+        <span className="policy-list-date">{policy.date}</span>
+        <span
+          className="policy-list-title"
+          onDoubleClick={(e) => { e.stopPropagation(); if (policy.url) window.open(policy.url, '_blank', 'noopener'); }}
+          title="双击标题跳转原发布网页"
+        >{policy.title}</span>
+        {sentimentTag(policy.sentiment)}
+      </div>
+      <div className="policy-list-tags">
+        {seps.map((s) => <span key={s} className="policy-sector-chip">{s}</span>)}
+        {kws.slice(0, 5).map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
+        {policy.url && <span className="policy-link-hint">双击标题↗</span>}
+      </div>
+    </div>
+  );
+}
+
+function SectorStack({ group, onHover, onMove, onLeave, onClick, onSectorClick }) {
+  const items = group.items || [];
+  const shown = items.slice(0, 6);
+  return (
+    <div className="policy-sector-block" style={{ '--sector-color': group.color }}>
+      <div className="policy-sector-head" title="点击展开该板块全部政策" style={{ cursor: 'pointer' }} onClick={() => onSectorClick(group)}>
+        <span className="policy-sector-dot" />
+        <span className="policy-sector-name">{group.sector}</span>
+        <span className="policy-sector-count">{group.count} 篇</span>
+      </div>
+      <div className="policy-stack">
+        {shown.map((p, i) => {
+          const kws = (p.keywords || []).filter(Boolean);
+          return (
+            <div
+              key={p.url || i}
+              className="policy-stack-card"
+              style={{ top: i * 6, zIndex: shown.length - i }}
+              onClick={() => onClick(p)}
+              onMouseEnter={(e) => onHover(e, {
+                title: p.title, tag: group.sector, time: p.time || p.date, dept: p.dept || p.org,
+                content: (p.content ? p.content + '。' : '') + (kws.length ? '关键词：' + kws.join('、') + '。' : '') + (p.org ? '发布机构：' + p.org : ''),
+              }, (p.sector || []).filter(Boolean))}
+              onMouseMove={onMove}
+              onMouseLeave={onLeave}
+            >
+              <div className="policy-stack-row">
+                <span className="policy-stack-date">{p.date}</span>
+                <span
+                  className="policy-stack-title"
+                  onDoubleClick={(e) => { e.stopPropagation(); if (p.url) window.open(p.url, '_blank', 'noopener'); }}
+                  title="双击标题跳转原发布网页"
+                >{p.title}</span>
+                {sentimentTag(p.sentiment)}
+              </div>
+            </div>
+          );
+        })}
+        {items.length > shown.length && (
+          <div className="policy-stack-more" onClick={() => onClick(items[shown.length])}>
+            +{items.length - shown.length} 篇，点击查看更多
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SectorListModal({ group, onClose, onPick }) {
+  if (!group) return null;
+  return (
+    <div className="policy-modal-overlay" onClick={onClose}>
+      <div className="policy-modal policy-modal-wide" onClick={(e) => e.stopPropagation()} style={{ '--sector-color': group.color || '#C9A861' }}>
+        <button className="policy-modal-close" onClick={onClose}>×</button>
+        <div className="policy-modal-tags">
+          <span className="policy-sector-chip" style={{ background: (group.color || '#C9A861') + '22', borderColor: group.color || '#C9A861' }}>{group.sector}</span>
+        </div>
+        <h2 className="policy-modal-title">该板块共收录 {group.count} 篇政策</h2>
+        <div className="policy-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          {(group.items || []).map((p, i) => {
+            const seps = (p.sector || []).filter(Boolean);
+            const kws = (p.keywords || []).filter(Boolean);
+            return (
+              <div
+                key={p.url || i}
+                className="policy-list-item policy-list-item--compact"
+                title="单击查看收录卡片 · 双击标题跳转原文"
+                onClick={() => onPick(p)}
+                onDoubleClick={(e) => { e.stopPropagation(); if (p.url) window.open(p.url, '_blank', 'noopener'); }}
+              >
+                <div className="policy-list-main">
+                  <span className="policy-list-date">{p.time || p.date}</span>
+                  <span className="policy-list-title" onDoubleClick={(e) => { e.stopPropagation(); if (p.url) window.open(p.url, '_blank', 'noopener'); }}>{p.title}</span>
+                  {sentimentTag(p.sentiment)}
+                </div>
+                <div className="policy-list-tags">
+                  {seps.map((s) => <span key={s} className="policy-sector-chip">{s}</span>)}
+                  {kws.slice(0, 5).map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
+                  {p.url && <span className="policy-link-hint">双击标题↗</span>}
+                </div>
+                {p.content && <div className="policy-list-content">{p.content}</div>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="policy-modal-hint">提示：单击某条可查看收录卡片，双击标题跳转原文</div>
+      </div>
+    </div>
+  );
+}
+
+function PolicyDetailModal({ policy, onClose }) {
+  // hooks 必须在任何 early return 之前调用，保证顺序稳定
+  const detail = useMCP('policy_detail', policy && policy.url ? { url: policy.url } : null);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  if (!policy) return null;
+  const parsed = safeParse(detail.data);
+  const body = parsed && parsed.body ? parsed.body : '';
+  const seps = (policy.sector || []).filter(Boolean);
+  const kws = (policy.keywords || []).filter(Boolean);
+  return (
+    <div className="policy-modal-overlay" onClick={onClose}>
+      <div className="policy-modal" onClick={(e) => e.stopPropagation()} style={{ '--sector-color': (seps[0] && sectorColor(seps[0])) || '#C9A861' }}>
+        <button className="policy-modal-close" onClick={onClose}>×</button>
+        <div className="policy-modal-tags">
+          {seps.map((s) => <span key={s} className="policy-sector-chip">{s}</span>)}
+          {sentimentTag(policy.sentiment)}
+        </div>
+        <h2 className="policy-modal-title"
+          onDoubleClick={() => { if (policy.url) window.open(policy.url, '_blank', 'noopener'); }}
+          title="双击标题跳转原发布网页">{policy.title}</h2>
+        <div className="policy-modal-meta">
+          <span>发布：{(policy.date || '').slice(0, 10)}</span>
+          <span>机构：{policy.org || '—'}</span>
+        </div>
+        {kws.length > 0 && (
+          <div className="policy-modal-kw">
+            {kws.map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
+          </div>
+        )}
+        <div className="policy-modal-body">
+          {detail.loading && <div className="policy-modal-loading">正在拉取原文摘要…</div>}
+          {!detail.loading && body && <p>{body.length > 1800 ? body.slice(0, 1800) + '…' : body}</p>}
+          {!detail.loading && !body && <p className="policy-modal-note">（该条目暂无正文快照，请点击右下方按钮跳转原文查看）</p>}
+        </div>
+        <div className="policy-modal-actions">
+          <button className="policy-modal-btn" onClick={onClose}>关闭</button>
+          {policy.url && <button className="policy-modal-btn primary" onClick={() => window.open(policy.url, '_blank', 'noopener')}>打开原发布网页 ↗</button>}
+        </div>
+        <div className="policy-modal-hint">提示：双击标题或点击右上按钮均可跳转原文</div>
       </div>
     </div>
   );

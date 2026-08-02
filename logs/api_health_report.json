@@ -1,12 +1,12 @@
 {
-  "log_line": "2026-08-01 17:02:58 : 校验成果汇总，当前接口数量共 162 个，异常接口 40 个，良率 75.3 %，异常接口名称如下：article_ff_crr, fund_etf_fund_info_em, fund_portfolio_bond_hold_em, fund_portfolio_hold_em, futures_foreign_commodity_realtime, get_us_stock_name, macro_china_m, macro_china_urban_unemployment, stock_bj_a_spot_em, stock_board_concept_cons_em, stock_board_concept_name_em, stock_board_industry_cons_em, stock_board_industry_hist_em, stock_board_industry_spot_em, stock_cg_lawsuit_cninfo, stock_cy_a_spot_em, stock_hk_hist, stock_hk_spot_em, stock_individual_basic_info_xq, stock_individual_fund_flow, stock_individual_info_em, stock_industry_category_cninfo, stock_industry_financial_em, stock_industry_pe_ratio_cninfo, stock_industry_valuation_em, stock_intraday_em, stock_jgdy_detail_em, stock_kc_a_spot_em, stock_new_a_spot_em, stock_nikkei_index_daily, stock_sector_fund_flow_rank, stock_sh_a_spot_em, stock_sz_a_spot_em, stock_zh_a_hist, stock_zh_a_hist_min_em, stock_zh_a_hist_pre_min_em, stock_zh_a_spot_em, stock_zh_a_st_em, stock_zh_index_spot_em, sw_index_daily。经检修：问题接口共 40 个，现修复 0 个，修复率 0.0 %，仍有 40 个接口无法修复，名称为: [\"article_ff_crr\", \"fund_etf_fund_info_em\", \"fund_portfolio_bond_hold_em\", \"fund_portfolio_hold_em\", \"futures_foreign_commodity_realtime\", \"get_us_stock_name\", \"macro_china_m\", \"macro_china_urban_unemployment\", \"stock_bj_a_spot_em\", \"stock_board_concept_cons_em\", \"stock_board_concept_name_em\", \"stock_board_industry_cons_em\", \"stock_board_industry_hist_em\", \"stock_board_industry_spot_em\", \"stock_cg_lawsuit_cninfo\", \"stock_cy_a_spot_em\", \"stock_hk_hist\", \"stock_hk_spot_em\", \"stock_individual_basic_info_xq\", \"stock_individual_fund_flow\", \"stock_individual_info_em\", \"stock_industry_category_cninfo\", \"stock_industry_financial_em\", \"stock_industry_pe_ratio_cninfo\", \"stock_industry_valuation_em\", \"stock_intraday_em\", \"stock_jgdy_detail_em\", \"stock_kc_a_spot_em\", \"stock_new_a_spot_em\", \"stock_nikkei_index_daily\", \"stock_sector_fund_flow_rank\", \"stock_sh_a_spot_em\", \"stock_sz_a_spot_em\", \"stock_zh_a_hist\", \"stock_zh_a_hist_min_em\", \"stock_zh_a_hist_pre_min_em\", \"stock_zh_a_spot_em\", \"stock_zh_a_st_em\", \"stock_zh_index_spot_em\", \"sw_index_daily\"]",
+  "log_line": "2026-08-02 16:18:22 : 校验成果汇总，当前接口数量共 162 个，异常接口 38 个，良率 76.5 %，异常接口名称如下：article_ff_crr, fund_etf_fund_info_em, fund_portfolio_bond_hold_em, fund_portfolio_hold_em, futures_foreign_commodity_realtime, get_us_stock_name, macro_china_m, macro_china_urban_unemployment, stock_bj_a_spot_em, stock_board_concept_cons_em, stock_board_concept_name_em, stock_board_industry_cons_em, stock_board_industry_hist_em, stock_board_industry_spot_em, stock_cg_lawsuit_cninfo, stock_cy_a_spot_em, stock_hk_hist, stock_hk_spot_em, stock_individual_basic_info_xq, stock_individual_fund_flow, stock_individual_info_em, stock_industry_financial_em, stock_industry_pe_ratio_cninfo, stock_industry_valuation_em, stock_jgdy_detail_em, stock_kc_a_spot_em, stock_new_a_spot_em, stock_nikkei_index_daily, stock_sector_fund_flow_rank, stock_sh_a_spot_em, stock_sz_a_spot_em, stock_zh_a_hist, stock_zh_a_hist_min_em, stock_zh_a_hist_pre_min_em, stock_zh_a_spot_em, stock_zh_a_st_em, stock_zh_index_spot_em, sw_index_daily。经检修：问题接口共 38 个，现修复 1 个，修复率 2.6 %，仍有 37 个接口无法修复，名称为: [\"article_ff_crr\", \"fund_etf_fund_info_em\", \"fund_portfolio_bond_hold_em\", \"fund_portfolio_hold_em\", \"futures_foreign_commodity_realtime\", \"get_us_stock_name\", \"macro_china_urban_unemployment\", \"stock_bj_a_spot_em\", \"stock_board_concept_cons_em\", \"stock_board_concept_name_em\", \"stock_board_industry_cons_em\", \"stock_board_industry_hist_em\", \"stock_board_industry_spot_em\", \"stock_cg_lawsuit_cninfo\", \"stock_cy_a_spot_em\", \"stock_hk_hist\", \"stock_hk_spot_em\", \"stock_individual_basic_info_xq\", \"stock_individual_fund_flow\", \"stock_individual_info_em\", \"stock_industry_financial_em\", \"stock_industry_pe_ratio_cninfo\", \"stock_industry_valuation_em\", \"stock_jgdy_detail_em\", \"stock_kc_a_spot_em\", \"stock_new_a_spot_em\", \"stock_nikkei_index_daily\", \"stock_sector_fund_flow_rank\", \"stock_sh_a_spot_em\", \"stock_sz_a_spot_em\", \"stock_zh_a_hist\", \"stock_zh_a_hist_min_em\", \"stock_zh_a_hist_pre_min_em\", \"stock_zh_a_spot_em\", \"stock_zh_a_st_em\", \"stock_zh_index_spot_em\", \"sw_index_daily\"]",
   "total": 162,
-  "abnormal_count": 40,
-  "yield_rate": 75.3,
-  "good_count": 122,
-  "fixed_count": 0,
-  "unfixed_count": 40,
-  "fix_rate": 0.0,
+  "abnormal_count": 38,
+  "yield_rate": 76.5,
+  "good_count": 124,
+  "fixed_count": 1,
+  "unfixed_count": 37,
+  "fix_rate": 2.6,
   "abnormal_names": [
     "article_ff_crr",
     "fund_etf_fund_info_em",
@@ -29,11 +29,9 @@
     "stock_individual_basic_info_xq",
     "stock_individual_fund_flow",
     "stock_individual_info_em",
-    "stock_industry_category_cninfo",
     "stock_industry_financial_em",
     "stock_industry_pe_ratio_cninfo",
     "stock_industry_valuation_em",
-    "stock_intraday_em",
     "stock_jgdy_detail_em",
     "stock_kc_a_spot_em",
     "stock_new_a_spot_em",
@@ -56,7 +54,6 @@
     "fund_portfolio_hold_em",
     "futures_foreign_commodity_realtime",
     "get_us_stock_name",
-    "macro_china_m",
     "macro_china_urban_unemployment",
     "stock_bj_a_spot_em",
     "stock_board_concept_cons_em",
@@ -71,11 +68,9 @@
     "stock_individual_basic_info_xq",
     "stock_individual_fund_flow",
     "stock_individual_info_em",
-    "stock_industry_category_cninfo",
     "stock_industry_financial_em",
     "stock_industry_pe_ratio_cninfo",
     "stock_industry_valuation_em",
-    "stock_intraday_em",
     "stock_jgdy_detail_em",
     "stock_kc_a_spot_em",
     "stock_new_a_spot_em",
@@ -376,7 +371,7 @@
         "手续费"
       ],
       "shape": [
-        23781,
+        23785,
         11
       ]
     },
@@ -1133,7 +1128,7 @@
         "变化幅度"
       ],
       "shape": [
-        24,
+        23,
         3
       ]
     },
@@ -1683,8 +1678,8 @@
         "macro_china_lpr",
         "macro_china_gdp"
       ],
-      "fixed": false,
-      "fix_note": "无登记修复；候选替代见 candidates 字段",
+      "fixed": true,
+      "fix_note": "已映射到新接口 macro_china_m2_yearly（复核状态 OK）",
       "transform_needed": false,
       "transform_stub": null,
       "columns": null,
@@ -3982,21 +3977,33 @@
     },
     {
       "name": "stock_industry_category_cninfo",
-      "status": "ERROR",
+      "status": "OK",
       "em": false,
       "files": [
         "akshare_adapter.py",
         "industry_cninfo.py"
       ],
-      "error": "Expecting value: line 1 column 1 (char 0)",
-      "error_type": "JSONDecodeError",
+      "error": null,
+      "error_type": null,
       "candidates": [],
       "fixed": false,
       "fix_note": "",
       "transform_needed": false,
       "transform_stub": null,
-      "columns": null,
-      "shape": null
+      "columns": [
+        "类目编码",
+        "类目名称",
+        "终止日期",
+        "行业类型",
+        "行业类型编码",
+        "类目名称英文",
+        "父类编码",
+        "分级"
+      ],
+      "shape": [
+        294,
+        8
+      ]
     },
     {
       "name": "stock_industry_financial_em",
@@ -4110,21 +4117,29 @@
     },
     {
       "name": "stock_intraday_em",
-      "status": "NETWORK",
+      "status": "OK",
       "em": true,
       "files": [
         "akshare_adapter.py",
         "stocks.py"
       ],
-      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
-      "error_type": "Network",
+      "error": null,
+      "error_type": null,
       "candidates": [],
       "fixed": false,
       "fix_note": "",
       "transform_needed": false,
       "transform_stub": null,
-      "columns": null,
-      "shape": null
+      "columns": [
+        "时间",
+        "成交价",
+        "手数",
+        "买卖盘性质"
+      ],
+      "shape": [
+        4712,
+        4
+      ]
     },
     {
       "name": "stock_jgdy_detail_em",
@@ -4173,7 +4188,7 @@
         "公告日期"
       ],
       "shape": [
-        22207,
+        22202,
         11
       ]
     },
