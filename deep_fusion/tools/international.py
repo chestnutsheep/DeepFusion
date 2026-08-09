@@ -650,9 +650,9 @@ def asset_bubble_watch(
             jp["industrial_production"] = round(jpn_indpro[-1][1], 2)
             jp["ip_direction"] = _direction(jpn_indpro[-1][1], jpn_indpro[-2][1]) if len(jpn_indpro) >= 2 else "N/A"
 
-        # 日经225相关 — 用 akshare fallback
+        # 日经225相关 — 用 akshare 全球指数历史 (index_global_hist_em, symbol="日经225")
         try:
-            nikkei = ak_cache(ak.stock_nikkei_index_daily, ttl=86400, ttl2=172800)
+            nikkei = ak_cache(ak.index_global_hist_em, "日经225", ttl=86400, ttl2=172800)
             if nikkei is not None and not nikkei.empty:
                 recent = nikkei.tail(5)
                 close_col = "收盘" if "收盘" in recent.columns else recent.columns[-1]

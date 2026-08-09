@@ -24,7 +24,25 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Iterable, Optional, Sequence
 
-from ...shared.utils import recent_trade_date
+try:
+    from ...shared.utils import recent_trade_date
+except ImportError:  # 独立按文件加载时(桥接层/官方入口 venv 运行)无包上下文，内联实现
+    from datetime import datetime as _datetime
+    import akshare as _ak
+
+    def recent_trade_date():
+        """返回最近一个交易日(<=今天)；akshare 取交易日历，失败回退今天。"""
+        try:
+            dfs = _ak.tool_trade_date_hist_sina()
+            if dfs is not None and len(dfs):
+                dfs = dfs.sort_values("trade_date", ascending=False)
+                now = _datetime.now().date()
+                for d in dfs["trade_date"]:
+                    if d <= now:
+                        return d
+        except Exception:
+            pass
+        return _datetime.now().date()
 
 # ── 路径 ──────────────────────────────────────────────
 # deep_fusion/data/sources/market_collector.py -> 上溯 4 级到 repo 根
@@ -154,21 +172,39 @@ def fetch_stock_daily(
     )
     if df is None or df.empty:
         return []
+    # akshare 不同版本列名可能为中文(日期/开盘…)或英文小写(date/open…)，统一兼容
+    _map = {
+        "date": ("date", "日期"),
+        "open": ("open", "开盘"),
+        "high": ("high", "最高"),
+        "low": ("low", "最低"),
+        "close": ("close", "收盘"),
+        "volume": ("volume", "成交量"),
+        "amount": ("amount", "成交额"),
+    }
+
+    def _g(r, *keys):
+        for k in keys:
+            v = r.get(k)
+            if v is not None and not (isinstance(v, float) and v != v):  # v!=v 即 NaN
+                return v
+        return None
+
     out = []
     for _, r in df.iterrows():
-        d = _norm_date(r.get("日期"))
+        d = _norm_date(_g(r, *_map["date"]))
         if not d:
             continue
         out.append(
             {
                 "code": code[-6:],
                 "date": d,
-                "open": _f(r.get("开盘")),
-                "high": _f(r.get("最高")),
-                "low": _f(r.get("最低")),
-                "close": _f(r.get("收盘")),
-                "volume": _f(r.get("成交量")),
-                "amount": _f(r.get("成交额")),
+                "open": _f(_g(r, *_map["open"])),
+                "high": _f(_g(r, *_map["high"])),
+                "low": _f(_g(r, *_map["low"])),
+                "close": _f(_g(r, *_map["close"])),
+                "volume": _f(_g(r, *_map["volume"])),
+                "amount": _f(_g(r, *_map["amount"])),
             }
         )
     return out
@@ -447,7 +483,7 @@ def needs_refresh(
     if d is None:
         return True
     try:
-        ld = datetime.strptime(d, "%Y-%m-%d")
+        ld = datetime.strptime(d, "%Y-%m-%d").date()
     except ValueError:
         return True
     return (recent_trade_date() - ld).days > max_age_days

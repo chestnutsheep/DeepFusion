@@ -2,7 +2,21 @@
 import os
 import sys
 import threading
+import warnings
 from datetime import datetime
+
+# 抑制 websockets 14+/uvicorn 0.46 的 legacy 弃用警告（不影响功能）
+# 注：实际生效点在 deep_fusion/logging_config.py（其 simplefilter("default") 会清空早期 filter）
+warnings.filterwarnings(
+    "ignore",
+    message=r"websockets\.legacy is deprecated",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"websockets\.server\.WebSocketServerProtocol is deprecated",
+    category=DeprecationWarning,
+)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

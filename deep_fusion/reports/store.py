@@ -19,6 +19,18 @@ def _resolve_db(db_path=None):
     return db_path or os.getenv("REPORTS_DB_PATH") or _DEFAULT_DB
 
 
+def _safe_json(raw, default=None):
+    """安全解析 DB 内 JSON 字段：损坏/空值则返回 default，避免查询侧崩。"""
+    if raw is None or raw == "":
+        return default
+    if isinstance(raw, (dict, list)):
+        return raw
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
 def _conn(db_path):
     path = _resolve_db(db_path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -107,6 +119,14 @@ def _migrate(con):
     ):
         if col not in lu_cols:
             con.execute(f"ALTER TABLE limit_up_stocks ADD COLUMN {col} {ctype}")
+    # 大事日历：补热点/投资方向拆解字段（2026-08-05，承载主题拆解+来源站点）
+    for col, ctype in (
+        ("theme_key", "TEXT"),
+        ("summary", "TEXT"),
+        ("sources", "TEXT"),
+    ):
+        if col not in cols:
+            con.execute(f"ALTER TABLE calendar_events ADD COLUMN {col} {ctype}")
     con.commit()
 
 
@@ -143,7 +163,7 @@ def get_latest(rtype, db_path=None):
     if row is None:
         return None
     return {"rtype": row["rtype"], "date": row["date"],
-            "payload": json.loads(row["payload"]), "created_at": row["created_at"]}
+            "payload": _safe_json(row["payload"]), "created_at": row["created_at"]}
 
 
 def get_history(rtype, limit=10, db_path=None):
@@ -152,7 +172,7 @@ def get_history(rtype, limit=10, db_path=None):
         "WHERE rtype=? ORDER BY date DESC LIMIT ?", (rtype, limit)
     ).fetchall()
     return [{"rtype": r["rtype"], "date": r["date"],
-             "payload": json.loads(r["payload"]), "created_at": r["created_at"]}
+             "payload": _safe_json(r["payload"]), "created_at": r["created_at"]}
             for r in rows]
 
 
@@ -164,7 +184,7 @@ def get_by_date(rtype, rdate, db_path=None):
     if row is None:
         return None
     return {"rtype": row["rtype"], "date": row["date"],
-            "payload": json.loads(row["payload"]), "created_at": row["created_at"]}
+            "payload": _safe_json(row["payload"]), "created_at": row["created_at"]}
 
 
 # ---------- limit_up 连板潜力股表 ----------
@@ -213,7 +233,7 @@ def get_limit_up(rdate, db_path=None):
     out = []
     for r in rows:
         d = {k: r[k] for k in _COLS if k in r.keys()}
-        d["sectors"] = json.loads(r["sectors"]) if r["sectors"] else []
+        d["sectors"] = _safe_json(r["sectors"], default=[])
         d["date"] = r["date"]
         out.append(d)
     return out
@@ -227,14 +247,16 @@ def seed_calendar(events, db_path=None):
     每条事件可带 domains(关联领域列表) 与 targets(抢跑标的列表)，均为 JSON。
     domains: [{"name": "半导体", "type": "industry|concept|sector", "code": "801081"}]
     targets: [{"code": "600519", "name": "贵州茅台"}]
+    theme_key/summary/sources: 热点/投资方向拆解（可选）。
     """
     con = _conn(db_path)
     try:
         for e in events:
             con.execute(
                 "INSERT OR REPLACE INTO calendar_events"
-                "(date, name, sector, rating, category, sentiment, source, note, domains, targets, created_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+                "(date, name, sector, rating, category, sentiment, source, note, domains, targets, "
+                " theme_key, summary, sources, created_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
                 (
                     e.get("date"), e.get("name"), e.get("sector"),
                     int(e.get("rating", 3)), e.get("category"),
@@ -242,6 +264,8 @@ def seed_calendar(events, db_path=None):
                     e.get("source", "manual"), e.get("note", ""),
                     json.dumps(e.get("domains") or [], ensure_ascii=False),
                     json.dumps(e.get("targets") or [], ensure_ascii=False),
+                    e.get("theme_key"), e.get("summary"),
+                    json.dumps(e.get("sources") or [], ensure_ascii=False),
                 ),
             )
         con.commit()
@@ -251,16 +275,19 @@ def seed_calendar(events, db_path=None):
 
 def add_calendar_event(rdate, name, sector="", rating=3, category="",
                        sentiment="中性", source="manual", note="",
-                       domains=None, targets=None, db_path=None):
+                       domains=None, targets=None,
+                       theme_key="", summary="", sources=None, db_path=None):
     con = _conn(db_path)
     try:
         con.execute(
             "INSERT OR REPLACE INTO calendar_events"
-            "(date, name, sector, rating, category, sentiment, source, note, domains, targets, created_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
+            "(date, name, sector, rating, category, sentiment, source, note, domains, targets, "
+            " theme_key, summary, sources, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','localtime'))",
             (rdate, name, sector, int(rating), category, sentiment, source, note,
              json.dumps(domains or [], ensure_ascii=False),
-             json.dumps(targets or [], ensure_ascii=False)),
+             json.dumps(targets or [], ensure_ascii=False),
+             theme_key, summary, json.dumps(sources or [], ensure_ascii=False)),
         )
         con.commit()
     finally:
@@ -283,8 +310,11 @@ def _row_to_event(r):
         "sector": r["sector"], "rating": r["rating"], "category": r["category"],
         "sentiment": r["sentiment"] if r["sentiment"] else "中性",
         "source": r["source"], "note": r["note"],
-        "domains": json.loads(r["domains"]) if r["domains"] else [],
-        "targets": json.loads(r["targets"]) if r["targets"] else [],
+        "domains": _safe_json(r["domains"], default=[]),
+        "targets": _safe_json(r["targets"], default=[]),
+        "theme_key": r["theme_key"] if r["theme_key"] else "",
+        "summary": r["summary"] if r["summary"] else "",
+        "sources": _safe_json(r["sources"], default=[]),
         "created_at": r["created_at"],
     }
 
@@ -318,3 +348,38 @@ def get_calendar_range(start, end, db_path=None):
         (start, end),
     ).fetchall()
     return [_row_to_event(r) for r in rows]
+
+
+# ─────────────────────────────────────────────────────────────
+# 热点/投资方向（invest_theme）— 复用通用 reports 表，rtype="invest_theme"
+# ─────────────────────────────────────────────────────────────
+INVEST_THEME_TYPE = "invest_theme"
+
+
+def save_invest_theme(items, rpt_date=None, meta=None, db_path=None):
+    """保存某日「热点/投资方向」标的组合。items 为列表，每条：
+    {"theme": "AI算力", "summary": "...拆解...", "sentiment": "利好",
+     "targets": [{"code":"300750","name":"宁德时代","pct":"+3.2%","change":"+0.65",
+                  "reason":"...","intensity":"强","next_day": {"pct":1.8,"win":1}}],
+     "sources": ["政策司", "专利库"]}
+    next_day 为次日(15:00后发布则看下一日)涨跌与强度回测字段。
+    """
+    rpt_date = rpt_date or date.today().isoformat()
+    payload = {
+        "date": rpt_date,
+        "meta": meta or {},
+        "themes": items,
+    }
+    return save_report(INVEST_THEME_TYPE, rpt_date, payload, db_path)
+
+
+def get_invest_theme(date_str, db_path=None):
+    return get_by_date(INVEST_THEME_TYPE, date_str, db_path)
+
+
+def get_invest_theme_latest(db_path=None):
+    return get_latest(INVEST_THEME_TYPE, db_path)
+
+
+def get_invest_theme_history(limit=30, db_path=None):
+    return get_history(INVEST_THEME_TYPE, limit, db_path)

@@ -62,12 +62,22 @@ class _NbsClient:
         if path.exists():
             age = time.time() - path.stat().st_mtime
             if age < ttl:
-                return json.loads(path.read_text(encoding="utf-8"))
+                try:
+                    return json.loads(path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    # 缓存文件损坏（半截写/并发写/被kill）时忽略，回退到重新拉取
+                    logger.warning("nbs_cache_corrupt", key=key, path=str(path))
+                    return None
         return None
 
     def _cache_set(self, key: str, data):
+        import os
+        import tempfile
         path = self.cache_dir / f"{key}.json"
-        path.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
+        # 原子写：先写临时文件再 replace，避免进程中断留下半截 JSON 导致下次读取崩溃
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
+        os.replace(tmp, path)
 
     def _load_cid_index(self):
         if self._cid_index is not None:
@@ -76,7 +86,11 @@ class _NbsClient:
         for fname in ["nbs_cids_monthly.json", "nbs_cids_quarterly.json", "nbs_cids_annual.json"]:
             path = self._cid_dir / fname
             if path.exists():
-                data = json.loads(path.read_text(encoding="utf-8"))
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    logger.warning("nbs_index_corrupt", fname=fname, path=str(path))
+                    continue
                 freq = "月度" if "monthly" in fname else ("季度" if "quarterly" in fname else "年度")
                 for item in data:
                     self._cid_index.append({
@@ -94,8 +108,9 @@ class _NbsClient:
             return []
         results = []
         for item in self._cid_index:
-            if keyword in item["name"]:
-                if freq and item["freq"] != freq:
+            name = item.get("name", "")
+            if keyword in name:
+                if freq and item.get("freq") != freq:
                     continue
                 results.append(dict(item))
         return results

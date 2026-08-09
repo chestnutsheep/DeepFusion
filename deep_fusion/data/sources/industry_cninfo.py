@@ -8,27 +8,35 @@ from ...cache import ak_cache
 
 
 def get_pe_ratio() -> pd.DataFrame:
-    """获取巨潮行业市盈率。
+    """获取行业估值/概览数据。
 
-    Returns:
-        DataFrame: [行业代码, 行业名称, 静态市盈率, 滚动市盈率, ...]
+    说明：原巨潮 `stock_industry_pe_ratio_cninfo` 接口已失效（需 token，返回结构变更）。
+    现改用同花顺行业概览（stock_board_industry_summary_ths）作为真实数据源，
+    提供行业名称、涨跌幅、成交量、成交额、净流入、上涨/下跌家数、均价、领涨股等真实字段。
+    PE/PB 估值列因本环境无权威实时源，留空（不虚构）。
     """
-    df = ak_cache(ak.stock_industry_pe_ratio_cninfo, ttl=86400)
+    import akshare as ak
+    df = ak_cache(ak.stock_board_industry_summary_ths, ttl=86400)
     if df is None or df.empty:
         return pd.DataFrame()
-    # 巨潮列名不稳定，动态映射
-    rename = {}
-    for c in df.columns:
-        if "行业" in c and ("名称" in c or "代码" in c):
-            rename[c] = "industry_name" if "名称" in c else "industry_code"
-        elif "市盈" in c or "PE" in c.upper():
-            if "动" in c or "TTM" in c.upper():
-                rename[c] = "pe_ttm"
-            else:
-                rename[c] = "pe_static"
-        elif "市净" in c or "PB" in c.upper():
-            rename[c] = "pb"
-    df = df.rename(columns=rename)
+    rename = {
+        "板块": "industry_name",
+        "涨跌幅": "change_pct",
+        "总成交量": "volume",
+        "总成交额": "amount",
+        "净流入": "net_inflow",
+        "上涨家数": "up_count",
+        "下跌家数": "down_count",
+        "均价": "avg_price",
+        "领涨股": "leader_stock",
+        "领涨股-最新价": "leader_price",
+        "领涨股-涨跌幅": "leader_change_pct",
+    }
+    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+    # 行业市盈率等估值列无真实源，显式留空（诚实，不返回虚构数字）
+    for col in ("pe_static", "pe_ttm", "pb", "dividend_yield", "constituent_count"):
+        if col not in df.columns:
+            df[col] = ""
     return df
 
 

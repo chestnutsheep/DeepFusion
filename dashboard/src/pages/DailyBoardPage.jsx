@@ -4,14 +4,18 @@ import ErrorBoundary from "../components/common/ErrorBoundary.jsx";
 import SectionHeader from "../components/common/SectionHeader.jsx";
 import UpdateTimestamp from "../components/common/UpdateTimestamp.jsx";
 import { safeParse } from "../components/Widgets/marketShared.jsx";
+import { useMarketScene, SCENE_META } from "../store/index.js";
 import {
   LimitUpWidget,
   CalibrationWidget,
   ReportsWidget,
   CalendarWidget,
 } from "../components/Widgets/DailyWidgets.jsx";
+import InvestThemeWidget from "../components/Reports/InvestThemeWidget.jsx";
 
 export default function DailyBoardPage() {
+  const scene = useMarketScene();
+  const meta = SCENE_META[scene];
   const lu = useMCP("limit_up_latest", {});
   const calib = useMCP("limit_up_calibration_latest", {});
 
@@ -28,6 +32,8 @@ export default function DailyBoardPage() {
   };
 
   const isFetching = lu.isFetching || calib.isFetching;
+  // 备抵场景(收盘后/非交易日)：实时刷新无意义，禁用并提示
+  const liveAllowed = scene === "live";
 
   return (
     <div>
@@ -44,10 +50,20 @@ export default function DailyBoardPage() {
         <button
           className="btn-primary"
           onClick={refreshAll}
-          disabled={isFetching}
+          disabled={isFetching || !liveAllowed}
+          title={liveAllowed ? "拉取实时数据" : "非交易时段，展示最近交易日缓存快照"}
         >
-          {isFetching ? "刷新中…" : "立即刷新"}
+          {isFetching ? "刷新中…" : liveAllowed ? "立即刷新" : "实时刷新(交易时段可用)"}
         </button>
+        <span
+          className="df-caption"
+          style={{
+            padding: "2px 10px", borderRadius: 999, fontWeight: 600,
+            color: "#0b0f0a", background: meta.color,
+          }}
+        >
+          {meta.label}
+        </span>
         <span className="df-caption">
           <UpdateTimestamp data={lu.updatedAt ? { updatedAt: lu.updatedAt } : null} />
         </span>
@@ -67,11 +83,19 @@ export default function DailyBoardPage() {
         </ErrorBoundary>
       </div>
 
-      {/* 金融大事日历 */}
+      {/* 金融大事日历 + 热点/投资方向 */}
       <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="金融大事日历 · 月历" />
+        <SectionHeader title="金融大事日历 · 月历 / 甘特" />
         <ErrorBoundary>
           <CalendarWidget />
+        </ErrorBoundary>
+      </div>
+
+      {/* 热点 / 投资方向（关键词触发采集 + 次日回测） */}
+      <div style={{ marginTop: "var(--sp-xl)" }}>
+        <SectionHeader title="热点 / 投资方向 · 主题追踪" />
+        <ErrorBoundary>
+          <InvestThemeWidget />
         </ErrorBoundary>
       </div>
 

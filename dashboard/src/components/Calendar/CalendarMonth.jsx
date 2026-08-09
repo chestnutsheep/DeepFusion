@@ -23,6 +23,7 @@ export default function CalendarMonth() {
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [selected, setSelected] = useState(now.getDate());
   const [popup, setPopup] = useState(null); // {name, type}
+  const [view, setView] = useState('month'); // month | gantt
 
   const month = useMCP('calendar_month', { year: ym.year, month: ym.month });
   const collect = useMCP('calendar_refresh_collect', null); // 禁用自动，仅手动刷新
@@ -93,15 +94,28 @@ export default function CalendarMonth() {
           </span>
           <button onClick={next} style={navBtn()}>›</button>
         </div>
-        <button
-          onClick={onRefresh}
-          disabled={collect.isFetching}
-          style={{ fontSize: 'var(--fs-xs)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
-            background: 'rgba(201,168,97,0.15)', border: '1px solid rgba(201,168,97,0.5)', color: 'var(--accent-gold)',
-            opacity: collect.isFetching ? 0.6 : 1 }}
-        >
-          {collect.isFetching ? '采集中…' : '↻ 刷新采集'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* 月历 / 甘特 滑动切换 */}
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: 2 }}>
+            {[['month', '月历'], ['gantt', '甘特图']].map(([k, label]) => (
+              <button key={k} onClick={() => setView(k)} style={{
+                fontSize: 'var(--fs-xs)', padding: '5px 14px', borderRadius: 999, cursor: 'pointer', border: 'none',
+                background: view === k ? 'var(--accent-gold)' : 'transparent',
+                color: view === k ? '#0b0b0f' : 'var(--text-secondary)', fontWeight: view === k ? 700 : 400,
+                transition: 'all .18s',
+              }}>{label}</button>
+            ))}
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={collect.isFetching}
+            style={{ fontSize: 'var(--fs-xs)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
+              background: 'rgba(201,168,97,0.15)', border: '1px solid rgba(201,168,97,0.5)', color: 'var(--accent-gold)',
+              opacity: collect.isFetching ? 0.6 : 1 }}
+          >
+            {collect.isFetching ? '采集中…' : '↻ 刷新采集'}
+          </button>
+        </div>
       </div>
       {collect.data && collect.isFetched && (
         <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -126,6 +140,8 @@ export default function CalendarMonth() {
         </span>
       </div>
 
+      {view === 'month' ? (
+        <>
       {/* 月历网格 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
         {WEEK.map((w) => (
@@ -183,8 +199,86 @@ export default function CalendarMonth() {
           ))}
         </div>
       </div>
+        </>
+      ) : (
+        <GanttView events={displayEvents} ym={ym} daysInMonth={daysInMonth} />
+      )}
 
       {popup && <DomainConstituentsPopup domain={popup.name} type={popup.type} onClose={() => setPopup(null)} />}
+    </div>
+  );
+}
+
+/**
+ * 甘特图视图：纵轴=事件（按类型分组），横轴=当月日期。
+ * 事件条按其 date 定位到对应日列；有 summary/theme 拆解的标注亮色。
+ */
+function GanttView({ events, ym, daysInMonth }) {
+  const months = ['全部', ...Array.from(new Set(events.map((e) => e.category).filter(Boolean))).sort()];
+  const [cat, setCat] = useState('全部');
+  const filtered = cat === '全部' ? events : events.filter((e) => e.category === cat);
+  const sentColor = (s) => s === '利好' ? '#5BAE7A' : s === '利空' ? '#C0584F' : '#C9A861';
+
+  // 按周行渲染：每 7 天一行，便于横向定位
+  const weeks = Math.ceil(daysInMonth / 7);
+  const today = new Date();
+  const isCurMonth = today.getFullYear() === ym.year && (today.getMonth() + 1) === ym.month;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>类型</span>
+        {months.slice(0, 12).map((c) => (
+          <button key={c} onClick={() => setCat(c)} style={{
+            fontSize: 'var(--fs-xs)', padding: '4px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid var(--border-subtle)',
+            background: cat === c ? 'var(--accent-gold)' : 'rgba(255,255,255,0.04)',
+            color: cat === c ? '#0b0b0f' : 'var(--text-secondary)', fontWeight: cat === c ? 700 : 400,
+          }}>{c}</button>
+        ))}
+        <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginLeft: 'auto' }}>横轴=当月日期 · 条=事件催化时点</span>
+      </div>
+
+      {/* 日期刻度 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8, marginBottom: 4 }}>
+        <div />
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${daysInMonth}, 1fr)`, gap: 2 }}>
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
+            const dim = isCurMonth && d < today.getDate();
+            return (
+              <div key={d} style={{ fontSize: 'var(--fs-2xs)', color: dim ? 'var(--text-muted)' : 'var(--text-secondary)', textAlign: 'center' }}>{d}</div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 460, overflowY: 'auto' }}>
+        {filtered.length === 0 && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', padding: '10px 0' }}>当前类型无事件。</div>}
+        {filtered.map((e, idx) => {
+          const d = e.date ? parseInt(e.date.slice(8, 10), 10) : 1;
+          const col = Math.min(Math.max(d, 1), daysInMonth);
+          return (
+            <div key={e.id || idx} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.name}>
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: sentColor(e.sentiment), marginRight: 6 }} />
+                {e.name}
+              </div>
+              <div style={{ position: 'relative', height: 22, background: 'rgba(255,255,255,0.025)', borderRadius: 4 }}>
+                <div
+                  title={`${e.name} · ${e.date} · ${e.sentiment||'中性'}${e.summary ? ' · ' + e.summary.slice(0,40) : ''}`}
+                  style={{
+                    position: 'absolute', left: `calc(${(col - 1) / daysInMonth * 100}% )`,
+                    width: `calc(${1 / daysInMonth * 100}% + 2px)`,
+                    top: 3, height: 16, borderRadius: 4, cursor: 'pointer',
+                    background: sentColor(e.sentiment),
+                    boxShadow: e.summary ? '0 0 0 1px rgba(255,255,255,0.25)' : 'none',
+                    opacity: e.summary ? 1 : 0.7,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

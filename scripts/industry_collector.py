@@ -327,44 +327,46 @@ def store_data(db_path: str, table_name: str, headers: list[str], rows: list[lis
     return count
 
 
-def init_db(db_path: str) -> int:
-    """Initialize database and return collection_id."""
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+def _ensure_collection_meta(db_path: str):
+    """确保 collection_meta 表结构与主库(industry_db.py)一致。
+
+    旧库可能已有表但缺列(或列名不同: tool_name/section_name vs table_name)。
+    用 ALTER TABLE ADD COLUMN 做迁移，避免 IF NOT EXISTS 不重建导致后续 INSERT 崩。
+    """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
-                   CREATE TABLE IF NOT EXISTS collection_meta
-                   (
-                       id
-                       INTEGER
-                       PRIMARY
-                       KEY
-                       AUTOINCREMENT,
-                       collected_at
-                       TEXT
-                       NOT
-                       NULL,
-                       tool_name
-                       TEXT
-                       NOT
-                       NULL,
-                       section_name
-                       TEXT
-                       NOT
-                       NULL,
-                       rows
-                       INTEGER
-                       DEFAULT
-                       0,
-                       status
-                       TEXT
-                       DEFAULT
-                       'ok'
-                   )
-                   """)
+        CREATE TABLE IF NOT EXISTS collection_meta
+        (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            collected_at TEXT NOT NULL,
+            table_name   TEXT NOT NULL,
+            rows         INTEGER DEFAULT 0,
+            status       TEXT DEFAULT 'ok'
+        )
+    """)
+    cols = {r[1] for r in cursor.execute("PRAGMA table_info(collection_meta)").fetchall()}
+    # 兼容旧版列的迁移
+    if "table_name" not in cols:
+        cursor.execute("ALTER TABLE collection_meta ADD COLUMN table_name TEXT")
+    if "rows" not in cols:
+        cursor.execute("ALTER TABLE collection_meta ADD COLUMN rows INTEGER DEFAULT 0")
+    if "status" not in cols:
+        cursor.execute("ALTER TABLE collection_meta ADD COLUMN status TEXT DEFAULT 'ok'")
+    # 旧列 tool_name/section_name 若残留则不影响(用 table_name 写入)
+    conn.commit()
+    conn.close()
+
+
+def init_db(db_path: str) -> int:
+    """Initialize database and return collection_id."""
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    _ensure_collection_meta(db_path)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO collection_meta (collected_at, tool_name, section_name, status) VALUES (?, ?, ?, ?)",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), "__init__", "__init__", "started"),
+        "INSERT INTO collection_meta (collected_at, table_name, rows, status) VALUES (?, ?, ?, ?)",
+        (time.strftime("%Y-%m-%d %H:%M:%S"), "__init__", 0, "started"),
     )
     conn.commit()
     cid = cursor.lastrowid
@@ -373,11 +375,15 @@ def init_db(db_path: str) -> int:
 
 
 def add_meta(db_path: str, tool_name: str, section_name: str, rows: int, status: str = "ok") -> int:
+    """记录一次采集元数据。section_name 作为 table_name 的细化后缀保留在内存，
+    落库统一用 table_name(=tool_name 或 tool_name_section_name)，与主库结构对齐。"""
+    table_name = tool_name if not section_name or section_name in ("__main__", "__error__") \
+        else f"{tool_name}_{section_name}"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO collection_meta (collected_at, tool_name, section_name, rows, status) VALUES (?, ?, ?, ?, ?)",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), tool_name, section_name, rows, status),
+        "INSERT INTO collection_meta (collected_at, table_name, rows, status) VALUES (?, ?, ?, ?)",
+        (time.strftime("%Y-%m-%d %H:%M:%S"), table_name, rows, status),
     )
     conn.commit()
     cid = cursor.lastrowid

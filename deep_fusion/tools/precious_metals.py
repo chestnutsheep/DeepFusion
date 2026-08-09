@@ -26,6 +26,50 @@ INTL_SYMBOLS = {
     "SI": "COMEX白银",
 }
 
+_SINA_HF_MAP = {"XAU": "hf_XAU", "XAG": "hf_XAG", "GC": "hf_GC", "SI": "hf_SI"}
+
+
+def _sina_foreign_futures(symbol: str) -> pd.DataFrame:
+    """新浪外盘期货实时行情（真实源），替代已失效的 ak.futures_foreign_commodity_realtime。
+
+    返回列：品种代码 / 名称 / 现价 / 买价 / 卖价 / 开盘 / 最高 / 最低 / 昨收 / 时间
+    """
+    import os
+    import re
+    import requests
+
+    sym = symbol.upper()
+    hf = _SINA_HF_MAP.get(sym)
+    if not hf:
+        return pd.DataFrame()
+    px = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    proxies = {"http": px, "https": px} if px else None
+    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn"}
+    try:
+        r = requests.get("https://hq.sinajs.cn/list=" + hf, headers=headers, proxies=proxies, timeout=10)
+        r.encoding = "gbk"
+    except Exception:
+        return pd.DataFrame()
+    m = re.search(r'var hq_str_%s="(.*)";' % hf, r.text)
+    if not m:
+        return pd.DataFrame()
+    parts = m.group(1).split(",")
+    if len(parts) < 7:
+        return pd.DataFrame()
+    name = parts[-1]
+    price = parts[2]
+    buy = parts[0]
+    sell = parts[1]
+    open_ = parts[3]
+    high = parts[4]
+    low = parts[5]
+    prev_close = parts[len(parts) - 3] if len(parts) >= 8 else ""
+    ts = parts[6]
+    return pd.DataFrame([{
+        "品种代码": sym, "名称": name, "现价": price, "买价": buy, "卖价": sell,
+        "开盘": open_, "最高": high, "最低": low, "昨收": prev_close, "时间": ts,
+    }])
+
 
 @mcp.tool(
     title="获取上海金交所现货价格",
@@ -75,9 +119,9 @@ def pm_spot_prices(
 def pm_international_prices(
         symbol: str = Field("XAU", description="品种代码，支持: XAU(伦敦金), XAG(伦敦银), GC(COMEX黄金), SI(COMEX白银)"),
 ):
-    df = ak_cache(ak.futures_foreign_commodity_realtime, symbol=symbol, ttl=300)
+    df = _sina_foreign_futures(symbol)
     if df is None or df.empty:
-        return format_error_csv("empty nbs_dictionary", "akshare", fallback=symbol)
+        return format_error_csv("empty nbs_dictionary", "sina", fallback=symbol)
     return df.to_csv(index=False, float_format="%.2f")
 
 

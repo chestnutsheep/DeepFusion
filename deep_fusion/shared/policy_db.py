@@ -1,6 +1,7 @@
 """Policy document SQLite storage."""
 from __future__ import annotations
 
+import atexit
 import json
 import re
 import sqlite3
@@ -17,6 +18,9 @@ from .policy_sectors import derive_sectors
 class PolicyDB:
     def __init__(self):
         self._conn: sqlite3.Connection | None = None
+        # 进程退出兜底关闭，避免模块级单例连接（policy.py 顶层 db=PolicyDB()）
+        # 在 GC 时触发 ResourceWarning: unclosed database
+        atexit.register(self.close)
 
     def _connect(self) -> sqlite3.Connection:
         if self._conn is None:

@@ -128,9 +128,10 @@ async def individual_info(
         market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
     # 5 个独立 akshare 调用并发执行，串行→并发
-    info, xq, holder, mgmt, dividend = await asyncio.gather(
+    # 注：雪球 stock_individual_basic_info_xq 需 token 且常失效，改用巨潮 stock_profile_cninfo（真实权威档案源）
+    info, profile, holder, mgmt, dividend = await asyncio.gather(
         ak_cache_async(ak.stock_individual_info_em, symbol=symbol, ttl=43200),
-        ak_cache_async(ak.stock_individual_basic_info_xq, symbol=f"{market.upper()}{symbol}", ttl=43200),
+        ak_cache_async(ak.stock_profile_cninfo, symbol=symbol, ttl=43200),
         ak_cache_async(ak.stock_main_stock_holder, stock=symbol, ttl=43200),
         ak_cache_async(ak.stock_management_change_ths, symbol=symbol, ttl=43200),
         ak_cache_async(ak.stock_dividend_cninfo, symbol=symbol, ttl=43200),
@@ -139,8 +140,8 @@ async def individual_info(
     results = {}
     if info is not None and not info.empty:
         results["基本信息(东方财富)"] = info.to_string()
-    if xq is not None and not xq.empty:
-        results["基本信息(雪球)"] = xq.to_string()
+    if profile is not None and not profile.empty:
+        results["公司档案(巨潮)"] = profile.to_string()
     if holder is not None and not holder.empty:
         results["主要股东"] = holder.head(10).to_csv(index=False, float_format="%.2f")
     if mgmt is not None and not mgmt.empty:
@@ -406,6 +407,17 @@ def market_prices(
         dfs.index = pd.to_datetime(dfs["日期"], errors="coerce")
         return dfs[start_date:"2222-01-01"]
 
+    def _stock_hk_daily_robust(symbol, start_date="2025-01-01", period="daily", **kwargs):
+        # 腾讯港股日线真实源（stock_hk_hist 走东财 push2 在本环境不可达）
+        dfs = ak.stock_hk_daily(symbol=symbol, adjust="")
+        if dfs is None or dfs.empty:
+            return None
+        dfs.rename(columns={"date": "日期", "open": "开盘", "close": "收盘", "high": "最高", "low": "最低",
+                            "volume": "成交量", "amount": "成交额"}, inplace=True)
+        dfs["换手率"] = None
+        dfs.index = pd.to_datetime(dfs["日期"], errors="coerce")
+        return dfs[start_date:"2222-01-01"]
+
     def fund_etf_hist_sina(symbol, market="sh", start_date="2025-01-01", period="daily"):
         dfs = ak.fund_etf_hist_sina(symbol=f"{market}{symbol}")
         if dfs is None or dfs.empty:
@@ -419,7 +431,7 @@ def market_prices(
     markets = [
         ["sh", ak.stock_zh_a_hist, {}, "equity"],
         ["sz", ak.stock_zh_a_hist, {}, "equity"],
-        ["hk", ak.stock_hk_hist, {}, "equity"],
+        ["hk", _stock_hk_daily_robust, {}, "equity"],
         ["us", stock_us_daily, {}, "equity"],
         ["sh", fund_etf_hist_sina, {"market": "sh"}, "etf"],
         ["sz", fund_etf_hist_sina, {"market": "sz"}, "etf"],

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>宏观·中观·微观·政策·国际 | 时间穿梭工作台</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
@@ -18,40 +18,69 @@
             --font-sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Inter', 'Helvetica Neue', sans-serif;
             --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
             --nav-width: 270px; --transition: 0.25s ease;
+            /* 流式间距阶梯：窄屏收紧、宽屏放宽，避免极端挤压 */
+            --pad-x: clamp(16px, 3vw, 32px);
+            --pad-y: clamp(16px, 2.2vw, 28px);
+            --gap: clamp(12px, 1.6vw, 20px);
+            --card-pad: clamp(12px, 1.4vw, 18px);
         }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:var(--font-sans); background:var(--bg-body-gradient); color:var(--text-primary); line-height:1.5; min-height:100vh; font-size:14px; }
+        html { -webkit-text-size-adjust:100%; }
+        body { font-family:var(--font-sans); background:var(--bg-body-gradient); color:var(--text-primary); line-height:1.5; min-height:100vh; font-size:14px; overflow-x:hidden; }
         ::-webkit-scrollbar { width:6px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--accent-purple); border-radius:8px; }
-        .sb { position:fixed; left:0; top:0; bottom:0; width:var(--nav-width); background:var(--bg-sidebar-gradient); backdrop-filter:blur(18px); border-right:1px solid var(--border-subtle); padding:28px 0 20px; z-index:100; overflow-y:auto; }
+        .sb { position:fixed; left:0; top:0; bottom:0; width:var(--nav-width); background:var(--bg-sidebar-gradient); backdrop-filter:blur(18px); border-right:1px solid var(--border-subtle); padding:28px 0 20px; z-index:100; overflow-y:auto; transition:transform var(--transition); }
         .sb-b { padding:0 20px 24px; border-bottom:1px solid var(--border-subtle); margin-bottom:16px; }
         .sb-b h1 { font-size:18px; font-weight:800; color:var(--accent-gold); letter-spacing:1px; }
         .sb-b p { font-size:11px; color:var(--text-muted); margin-top:6px; }
-        .mn { margin-left:var(--nav-width); position:relative; z-index:2; padding:0 0 20px 0; }
-        #top-tabs { display:flex; background:rgba(13,17,23,0.65); backdrop-filter:blur(12px); border-bottom:1px solid var(--border-subtle); padding:0 28px; gap:6px; overflow-x:auto; }
-        .tab-btn { background:transparent; border:none; color:var(--text-secondary); padding:12px 26px; font-size:14px; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:0.2s; white-space:nowrap; }
+        .mn { margin-left:var(--nav-width); position:relative; z-index:2; padding:0 0 20px 0; transition:margin-left var(--transition); }
+        #top-tabs { display:flex; background:rgba(13,17,23,0.65); backdrop-filter:blur(12px); border-bottom:1px solid var(--border-subtle); padding:0 var(--pad-x); gap:6px; overflow-x:auto; }
+        .tab-btn { background:transparent; border:none; color:var(--text-secondary); padding:12px 26px; font-size:14px; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:0.2s; white-space:nowrap; flex:0 0 auto; }
         .tab-btn:hover { color:var(--text-primary); background:rgba(255,255,255,0.03); }
         .tab-btn.active { color:var(--accent-gold); border-bottom-color:var(--accent-gold); background:rgba(212,168,83,0.06); }
-        #main-panel { padding:28px 32px; }
-        .tab-content { display:none; flex-direction:column; gap:28px; }
+        /* 内容容器：限制最大宽度并居中，避免超宽屏内容摊得过宽 */
+        #main-panel { padding:var(--pad-y) var(--pad-x); max-width:1600px; margin:0 auto; width:100%; }
+        .tab-content { display:none; flex-direction:column; gap:var(--gap); }
         .tab-content.active { display:flex; }
-        .chart-container { background:var(--bg-panel); backdrop-filter:blur(12px); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:22px; }
-        .snapshot-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-        .snapshot-card { background:rgba(0,0,0,0.2); border-radius:var(--radius); padding:14px; border:1px solid var(--border-subtle); }
+        .chart-container { background:var(--bg-panel); backdrop-filter:blur(12px); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--card-pad); min-width:0; }
+        .snapshot-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--gap); }
+        .snapshot-card { background:rgba(0,0,0,0.2); border-radius:var(--radius); padding:var(--card-pad); border:1px solid var(--border-subtle); min-width:0; }
         .card-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
-        .card-value { font-size:18px; font-weight:700; margin:6px 0; }
+        .card-value { font-size:18px; font-weight:700; margin:6px 0; word-break:break-word; }
         .card-desc { font-size:11px; color:var(--text-secondary); }
         .btn { background:rgba(212,168,83,0.12); border:1px solid var(--border-subtle); color:var(--accent-gold); padding:8px 16px; border-radius:var(--radius-sm); cursor:pointer; font-size:12px; transition:0.2s; }
         .btn:hover { background:rgba(212,168,83,0.25); }
-        .heatmap-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-top:12px; }
+        .heatmap-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(28px,1fr)); gap:2px; margin-top:12px; }
         .heatmap-cell { aspect-ratio:1; border-radius:4px; cursor:pointer; min-height:24px; }
         .breadcrumb { font-size:12px; color:var(--text-secondary); margin-bottom:8px; }
         .breadcrumb span { cursor:pointer; color:var(--accent-gold); }
         .history-bookmark { background:rgba(212,168,83,0.08); border-radius:10px; padding:8px 12px; margin-bottom:8px; cursor:pointer; transition:all 0.2s; font-size:12px; display:flex; justify-content:space-between; }
         .history-bookmark:hover { background:rgba(212,168,83,0.2); }
+        /* 移动端汉堡按钮（默认隐藏） */
+        .hamburger { display:none; position:fixed; top:10px; left:10px; z-index:200; width:42px; height:42px; border-radius:10px; background:rgba(212,168,83,0.32); border:1px solid var(--border-subtle); color:var(--accent-gold); font-size:20px; cursor:pointer; align-items:center; justify-content:center; backdrop-filter:blur(8px); }
+        .sb-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:99; }
+        /* ── 响应式断点 ── */
+        @media (max-width: 1180px) {
+            #main-panel { max-width:100%; }
+        }
+        @media (max-width: 900px) {
+            .sb { transform:translateX(-100%); width:84vw; max-width:320px; min-width:260px; }
+            .sb.open { transform:translateX(0); }
+            .sb-overlay.show { display:block; }
+            .mn { margin-left:0; }
+            .hamburger { display:flex; }
+            #top-tabs { padding-left:56px; }
+        }
+        @media (max-width: 560px) {
+            .snapshot-row { grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); }
+            .tab-btn { padding:10px 16px; font-size:13px; }
+            #main-panel { padding:14px 12px; }
+        }
     </style>
 </head>
 <body>
-<div class="sb">
+<button class="hamburger" id="hamburger" aria-label="菜单">☰</button>
+<div class="sb-overlay" id="sb-overlay"></div>
+<div class="sb" id="sidebar">
     <div class="sb-b"><h1>⟡ Deep Fusion</h1><p>宏观 · 中观 · 微观 · 政策 · 国际</p></div>
     <div style="padding:0 20px 20px;">
         <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px;">数据状态</div>
@@ -144,6 +173,22 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
 });
+
+// ── 移动端侧栏抽屉 ──
+const sidebar = document.getElementById('sidebar');
+const sbOverlay = document.getElementById('sb-overlay');
+function toggleSidebar(open) {
+    sidebar.classList.toggle('open', open);
+    sbOverlay.classList.toggle('show', open);
+}
+document.getElementById('hamburger').addEventListener('click', () => toggleSidebar(!sidebar.classList.contains('open')));
+sbOverlay.addEventListener('click', () => toggleSidebar(false));
+// 点击侧栏导航项后自动收起（移动端）
+document.querySelectorAll('.sb a').forEach(a => a.addEventListener('click', () => {
+    if (window.innerWidth <= 900) toggleSidebar(false);
+}));
+// 视口变宽时确保侧栏复位
+window.addEventListener('resize', () => { if (window.innerWidth > 900) toggleSidebar(false); });
 
 // ── 宏观：周期图 ──
 async function loadMacro() {

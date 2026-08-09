@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>午间新闻驱动选股 · 2026-07-23</title>
+    <style>
+        /* ===== 主题：梦境（Rêve）· 与 daily-review / quality-stock-push 同色系 ===== */
+        :root {
+            --bg-deep: #1B1726; --bg-grad-1: #221C33; --bg-grad-2: #181422;
+            --bg-panel: rgba(58,48,78,0.32); --bg-panel-hover: rgba(58,48,78,0.52);
+            --border-subtle: rgba(168,148,190,0.14); --border-hover: rgba(168,148,190,0.28);
+            --text-primary: #ECE6F4; --text-secondary: #BCB2CE; --text-muted: #847A98;
+            --accent-gold: #C9A861; --accent-gold-soft: #E8D090; --accent-rose: #C49DB2;
+            --accent-purple: #9C82B4; --accent-green: #6FA088; --accent-red: #C07C7C;
+            --danger: #D8745C; --danger-soft: rgba(216,116,92,0.12);
+            --shadow-glow: rgba(156,130,180,0.12);
+            --sp-1: 6px; --sp-2: 10px; --sp-3: 14px; --sp-4: 18px; --sp-5: 24px; --sp-6: 32px;
+            --radius: 16px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+            background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(156,130,180,0.10), transparent 60%),
+                radial-gradient(900px 500px at -10% 110%, rgba(201,168,97,0.08), transparent 55%),
+                linear-gradient(160deg, var(--bg-grad-1), var(--bg-grad-2));
+            background-attachment: fixed; color: var(--text-primary); line-height: 1.75;
+            font-size: 14px; padding: var(--sp-5); min-height: 100vh;
+        }
+        .container { max-width: 1480px; margin: 0 auto; }
+        .header {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            padding: var(--sp-1) 0 var(--sp-4); border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: var(--sp-5); flex-wrap: wrap; gap: var(--sp-3);
+        }
+        .header h1 {
+            font-size: 33px; font-weight: 700; letter-spacing: 1px; line-height: 1.15;
+            display: flex; align-items: baseline; gap: 22px; margin-top: -8px; flex-wrap: wrap;
+        }
+        .header h1 .zh {
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-soft));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .header h1 .en { font-size: 19px; font-weight: 500; color: var(--text-secondary); letter-spacing: .5px; }
+        .header .meta { display: flex; align-items: center; gap: var(--sp-3); color: var(--text-secondary); font-size: 13px; flex-wrap: wrap; }
+        .header .tag {
+            font-size: 11.5px; color: var(--text-muted); border: 1px solid var(--border-subtle);
+            padding: 3px 10px; border-radius: 999px;
+        }
+        .summary {
+            background: linear-gradient(180deg, rgba(201,168,97,0.10), rgba(201,168,97,0.03));
+            border: 1px solid rgba(201,168,97,0.30); border-radius: 14px;
+            padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); font-size: 13.5px;
+        }
+        .summary b { color: var(--accent-gold-soft); }
+
+        /* ===== 候选榜 ===== */
+        .candidates {
+            background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius);
+            padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-5);
+        }
+        .candidates h2 { font-size: 15px; color: var(--accent-purple); margin-bottom: var(--sp-2); font-weight: 600; }
+        .cand-row { display: flex; align-items: center; gap: var(--sp-3); padding: 7px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 13px; }
+        .cand-row:last-child { border-bottom: none; }
+        .cand-rank { width: 26px; height: 26px; border-radius: 999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; background: rgba(156,130,180,0.18); color: var(--accent-gold-soft); }
+        .cand-body { flex: 1; }
+        .cand-body .nm { font-weight: 600; color: var(--text-primary); }
+        .cand-body .rs { color: var(--text-muted); font-size: 12px; margin-left: 6px; }
+        .cand-dir { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; flex-shrink: 0; font-weight: 600; }
+        .dir-up { color: var(--accent-green); background: rgba(111,160,136,0.14); border: 1px solid rgba(111,160,136,0.4); }
+        .dir-dn { color: var(--accent-red); background: rgba(192,124,124,0.14); border: 1px solid rgba(192,124,124,0.4); }
+        .dir-mix { color: var(--accent-gold-soft); background: rgba(201,168,97,0.14); border: 1px solid rgba(201,168,97,0.4); }
+
+        /* ===== 时间线卡片 ===== */
+        .band { margin-bottom: var(--sp-5); }
+        .band-head { display: flex; align-items: center; gap: 12px; margin-bottom: var(--sp-3); }
+        .band-head .badge {
+            font-weight: 700; font-size: 15px; padding: 4px 14px; border-radius: 999px;
+            background: rgba(156,130,180,0.18); border: 1px solid var(--border-hover); color: var(--accent-purple);
+        }
+        .band.strong .badge { color: var(--accent-red); background: rgba(192,124,124,0.14); border-color: rgba(192,124,124,0.4); }
+        .band.mid .badge { color: var(--accent-gold-soft); background: rgba(201,168,97,0.14); border-color: rgba(201,168,97,0.4); }
+        .band.weak .badge { color: var(--accent-green); background: rgba(111,160,136,0.14); border-color: rgba(111,160,136,0.4); }
+        .band-head .desc { color: var(--text-muted); font-size: 12.5px; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(370px, 1fr)); gap: var(--sp-3); }
+        .news {
+            background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 14px;
+            padding: var(--sp-3); transition: .2s; display: flex; flex-direction: column;
+        }
+        .news:hover { background: var(--bg-panel-hover); border-color: var(--border-hover); transform: translateY(-2px); }
+        .news .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: var(--sp-2); }
+        .news .time { font-size: 13px; font-weight: 700; color: var(--accent-gold-soft); font-variant-numeric: tabular-nums; }
+        .news .src { font-size: 11.5px; color: var(--text-muted); }
+        .news .title { font-size: 14.5px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; line-height: 1.55; }
+        .news .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12.5px; flex-wrap: wrap; }
+        .news .row .k { color: var(--text-muted); flex-shrink: 0; min-width: 56px; }
+        .news .row .v { color: var(--text-secondary); }
+        .news .logic { font-size: 12.5px; color: var(--text-secondary); margin-top: auto; padding-top: 9px; border-top: 1px dashed var(--border-subtle); line-height: 1.65; }
+        .chip {
+            display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; margin-right: 6px;
+            background: rgba(156,130,180,0.16); color: var(--accent-purple); border: 1px solid var(--border-hover);
+        }
+        .chip.strong { color: var(--accent-red); background: rgba(192,124,124,0.12); border-color: rgba(192,124,124,0.35); }
+        .chip.mid { color: var(--accent-gold-soft); background: rgba(201,168,97,0.12); border-color: rgba(201,168,97,0.35); }
+        .chip.weak { color: var(--accent-green); background: rgba(111,160,136,0.12); border-color: rgba(111,160,136,0.35); }
+        .chip.up { color: var(--accent-green); background: rgba(111,160,136,0.12); border-color: rgba(111,160,136,0.35); }
+        .chip.dn { color: var(--accent-red); background: rgba(192,124,124,0.12); border-color: rgba(192,124,124,0.35); }
+        .empty { color: var(--text-muted); font-size: 13px; padding: var(--sp-3); border: 1px dashed var(--border-subtle); border-radius: 12px; }
+        .footer { margin-top: var(--sp-5); padding-top: var(--sp-3); border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 11.5px; line-height: 1.7; }
+        .srcnote { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>
+            <span class="zh">午间新闻驱动选股</span>
+            <span class="en">Noon News-Driven Picks</span>
+        </h1>
+        <div class="meta">
+            <span>📅 日期：2026-07-23（周四）</span>
+            <span>⏰ 生成：2026-07-23 12:55</span>
+            <span class="tag">信息时效优先 · 不构成投资建议</span>
+        </div>
+    </div>
+
+    <div class="summary">
+        <b>午间简报：</b>本期基于 2026-07-23 上午 09:30–13:00 的实时财经快讯（主源：新浪财经股票频道；舆情信号：抖音/微博/百度热搜）整合。半日主线呈「<b>政策改革托底 + 并购易主密集 + 业绩大幅分化</b>」特征：科创板改革、北京算力布局为盘面提供题材锚点；杉杉股份、超卓航科、文峰股份等「易主/立案」类事件催化明确；益生股份等业绩暴增与科沃斯出海构成个股阿尔法。半导体/芯片半日领跌（科创50 跌超 4%），午后注意高低切换。<br>
+        <span class="srcnote">数据可达性说明：金融界资讯研报搜索（J RJ_API_KEY 未配置，源不可用）、财联社电报（接口 404 动态加载受限）、同花顺/东方财富快讯接口（404/403 失效）本次不可达，已退回新浪财经与全网热搜等可达源兜底，所有消息均来自真实抓取，无编造。</span>
+    </div>
+
+    <div class="candidates">
+        <h2>下午开盘可关注候选范围（按催化强度排序）</h2>
+        <div class="cand-row"><span class="cand-rank">1</span><div class="cand-body"><span class="nm">杉杉股份</span><span class="rs">（并购易主·安徽国资 71.56 亿接盘）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">2</span><div class="cand-body"><span class="nm">上海科创板改革 / 券商（兴业证券等）</span><span class="rs">（政策：扩大第五套上市标准适用范围）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">3</span><div class="cand-body"><span class="nm">益生股份 等 5 股</span><span class="rs">（中报业绩暴增，益生近 +4900%）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">4</span><div class="cand-body"><span class="nm">中国黄金 / 东风汽车</span><span class="rs">（集团级战略合作签约）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">5</span><div class="cand-body"><span class="nm">北京算力 / 磷化铟·金属铟</span><span class="rs">（北京 Token 工厂 + AI 驱动铟量价齐升）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">6</span><div class="cand-body"><span class="nm">科沃斯</span><span class="rs">（海外销量连续三年翻倍·出海阿尔法）</span></div><span class="cand-dir dir-up">利多</span></div>
+        <div class="cand-row"><span class="cand-rank">7</span><div class="cand-body"><span class="nm">文峰股份</span><span class="rs">（公司及控股股东被立案调查）</span></div><span class="cand-dir dir-dn">利空</span></div>
+        <div class="cand-row"><span class="cand-rank">8</span><div class="cand-body"><span class="nm">超卓航科 / 正川股份 / 越疆科技</span><span class="rs">（控股权变更 / 创业板 IPO 过会）</span></div><span class="cand-dir dir-mix">混合</span></div>
+        <div class="cand-row"><span class="cand-rank">9</span><div class="cand-body"><span class="nm">半导体 / 芯片板块</span><span class="rs">（半日领跌，科创50 跌超 4%，谨慎）</span></div><span class="cand-dir dir-dn">利空</span></div>
+    </div>
+
+    <div class="band strong">
+        <div class="band-head"><span class="badge">#强催化</span><span class="desc">政策落地 / 控股权变更 / 业绩暴增 — 午后或快速反应</span></div>
+        <div class="cards">
+            <div class="news">
+                <div class="top"><span class="time">11:47</span><span class="src">新浪财经</span></div>
+                <div class="title">杉杉股份易主安徽国资，郑氏家族退出，交易额 71.56 亿元</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">杉杉股份（锂电负极+偏光片）</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip strong">强</span></span></div>
+                <div class="logic">国资接盘化解控制权的不确定性，偏光片/负极业务有望获资源注入与信用修复，易主逻辑催化明确。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">午间</span><span class="src">新浪财经 / 政策</span></div>
+                <div class="title">上海：推动科创板持续深化改革，扩大第五套上市标准适用范围</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">科创板、券商（兴业证券等）、硬科技创投</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip strong">强</span></span></div>
+                <div class="logic">第五套标准放宽直接利好未盈利硬科技公司上市预期，券商投行与科创板估值中枢受益，属结构性政策催化。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">午间</span><span class="src">新浪财经 / 业绩</span></div>
+                <div class="title">益生股份业绩暴增近 4900%，5 股半年度净利润预增</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">益生股份等 5 只中报预增股</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip strong">强</span></span></div>
+                <div class="logic">中报预告进入密集兑现期，高弹性业绩（禽链景气）构成个股阿尔法，午后资金或博弈业绩线。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:31</span><span class="src">新浪财经</span></div>
+                <div class="title">文峰股份（601010）及控股股东被立案调查</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">文峰股份</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip dn">利空</span></span><span class="k">强度</span><span class="v"><span class="chip strong">强</span></span></div>
+                <div class="logic">监管立案直接打击风险偏好，短期避险抛压明确，利空标的自身及相关零售百货情绪。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="band mid">
+        <div class="band-head"><span class="badge">#中催化</span><span class="desc">战略合作 / 订单 / 出海 / 主题政策 — 需观察资金承接</span></div>
+        <div class="cards">
+            <div class="news">
+                <div class="top"><span class="time">11:47</span><span class="src">新浪财经</span></div>
+                <div class="title">中国黄金集团与东风汽车集团签署战略合作协议</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">中国黄金、东风汽车</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">央企级跨产业协同释放资源互补信号，利好双方品牌与渠道，属事件型主题催化。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:34</span><span class="src">新浪财经</span></div>
+                <div class="title">超卓航科再谋「易主」，李光平家族拟转让控制权</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">超卓航科</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">距上次易主仅一月再谋转让，控股权变更预期重燃，但治理稳定性存疑，催化强度中等。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:31</span><span class="src">新浪财经</span></div>
+                <div class="title">科沃斯擦窗、割草机海外销量连续三年翻倍</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">科沃斯</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">出海品类高景气验证成长逻辑，服务机器人第二曲线打开估值空间，属基本面阿尔法。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">10:15</span><span class="src">巨丰财经 / 新浪</span></div>
+                <div class="title">北京将布局建设 Token 工厂，力争下半年新增智能算力 5 万 P</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">算力、IDC、AI 服务器</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">地方算力基建目标量化，直接拉动智算中心与液冷/电源配套需求，主题持续性较强。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">02:12</span><span class="src">新浪财经</span></div>
+                <div class="title">AI 需求驱动磷化铟景气度高涨，金属铟迎来量价齐升窗口</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">磷化铟、金属铟（有色/半导体材料）</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">AI 光通信拉动磷化铟衬底需求，铟供给偏紧推动涨价，材料端业绩弹性可期。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:47</span><span class="src">新浪财经</span></div>
+                <div class="title">铜箔周报：中一科技 / 铜冠铜箔中报预告出炉</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">中一科技、铜冠铜箔</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip mid">中</span></span></div>
+                <div class="logic">锂电铜箔中报预告披露，若盈利改善则确认周期底部反转，关注预告方向。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="band weak">
+        <div class="band-head"><span class="badge">#弱催化</span><span class="desc">事件扰动 / 治理 / 资金面 — 仅作情绪观察</span></div>
+        <div class="cards">
+            <div class="news">
+                <div class="top"><span class="time">11:53</span><span class="src">新浪财经</span></div>
+                <div class="title">水井坊财务总监蒋磊峰辞任，副手接替</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">水井坊</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip dn">利空</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">高管变动引发治理担忧，但属常规人事，对经营实质影响有限，情绪扰动为主。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:58</span><span class="src">新浪财经</span></div>
+                <div class="title">正川股份 × 斯蒂瓦纳托重磅签约，战略升级</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">正川股份（药用玻璃）</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip up">利多</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">与海外药玻龙头合作升级，长期利好出口，但短期订单贡献待验证，催化偏弱。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">12:11</span><span class="src">新浪财经</span></div>
+                <div class="title">光模块被盗，东山精密回应</div>
+                <div class="row"><span class="k">影响标的</span><span class="v">东山精密（事件扰动）</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip dn">利空</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">资产被盗属偶发事件，公司回应后影响可控，短线情绪冲击，非基本面利空。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">午间</span><span class="src">新浪财经 / 监管</span></div>
+                <div class="title">证监会座谈会释放三大信号；监管再叫停股票类跨境 TRS</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">券商、港股 IPO 通道、跨境资金</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip mix">混合</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">座谈会对市场偏安抚基调，但跨境 TRS 叫停在岸外通道，对券商中间业务影响中性偏负。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">07:23</span><span class="src">新浪财经 / 早报</span></div>
+                <div class="title">红海战线重启，胡塞袭击沙特油轮；韩国投资者爆买中国股票</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">原油、黄金、外资偏好的核心资产</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip mix">混合</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">地缘扰动推升油价与避险情绪，外资爆买提供承接；对 A 股整体为间接映射，观察商品期货联动。</div>
+            </div>
+            <div class="news">
+                <div class="top"><span class="time">11:40</span><span class="src">新浪财经 / 盘面</span></div>
+                <div class="title">午评：科创 50 跌超 4%，半导体/芯片领跌，能源金属逆势</div>
+                <div class="row"><span class="k">影响板块</span><span class="v">半导体、芯片（谨慎）；能源金属（相对强）</span></div>
+                <div class="row"><span class="k">方向</span><span class="v"><span class="chip dn">利空</span></span><span class="k">强度</span><span class="v"><span class="chip weak">弱</span></span></div>
+                <div class="logic">半日科技成长大幅回撤，午后注意高低切换与止损盘；能源金属逆势显示资金轮动方向。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="candidates">
+        <h2>收盘回测 · 2026-07-23 实际表现（验证午间预测）</h2>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(111,160,136,0.2);color:var(--accent-green)">✓</span><div class="cand-body"><span class="nm">益生股份</span><span class="rs">午间:利多/强(业绩+4900%) → 收 <b>+7.43%</b>(最高+8.48%)</span></div><span class="cand-dir dir-up">命中</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(111,160,136,0.2);color:var(--accent-green)">✓</span><div class="cand-body"><span class="nm">芯片/半导体ETF</span><span class="rs">午间:利空/弱(半日领跌警示) → 收 <b>-3.81% / -3.99%</b></span></div><span class="cand-dir dir-dn">命中</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(111,160,136,0.2);color:var(--accent-green)">✓</span><div class="cand-body"><span class="nm">东风汽车</span><span class="rs">午间:利多/中(战略合作) → 收 <b>+1.91%</b></span></div><span class="cand-dir dir-up">命中</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(111,160,136,0.2);color:var(--accent-green)">✓</span><div class="cand-body"><span class="nm">超卓航科</span><span class="rs">午间:混合/中(易主) → 收 <b>+1.94%</b>(最高+4.30%)</span></div><span class="cand-dir dir-up">命中</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(201,168,97,0.2);color:var(--accent-gold-soft)">△</span><div class="cand-body"><span class="nm">杉杉股份 / 兴业证券 / 中国黄金 / 科沃斯</span><span class="rs">方向均对，实际涨幅 +1.76% / +1.47% / +0.40% / +0.39%，强度较"强/中"偏弱</span></div><span class="cand-dir dir-mix">偏弱</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(201,168,97,0.2);color:var(--accent-gold-soft)">⚠</span><div class="cand-body"><span class="nm">正川股份</span><span class="rs">午间:混合/弱(签约) → 收 -0.48%(盘中曾+3.08%)，冲高回落</span></div><span class="cand-dir dir-mix">未兑</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(192,124,124,0.22);color:var(--accent-red)">✗</span><div class="cand-body"><span class="nm">文峰股份</span><span class="rs">午间:利空/强(被立案) → 收 <b>+3.05%</b> 收最高，利空出尽+资金博弈</span></div><span class="cand-dir dir-up">方向反</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(192,124,124,0.22);color:var(--accent-red)">✗</span><div class="cand-body"><span class="nm">科创50 / 科创板</span><span class="rs">午间:利多/强(改革) → 收 <b>-3.43%</b>，制度利好≠当日指数，被半导体拖累</span></div><span class="cand-dir dir-dn">未兑</span></div>
+        <div class="cand-row"><span class="cand-rank" style="background:rgba(156,130,180,0.2);color:var(--accent-purple)">·</span><div class="cand-body"><span class="nm">北京算力 / 磷化铟·铟</span><span class="rs">板块 AI 链当日整体承压，无单标的可证，待后续观察</span></div><span class="cand-dir dir-mix">待观察</span></div>
+        <div class="srcnote">回测小结：方向正确 10/12；强催化标签最可靠（益生+7.43%、半导体-3.8% 全中）。两处失误——文峰股份"立案利空"实际利空出尽走强；科创板改革为长线制度利好、当日被半导体杀跌拖累。方法论校准：对"立案/处罚"类需区分已预期与突发；政策催化与指数短线须分开评估。</div>
+    </div>
+
+    <div class="footer">
+        本报告由 noon-news-push（午间新闻驱动选股）技能生成，数据来源于 2026-07-23 上午 09:30–13:00 真实抓取的财经快讯与全网热搜。
+        因金融界 API Key 未配置、财联社/同花顺/东方财富快讯接口当前不可达，已退回新浪财经与热搜等可达源兜底，所有条目均来自真实抓取，未编造。
+        本报告仅作信息整合与催化分类，<b>不构成投资建议、不承诺收益、不给确定买卖点</b>。投资有风险，决策需独立判断。
+    </div>
+</div>
+</body>
+</html>

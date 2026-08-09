@@ -41,16 +41,29 @@ def _prev_quarter_end() -> str:
 
 def load_portfolio():
     if not os.path.exists(PORTFOLIO_FILE):
-        os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
         return {}
-    with open(PORTFOLIO_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        # 文件损坏/半截写/并发写失败时，备份坏文件并回退空字典，避免上层调用方崩溃
+        _LOGGER.warning("portfolio_load_corrupt", path=PORTFOLIO_FILE, error=str(e))
+        bad = PORTFOLIO_FILE + ".corrupt"
+        try:
+            if os.path.exists(PORTFOLIO_FILE):
+                os.replace(PORTFOLIO_FILE, bad)
+        except OSError:
+            pass
+        return {}
 
 
 def save_portfolio(data):
     os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
-    with open(PORTFOLIO_FILE, "w") as f:
+    # 原子写：临时文件 + replace，避免进程中断留下半截 JSON 导致下次 load 崩溃
+    tmp = PORTFOLIO_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp, PORTFOLIO_FILE)
 
 
 def ak_search(symbol: str | None = None, keyword: str | None = None, market: str | None = None):

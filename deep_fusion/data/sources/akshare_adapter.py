@@ -149,7 +149,8 @@ def macro_pmi(ttl: int = 86400) -> pd.DataFrame | None:
 
 
 def macro_m2(ttl: int = 86400) -> pd.DataFrame | None:
-    return ak_cache(ak.macro_china_m, ttl=ttl)
+    # 旧接口 ak.macro_china_m 在当前 akshare 已移除；等价替换为 macro_china_m2_yearly
+    return ak_cache(ak.macro_china_m2_yearly, ttl=ttl)
 
 
 def macro_lpr(ttl: int = 86400) -> pd.DataFrame | None:

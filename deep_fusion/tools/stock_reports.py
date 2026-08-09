@@ -98,7 +98,7 @@ def financial_indicators(
         limit: int = Field(20, description="返回期数"),
 ) -> str:
     results = {}
-    info = ak_cache(ak.stock_individual_info_em, symbol=symbol, ttl=43200)
+    info = ak_cache(ak.stock_profile_cninfo, symbol=symbol, ttl=43200)
     if info is not None and not info.empty:
         results["个股基本信息"] = info.to_string()
     indicators = ak_cache(ak.stock_financial_analysis_indicator, symbol=symbol, start_year=start_year, ttl=86400,

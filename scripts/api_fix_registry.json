@@ -5,6 +5,14 @@
   },
   "alternatives": {},
   "notes": {
-    "macro_china_m": "旧接口 ak.macro_china_m 在当前 akshare 已移除；唯一消费方 adapter.macro_m2（M2货币供应）语义明确，等价替换为 ak.macro_china_m2_yearly（输出商品/日期/今值/预测值/前值，与 M2 口径一致）。"
+    "macro_china_m": "旧接口 ak.macro_china_m 在当前 akshare 已移除；唯一消费方 adapter.macro_m2（M2货币供应）语义明确，等价替换为 ak.macro_china_m2_yearly（输出商品/日期/今值/预测值/前值，与 M2 口径一致）。",
+    "stock_nikkei_index_daily": "akshare 当前版已移除。下游 international.py 日经处理有 try/except 容错，仅需'收盘'列。等价替代：ak.index_global_hist_em(symbol='日经225')（symbol 必须传中文名'日经225'，传 N225/NKY 会 KeyError）。注意：try_fix_renamed 自动填参会传 symbol='600519' 导致复核失败，故此处仅记方案、不在 renames 登记；需工程在 apply_fix 支持固定 kwargs 后正式接入。",
+    "sw_index_daily": "akshare 当前版已移除（仅剩 sw_index_*_info / sw_index_third_cons，无申万指数日线函数）。下游 data_clusters._industry_quotes(symbol='801010') 取申万一级行业指数日线。候选 stock_zh_index_daily_em(symbol='801010') 实测返回空 DataFrame(0x0)，东财源不支持该 secid；stock_zh_index_daily(新浪源) 报 KeyError 'date'。目前无干净替代，需工程确认新源（如东财 push2his 直接拉 1.801010）或新增 adapter。",
+    "stock_industry_valuation_em": "akshare 当前版已移除（行业估值总览被删）。候选 stock_board_industry_* 是板块行情非估值(无 PE/PB 列)，语义不符；无 PE/PB 等价源。下游 meso_industry_valuation 表依赖原口径，强行映射会写错数据，故暂登记，需工程确认新源。",
+    "stock_industry_financial_em": "akshare 当前版已移除（行业财务总览被删）。候选 stock_gpzy_industry_data_em 是质押数据非财务，语义不符。下游 meso_industry_financial 表依赖原口径，暂登记，需工程确认新源。"
+  },
+  "transforms": {
+    "article_ff_crr": "transforms/transform_article_ff_crr.py",
+    "fund_open_fund_daily_em": "transforms/transform_fund_open_fund_daily_em.py"
   }
 }

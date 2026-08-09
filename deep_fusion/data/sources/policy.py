@@ -327,6 +327,43 @@ def fetch_safe(max_pages: int = 2) -> list[dict]:
     )
 
 
+# ── 实时政策/快讯（拓宽渠道：监管直达 + 7x24） ──────────
+def fetch_policy_realtime(max_pages: int = 1, max_items: int = 15, cls_num: int = 50) -> list[dict]:
+    """拓宽渠道：证监会/央行监管政策 + 7x24 实时快讯。
+
+    复用本地 scrapers 包（来源 cnfinancialscraper/hot skill 的可用工具部分），
+    不改动既有 6 站逻辑。返回 policy.py 标准记录（url 主键幂等写库）。
+    max_pages 为兼容 collect_all 统一调用约定（此处忽略，渠道自带条数控制）。
+    """
+    from .scrapers import collect_realtime
+    try:
+        rows = collect_realtime(max_items=max_items, cls_num=cls_num)
+    except Exception as e:
+        _LOGGER.warning("fetch_policy_realtime 失败: %s", e)
+        return []
+    out = []
+    for r in rows:
+        # 把实时渠道的 org 字段映射为 organization（前端 timeline 按 organization 分组）
+        org = r.get("org", "")
+        raw_url = r.get("url", "") or ""
+        # cls 7x24 的 url 为空或 pseudo 协议（realtime://），正文已在 summary/content 字段，
+        # 且无法用 requests 抓取，必须跳过 _extract_detail；监管条目 url 是真实详情页，保留抓取。
+        is_pseudo = (not raw_url) or raw_url.startswith("realtime://")
+        url = raw_url or f"realtime://{abs(hash(r.get('title', '')))}"
+        out.append({
+            "url": url,
+            "title": r.get("title", ""),
+            "source": org,
+            "organization": org,
+            "publish_date": r.get("date", "") or datetime.now().strftime("%Y-%m-%d"),
+            "keywords": "",
+            "body": r.get("summary", "") or r.get("content", ""),
+            "sentiment": "中性",
+            "_skip_detail": is_pseudo,
+        })
+    return out
+
+
 # ── 统一调度 ─────────────────────────────────────────
 
 _FETCHERS: list[tuple[str, Callable]] = [
@@ -336,6 +373,7 @@ _FETCHERS: list[tuple[str, Callable]] = [
     ("财政部", fetch_mof),
     ("发改委", fetch_ndrc),
     ("外管局", fetch_safe),
+    ("实时政策", fetch_policy_realtime),
 ]
 
 
@@ -351,7 +389,10 @@ def collect_all(max_pages: int = 2) -> dict[str, dict[str, int]]:
             for e in entries:
                 if db.exists(e["url"]):
                     continue
-                e = _extract_detail(e)
+                # 实时快讯等内容已在 body 字段、且 url 可能是 pseudo 协议，
+                # 跳过 HTTP 正文抓取（见 fetch_policy_realtime 的 _skip_detail 标记）
+                if not e.pop("_skip_detail", False):
+                    e = _extract_detail(e)
                 db.save(e)
                 new += 1
             totals[name] = {"total": len(entries), "new": new}
@@ -366,6 +407,8 @@ def collect_all(max_pages: int = 2) -> dict[str, dict[str, int]]:
             _LOGGER.info("date_normalized", fixed=fixed)
     except Exception as ex:
         _LOGGER.warning("date_normalize_failed", error=str(ex))
+    # 关闭模块级单例连接，避免进程退出时 sqlite3 未关闭触发 ResourceWarning
+    db.close()
     return totals
 
 

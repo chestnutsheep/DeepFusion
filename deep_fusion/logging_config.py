@@ -11,7 +11,24 @@ import uuid
 import warnings
 from pathlib import Path
 
-import structlog
+try:
+    import structlog
+except ImportError:
+    # 降级：环境缺 structlog 时（如误用原生 python3 启动），用标准 logging 模拟，
+    # 避免整个进程 import 阶段崩溃 → serve.py 后台线程(定时任务)全部不工作。
+    import logging as _std_logging
+
+    class _StructlogFallback:
+        def get_logger(self, name: str | None = None):
+            return _std_logging.getLogger(name or __name__)
+
+        def configure(self, *args, **kwargs):
+            pass
+
+        def wrap_logger(self, *args, **kwargs):
+            return self.get_logger()
+
+    structlog = _StructlogFallback()  # type: ignore
 
 # 集中落盘位置：所有运行时 info/warn/error（含 akshare 超时、政策采集、
 # 非交易日告警等）统一写入此文件，JSON 行，前端调试抽屉读取尾部。
@@ -40,6 +57,17 @@ def configure_logging(level: str = "WARNING") -> None:
     # 接管 akshare 的 UserWarning（如「20210206非交易日」）到 logger，
     # 避免散落 stderr 且带 traceback 噪声。
     warnings.simplefilter("default")
+    # 抑制 websockets 14+/uvicorn 0.46 的 legacy 弃用警告（不影响功能，仅启动噪声）
+    warnings.filterwarnings(
+        "ignore",
+        message=r"websockets\.legacy is deprecated",
+        category=DeprecationWarning,
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r"websockets\.server\.WebSocketServerProtocol is deprecated",
+        category=DeprecationWarning,
+    )
     logging.getLogger("py.warnings").addHandler(logging.NullHandler())
     _orig_showwarning = warnings.showwarning
 

@@ -1,0 +1,104 @@
+/* 热点 / 投资方向 widget 样式（对齐 DeepFusion 暗色金调主题） */
+
+.invest-theme-widget .widget-sub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.invest-theme-widget .rs-latest-label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.invest-theme-widget .theme-count {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.invest-theme-widget .rs-date-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.invest-theme-widget .rs-arrow {
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-size: 16px; line-height: 1;
+}
+.invest-theme-widget .rs-date-input {
+  font-size: var(--fs-xs); padding: 4px 8px; border-radius: 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.invest-theme-widget .theme-collect-row {
+  display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+}
+.invest-theme-widget .theme-kw-input {
+  flex: 1; min-width: 220px; font-size: var(--fs-xs); padding: 7px 10px;
+  border-radius: 8px; background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-subtle); color: var(--text-primary);
+}
+.invest-theme-widget .theme-kw-input::placeholder { color: var(--text-muted); }
+.invest-theme-widget .theme-kw-btn {
+  font-size: var(--fs-xs); padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  background: rgba(201,168,97,0.15); border: 1px solid rgba(201,168,97,0.5);
+  color: var(--accent-gold);
+}
+.invest-theme-widget .theme-kw-btn:disabled { opacity: 0.5; cursor: default; }
+.invest-theme-widget .theme-collect-msg {
+  font-size: var(--fs-2xs); color: var(--text-secondary);
+  background: rgba(255,255,255,0.04); border-radius: 6px; padding: 8px 10px;
+  margin-bottom: 10px; white-space: pre-wrap;
+}
+.invest-theme-widget .theme-list {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.invest-theme-widget .empty-hint {
+  font-size: var(--fs-sm); color: var(--text-muted); padding: 12px 0;
+}
+.invest-theme-widget .theme-card {
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle);
+  border-radius: 10px; padding: 12px 14px;
+}
+.invest-theme-widget .theme-head {
+  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+}
+.invest-theme-widget .theme-name {
+  font-size: var(--fs-md); font-weight: 700; color: var(--text-primary);
+}
+.invest-theme-widget .theme-sentiment {
+  font-size: var(--fs-xs); font-weight: 600;
+}
+.invest-theme-widget .theme-summary {
+  font-size: var(--fs-sm); color: var(--text-secondary); margin-top: 6px;
+  line-height: 1.5;
+}
+.invest-theme-widget .theme-sources {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+.invest-theme-widget .src-tag {
+  font-size: var(--fs-2xs); color: var(--text-muted);
+  background: rgba(255,255,255,0.05); border-radius: 999px; padding: 2px 9px;
+}
+.invest-theme-widget .theme-targets { margin-top: 10px; }
+.invest-theme-widget .targets-title {
+  font-size: var(--fs-xs); color: var(--text-muted); margin-bottom: 6px;
+}
+.invest-theme-widget .targets-table {
+  width: 100%; border-collapse: collapse; font-size: var(--fs-xs);
+}
+.invest-theme-widget .targets-table th {
+  text-align: left; color: var(--text-muted); font-weight: 500;
+  padding: 4px 6px; border-bottom: 1px solid var(--border-subtle);
+}
+.invest-theme-widget .targets-table td {
+  padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-secondary); vertical-align: top;
+}
+.invest-theme-widget .targets-table td.mono { font-family: var(--mono, monospace); }
+.invest-theme-widget .targets-table td.reason { color: var(--text-muted); line-height: 1.4; }
+.invest-theme-widget .intensity-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 5px; vertical-align: middle;
+}

@@ -13,6 +13,21 @@ from ..shared.utils import ak_cache
 logger = logging.getLogger(__name__)
 
 
+def _nbs_unemployment_df(limit: int) -> pd.DataFrame:
+    """城镇调查失业率：直接调用 NBS 官方客户端真实源（akshare macro_china_urban_unemployment 已失效）。"""
+    from ..data.sources.nbs_client import _fetch_nbs_unemployment
+    limit = _val(limit)
+    try:
+        dates, values = _fetch_nbs_unemployment()
+        if not dates:
+            return pd.DataFrame()
+        df = pd.DataFrame({"日期": dates, "城镇调查失业率(%)": values})
+        return df.tail(limit).reset_index(drop=True)
+    except Exception as e:
+        logger.warning("NBS unemployment fetch failed: %s", e)
+        return pd.DataFrame()
+
+
 def _val(v, default=0):
     """解包 Field 默认值——兼容 MCP 框架传入 FieldInfo 与直接 Python 调用。
 
@@ -247,19 +262,18 @@ async def macro_monetary(
         limit: int = Field(24, description="返回期数"),
 ) -> str:
     loop = asyncio.get_event_loop()
-    # 8 个独立 akshare 调用 + 1 个 _fetch_with_priority 并发
-    m2, shrzgm, lpr, unemp, fx, export, imp, trade = await asyncio.gather(
+    # 8 个独立 akshare 调用 + 1 个 NBS 真实失业率并发
+    m2, shrzgm, lpr, fx, export, imp, trade = await asyncio.gather(
         ak_cache_async(ak.macro_china_m2_yearly, ttl=604800, ttl2=1209600),
         ak_cache_async(ak.macro_china_shrzgm, ttl=604800, ttl2=1209600),
         ak_cache_async(ak.macro_china_lpr, ttl=604800, ttl2=1209600),
-        loop.run_in_executor(None, _fetch_with_priority, "UNEMPLOYMENT", ak.macro_china_urban_unemployment, limit),
         ak_cache_async(ak.macro_china_fx_reserves_yearly, ttl=604800, ttl2=1209600),
         ak_cache_async(ak.macro_china_exports_yoy, ttl=604800, ttl2=1209600),
         ak_cache_async(ak.macro_china_imports_yoy, ttl=604800, ttl2=1209600),
         ak_cache_async(ak.macro_china_trade_balance, ttl=604800, ttl2=1209600),
     )
-    # _fetch_with_priority 返回 (df, _) 元组
-    unemp_df = unemp[0] if isinstance(unemp, tuple) else unemp
+    # 城镇调查失业率：直接走 NBS 真实源（akshare macro_china_urban_unemployment 已失效返回空）
+    unemp_df = _nbs_unemployment_df(limit)
 
     results = {}
     if m2 is not None and not m2.empty:
@@ -272,13 +286,6 @@ async def macro_monetary(
         data_lake.store("LPR", lpr)
     if unemp_df is not None and not unemp_df.empty:
         results["城镇调查失业率"] = unemp_df.to_csv(index=False, float_format="%.2f")
-    else:
-        # akshare 接口有 bug，从 cycle_db 缓存取 NBS 数据
-        from ..shared.cycle_db import get as cycle_db_get
-        unemp_db = cycle_db_get("unemployment")
-        if unemp_db is not None and not unemp_db.empty:
-            unemp_db = unemp_db.tail(limit)
-            results["城镇调查失业率"] = unemp_db.to_csv(index=False, float_format="%.2f")
     if fx is not None and not fx.empty:
         results["外汇储备"] = fx.tail(limit).to_csv(index=False, float_format="%.2f")
     if export is not None and not export.empty:
