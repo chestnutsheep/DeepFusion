@@ -21,6 +21,8 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
 from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -33,19 +35,36 @@ from deep_fusion.logging_config import get_logger, configure_logging  # noqa: E4
 _LOGGER = get_logger("calendar")
 _INDUSTRY_CACHE: dict[str, str] = {}
 
+# 单次 akshare 网络调用超时（秒）。超时即跳过该源，返回已采集部分，避免整个定时任务卡死。
+_AKSHARE_TIMEOUT = int(os.getenv("CALENDAR_AK_TIMEOUT", "45"))
+
+
+def _with_timeout(fn, *args, **kwargs):
+    """给同步 akshare 调用包一层线程超时，超时返回 None 不抛异常。"""
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        fut = ex.submit(fn, *args, **kwargs)
+        try:
+            return fut.result(timeout=_AKSHARE_TIMEOUT)
+        except FutTimeout:
+            _LOGGER.warning("akshare_timeout", fn=fn.__name__)
+            return None
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.warning("akshare_error", fn=fn.__name__, error=str(e))
+            return None
+
 
 def _stock_industry(code: str) -> str:
-    """取个股申万/东财行业名（用于关联领域），失败返回空。带进程内缓存。"""
+    """取个股申万/东财行业名（用于关联领域），失败/超时返回空。带进程内缓存。"""
     if code in _INDUSTRY_CACHE:
         return _INDUSTRY_CACHE[code]
     try:
-        info = ak.stock_individual_info_em(symbol=code)
-        # info: DataFrame[项目, 内容]
+        info = _with_timeout(ak.stock_individual_info_em, symbol=code)
         industry = ""
-        for _, r in info.iterrows():
-            if str(r["项目"]) == "行业":
-                industry = str(r["内容"]).strip()
-                break
+        if info is not None:
+            for _, r in info.iterrows():
+                if str(r["项目"]) == "行业":
+                    industry = str(r["内容"]).strip()
+                    break
         _INDUSTRY_CACHE[code] = industry
         return industry
     except Exception:
@@ -68,8 +87,17 @@ def _parse_date(s) -> str | None:
         return None
 
 
+def _prefill_industries(codes: list[str], max_workers: int = 12):
+    """并发批量预热行业缓存（限并发 + 单源超时），避免逐股同步请求累加成百秒级卡死。"""
+    uniq = [c for c in dict.fromkeys(codes) if c and c not in _INDUSTRY_CACHE]
+    if not uniq:
+        return
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        list(ex.map(lambda c: _stock_industry(c), uniq))
+
+
 def _domain_for(code: str, name: str):
-    ind = _stock_industry(code)
+    ind = _INDUSTRY_CACHE.get(code, "")
     if ind:
         return [{"name": ind, "type": "auto"}]
     return [{"name": name, "type": "auto"}]
@@ -78,11 +106,10 @@ def _domain_for(code: str, name: str):
 def collect_restricted(days: int, today: str):
     out = []
     horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y%m%d")
-    try:
-        df = ak.stock_restricted_release_detail_em(
-            start_date=today.replace("-", ""), end_date=horizon)
-    except Exception as ex:
-        _LOGGER.warning("restricted_fetch_failed", error=str(ex))
+    df = _with_timeout(ak.stock_restricted_release_detail_em,
+                       start_date=today.replace("-", ""), end_date=horizon)
+    if df is None:
+        _LOGGER.warning("restricted_fetch_failed")
         return out
     if df is None or df.empty:
         return out
@@ -93,10 +120,10 @@ def collect_restricted(days: int, today: str):
         if not code or not d or d < today or d > horizon[:4] + "-" + horizon[4:6] + "-" + horizon[6:]:
             continue
         out.append({
-            "date": d, "name": f"{name}解禁", "sector": _stock_industry(code),
+            "date": d, "name": f"{name}解禁", "sector": "",
             "rating": 3, "category": "解禁", "sentiment": "利空", "source": "auto_collect",
             "note": f"解禁明细自动采集（{code}）",
-            "domains": _domain_for(code, name),
+            "domains": [{"name": name, "type": "auto"}],
             "targets": [{"code": code, "name": name}],
         })
     return out
@@ -105,10 +132,9 @@ def collect_restricted(days: int, today: str):
 def collect_ipo(days: int, today: str):
     out = []
     horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
-    try:
-        df = ak.stock_new_ipo_cninfo()
-    except Exception as ex:
-        _LOGGER.warning("ipo_fetch_failed", error=str(ex))
+    df = _with_timeout(ak.stock_new_ipo_cninfo)
+    if df is None:
+        _LOGGER.warning("ipo_fetch_failed")
         return out
     if df is None or df.empty:
         return out
@@ -119,10 +145,10 @@ def collect_ipo(days: int, today: str):
         if not code or not d or d < today or d > horizon:
             continue
         out.append({
-            "date": d, "name": f"{name}申购", "sector": _stock_industry(code),
+            "date": d, "name": f"{name}申购", "sector": "",
             "rating": 3, "category": "新股", "sentiment": "中性", "source": "auto_collect",
             "note": f"新股申购自动采集（{code}）",
-            "domains": _domain_for(code, name),
+            "domains": [{"name": name, "type": "auto"}],
             "targets": [{"code": code, "name": name}],
         })
     return out
@@ -143,11 +169,7 @@ def collect_yjbb(days: int, today: str):
     out = []
     horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
     for period in _REPORT_PERIODS():
-        try:
-            df = ak.stock_report_disclosure(market="沪深京", period=period)
-        except Exception as ex:
-            _LOGGER.warning("yjbb_fetch_failed", period=period, error=str(ex))
-            continue
+        df = _with_timeout(ak.stock_report_disclosure, market="沪深京", period=period)
         if df is None or df.empty:
             continue
         # 同报告期业绩预告方向映射：给业绩披露事件补 sentiment 维度
@@ -160,11 +182,11 @@ def collect_yjbb(days: int, today: str):
                 continue
             sent = ymap.get(code, "中性")
             out.append({
-                "date": d, "name": f"{name}业绩披露", "sector": _stock_industry(code),
+                "date": d, "name": f"{name}业绩披露", "sector": "",
                 "rating": 3, "category": "业绩披露", "sentiment": sent, "source": "auto_collect",
                 "note": f"业绩披露预约自动采集（{code}，{period}）"
                          + (f"，预告{sent}" if sent != "中性" else ""),
-                "domains": _domain_for(code, name),
+                "domains": [{"name": name, "type": "auto"}],
                 "targets": [{"code": code, "name": name}],
             })
     return out
@@ -197,11 +219,7 @@ def collect_yjyg(days: int, today: str):
     horizon = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
     seen: dict[str, dict] = {}
     for period in _yjyg_periods():
-        try:
-            df = ak.stock_yjyg_em(date=period)
-        except Exception as ex:
-            _LOGGER.warning("yjyg_fetch_failed", period=period, error=str(ex))
-            continue
+        df = _with_timeout(ak.stock_yjyg_em, date=period)
         if df is None or df.empty:
             continue
         for _, r in df.iterrows():
@@ -222,11 +240,11 @@ def collect_yjyg(days: int, today: str):
             ev = {
                 "date": gdate,
                 "name": f"{name}业绩预告·{ytype}",
-                "sector": _stock_industry(code),
+                "sector": "",
                 "rating": 3, "category": "业绩预告", "sentiment": sent,
                 "source": "auto_collect",
                 "note": f"业绩预告（{ytype}{'，变动' + chg_txt if chg_txt else ''}）",
-                "domains": _domain_for(code, name),
+                "domains": [{"name": name, "type": "auto"}],
                 "targets": [{"code": code, "name": name}],
             }
             # 同代码保留公告日期最新的一条
@@ -260,12 +278,7 @@ def _yjyg_sentiment_map(period: str) -> dict:
     if yjyg_date in _YJYG_MAP_CACHE:
         return _YJYG_MAP_CACHE[yjyg_date]
     m: dict = {}
-    try:
-        df = ak.stock_yjyg_em(date=yjyg_date)
-    except Exception as ex:
-        _LOGGER.warning("yjyg_map_failed", period=period, error=str(ex))
-        _YJYG_MAP_CACHE[yjyg_date] = m
-        return m
+    df = _with_timeout(ak.stock_yjyg_em, date=yjyg_date)
     if df is not None and not df.empty:
         for _, r in df.iterrows():
             code = str(r.get("股票代码", "")).strip()
@@ -291,6 +304,17 @@ def main():
     events += collect_yjbb(args.days, today)
     events += collect_yjyg(args.days, today)
 
+    # 并发预热行业缓存（限并发+单源超时），避免逐股同步网络请求累加成百秒级卡死
+    all_codes = [e.get("targets", [{}])[0].get("code", "") for e in events if e.get("targets")]
+    _prefill_industries(all_codes)
+    # 预热后回写 sector/domains（读缓存，不再触发网络）
+    for e in events:
+        code = e.get("targets", [{}])[0].get("code", "") if e.get("targets") else ""
+        name = e["name"]
+        if code and _INDUSTRY_CACHE.get(code):
+            e["sector"] = _INDUSTRY_CACHE[code]
+            e["domains"] = [{"name": _INDUSTRY_CACHE[code], "type": "auto"}]
+
     n = 0
     for e in events:
         try:
@@ -305,6 +329,12 @@ def main():
         except Exception as ex:
             _LOGGER.warning("write_failed", name=e['name'], error=str(ex))
     _LOGGER.info("collect_done", written=n)
+    # 强制退出：akshare 内部线程/信号量泄漏会导致解释器退出挂起（resource_tracker 警告），
+    # 用 os._exit 避免定时任务子进程卡死不返回。
+    try:
+        _LOGGER.info("force_exit")
+    finally:
+        os._exit(0)
 
 
 if __name__ == "__main__":

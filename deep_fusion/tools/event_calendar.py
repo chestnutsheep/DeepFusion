@@ -507,10 +507,15 @@ def calendar_refresh_collect():
         return json.dumps({"ok": False, "error": f"采集脚本不存在: {script}"}, ensure_ascii=False)
     try:
         import sys
-        # 采集含解禁/新股/业绩预约 + 逐股行业查询，数据量大时 >180s，放宽到 600s
-        proc = subprocess.run([sys.executable, script], capture_output=True, text=True, timeout=600)
+        # 采集含解禁/新股/业绩预约 + 逐股行业查询，数据量大；脚本内部已对单源加超时降级，
+        # 整体放宽到 300s。超时也不算失败：日历库已有历史事件，返回降级成功。
+        proc = subprocess.run([sys.executable, script], capture_output=True, text=True, timeout=300)
         out = (proc.stdout or "") + (proc.stderr or "")
         return json.dumps({"ok": proc.returncode == 0, "returncode": proc.returncode,
                            "log": out[-2000:]}, ensure_ascii=False)
+    except subprocess.TimeoutExpired:
+        # 超时降级：返回既有日历缓存，不阻塞看板
+        return json.dumps({"ok": True, "degraded": True,
+                           "note": "采集超时，使用既有日历缓存"}, ensure_ascii=False)
     except Exception as ex:
         return json.dumps({"ok": False, "error": str(ex)}, ensure_ascii=False)

@@ -20,9 +20,10 @@ def report_latest(rtype: str = ""):
         return json.dumps({"ok": False, "error": "rtype 必填"}, ensure_ascii=False)
     row = get_latest(rtype)
     if not row:
-        return json.dumps({"ok": True, "rtype": rtype, "date": None, "payload": None,
-                           "note": "暂无数据，定时任务尚未写入"}, ensure_ascii=False)
+        return json.dumps({"ok": True, "rtype": rtype, "date": None, "created_at": None,
+                           "payload": None, "note": "暂无数据，定时任务尚未写入"}, ensure_ascii=False)
     return json.dumps({"ok": True, "rtype": rtype, "date": row["date"],
+                       "created_at": row.get("created_at"),
                        "payload": row["payload"]}, ensure_ascii=False)
 
 
@@ -62,7 +63,8 @@ def report_by_date(rtype: str = "", rdate: str = ""):
         return json.dumps({"ok": False, "error": "rtype 与 rdate 必填"}, ensure_ascii=False)
     row = get_by_date(rtype, rdate)
     if not row:
-        return json.dumps({"ok": True, "rtype": rtype, "date": rdate, "payload": None,
-                           "note": "该日期暂无报告"}, ensure_ascii=False)
+        return json.dumps({"ok": True, "rtype": rtype, "date": rdate, "created_at": None,
+                           "payload": None, "note": "该日期暂无报告"}, ensure_ascii=False)
     return json.dumps({"ok": True, "rtype": rtype, "date": row["date"],
+                       "created_at": row.get("created_at"),
                        "payload": row["payload"]}, ensure_ascii=False)

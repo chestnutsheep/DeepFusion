@@ -293,8 +293,24 @@ def limit_up_latest():
                            "note": "暂无可回溯的连板数据，请先运行 limit_up_scan"},
                           ensure_ascii=False)
     stocks = get_limit_up(row["date"])
-    return json.dumps({"ok": True, "date": row["date"], "count": len(stocks),
-                       "stocks": stocks}, ensure_ascii=False)
+    # 事件戳：连板数据写入 reports 表的 created_at（写入时刻），用于前端判断新鲜度
+    created_at = None
+    try:
+        from ..reports.store import _conn as _c2
+        con2 = _c2(None)
+        try:
+            rr = con2.execute(
+                "SELECT created_at FROM reports WHERE rtype='limit_up' AND date=? ORDER BY created_at DESC LIMIT 1",
+                (row["date"],),
+            ).fetchone()
+            if rr:
+                created_at = rr["created_at"]
+        finally:
+            con2.close()
+    except Exception:
+        pass
+    return json.dumps({"ok": True, "date": row["date"], "created_at": created_at,
+                       "count": len(stocks), "stocks": stocks}, ensure_ascii=False)
 
 
 @mcp.tool(

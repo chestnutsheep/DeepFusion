@@ -9,9 +9,13 @@
 注意：这些站点部分需经代理（clash-verge 全局接管），http_utils 已处理降级。
 """
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from .http_utils import http_get, urljoin
+
+# 监管政策"新催化"判定窗口：只保留最近 N 天发布的条目，避免抓到列表页靠前的旧帖
+# （如 2026-05-22 旧政策）被误判为当日新催化。默认可被环境变量覆盖。
+_MAX_AGE_DAYS = int(__import__("os").getenv("REGULATORY_MAX_AGE_DAYS", "14"))
 
 # URL 已逐一实测可用（2026-08-05）。
 # 注：国家金融监督管理总局官网为 JS 渲染，纯 HTTP 抓不到政策列表（verify 后 404/空），
@@ -75,20 +79,40 @@ def _parse_list(html, org_conf, org_code):
     return uniq
 
 
+def _is_fresh(item: dict) -> bool:
+    """日期过滤：仅保留近 _MAX_AGE_DAYS 天内的条目，剔除列表页靠前的旧帖；同时剔除导航噪音标题。"""
+    title = (item.get("title") or "").strip()
+    low = title.lower()
+    if not title or low in _NAV_NOISE or any(n in title for n in ("【更多】", ">>", " More")):
+        return False
+    d = item.get("date") or ""
+    m = re.search(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})", d)
+    if not m:
+        # 无有效日期的条目保留（避免误杀），交由上层按其他信号判断
+        return True
+    try:
+        pub = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return True
+    return pub >= (date.today() - timedelta(days=_MAX_AGE_DAYS))
+
+
 def _fetch_one(org_code, max_items=20):
     conf = _ORGS[org_code]
     html = http_get(conf["url"])
     rows = _parse_list(html, conf, org_code)
     out = []
     for r in rows[:max_items]:
-        out.append({
+        item = {
             "date": r["date"],
             "title": r["title"],
             "url": r["url"],
             "org": conf["name"],
             "org_code": org_code,
             "summary": "",
-        })
+        }
+        if _is_fresh(item):
+            out.append(item)
     return out
 
 

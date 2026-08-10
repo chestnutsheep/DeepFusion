@@ -65,7 +65,7 @@ export default function DailyBoardPage() {
           {meta.label}
         </span>
         <span className="df-caption">
-          <UpdateTimestamp data={lu.updatedAt ? { updatedAt: lu.updatedAt } : null} />
+          <UpdateTimestamp dataTime={luData?.created_at} updatedAt={lu.updatedAt} />
         </span>
       </div>
 

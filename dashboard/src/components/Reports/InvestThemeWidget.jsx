@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMCP } from "../../hooks/useMCP";
 import { mcp } from "../../services/mcp";
+import UpdateTimestamp from "../common/UpdateTimestamp";
 import "./reportslot.css";
 
 const SENTIMENT_COLOR = {
@@ -137,6 +138,7 @@ export default function InvestThemeWidget({ className = "" }) {
           <span className="rs-latest-label">最新一期 · {rptDate}</span>
         )}
         <span className="theme-count">{themes.length} 个主题</span>
+        <UpdateTimestamp dataTime={payload.created_at} compact />
       </div>
 
       <div className="theme-collect-row">

@@ -8,6 +8,10 @@
  * 用法:
  *   <UpdateTimestamp updatedAt={updatedAt} />
  *   <UpdateTimestamp updatedAt={updatedAt} compact />
+ *   <UpdateTimestamp dataTime={data.created_at} updatedAt={updatedAt} />
+ *
+ * dataTime（数据自带写入时刻）优先于 updatedAt（本次请求时刻）；
+ * 优先用 dataTime 才能真实反映定时任务落库新鲜度（而非每次刷新都变）。
  */
 import {useMemo} from 'react';
 
@@ -29,10 +33,12 @@ function relativeTime(date) {
   return `${Math.floor(mon / 12)}年前`;
 }
 
-export default function UpdateTimestamp({updatedAt, compact = false}) {
+export default function UpdateTimestamp({updatedAt, dataTime, compact = false}) {
   const {date, isFresh, absStr, relStr} = useMemo(() => {
-    if (!updatedAt) return {date: null, isFresh: false, absStr: '', relStr: ''};
-    const d = new Date(updatedAt);
+    // 优先采用数据自带的写入时刻（事件戳），回退到本次请求时刻
+    const ts = dataTime || updatedAt;
+    if (!ts) return {date: null, isFresh: false, absStr: '', relStr: ''};
+    const d = new Date(ts);
     if (isNaN(d.getTime())) return {date: null, isFresh: false, absStr: '', relStr: ''};
     const fresh = (Date.now() - d.getTime()) < FRESH_THRESHOLD_MS;
     const abs = d.toLocaleString('zh-CN', {

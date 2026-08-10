@@ -98,6 +98,11 @@ def invest_theme_collect(
                 "  invest_theme_collect(keywords='AI算力,低空经济')\n"
                 "  invest_theme_collect(themes='[{\"theme\":\"AI算力\",\"targets\":[{\"code\":\"300750\",\"name\":\"宁德时代\"}]}]')")
 
+    # 1.5) 补全 targets：对空 targets 的主题，按"已实测验证的主题→个股映射"补关联标的；
+    #      遵循题材猎手方法论——不联网硬凑，无匹配则留空。
+    from ..data.sources.scrapers.theme_enrich import enrich_themes
+    enrich_themes(parsed_themes)
+
     save_invest_theme(parsed_themes, rpt_date=rpt_date)
     lines = [f"✅ 热点/投资方向已落库  ({rpt_date})  共 {len(parsed_themes)} 个主题："]
     for i, t in enumerate(parsed_themes, 1):
@@ -118,6 +123,8 @@ def invest_theme_latest():
     if not row:
         return "暂无热点/投资方向数据。可用 invest_theme_collect 落库。"
     payload = row["payload"] if isinstance(row, dict) else json.loads(row[2])
+    if isinstance(payload, dict):
+        payload.setdefault("created_at", row.get("created_at") if isinstance(row, dict) else None)
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
@@ -143,6 +150,8 @@ def invest_theme_date(rpt_date: str):
     """按日期取。"""
     row = get_invest_theme(rpt_date)
     if not row:
-        return json.dumps({"date": rpt_date, "themes": []}, ensure_ascii=False)
+        return json.dumps({"date": rpt_date, "created_at": None, "themes": []}, ensure_ascii=False)
     payload = row["payload"] if isinstance(row, dict) else json.loads(row[2])
+    if isinstance(payload, dict):
+        payload.setdefault("created_at", row.get("created_at") if isinstance(row, dict) else None)
     return json.dumps(payload, ensure_ascii=False, indent=2)

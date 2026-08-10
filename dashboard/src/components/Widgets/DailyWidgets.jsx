@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useMCP } from "../../hooks/useMCP.js";
 import CardWrapper from "../common/CardWrapper.jsx";
 import ErrorBoundary from "../common/ErrorBoundary.jsx";
+import UpdateTimestamp from "../common/UpdateTimestamp.jsx";
 import CalendarMonth from "../Calendar/CalendarMonth.jsx";
 import ReportModal from "./ReportModal.jsx";
 
@@ -331,7 +332,10 @@ export function ReportSlot({ rtype, label, reloadToken }) {
     <>
       <CardWrapper hoverable onClick={() => hasPayload && setOpen(true)} style={{ cursor: hasPayload ? "pointer" : "default" }}>
         <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <span>{label}</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            {label}
+            <UpdateTimestamp dataTime={active?.created_at} compact />
+          </span>
           <div onClick={(e) => e.stopPropagation()}>
             <select
               value={selectedDate || ""}
