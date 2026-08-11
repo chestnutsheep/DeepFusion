@@ -71,7 +71,7 @@ export default function LogDrawer() {
         title="运行日志"
         style={{
           position: 'fixed',
-          right: '18px',
+          left: '18px',
           bottom: '18px',
           zIndex: 9999,
           width: '44px',

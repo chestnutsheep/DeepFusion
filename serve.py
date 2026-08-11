@@ -3,7 +3,7 @@ import os
 import sys
 import threading
 import warnings
-from datetime import datetime
+from datetime import datetime, date
 
 # 抑制 websockets 14+/uvicorn 0.46 的 legacy 弃用警告（不影响功能）
 # 注：实际生效点在 deep_fusion/logging_config.py（其 simplefilter("default") 会清空早期 filter）
@@ -165,11 +165,166 @@ def _policy_collect_loop():
         time.sleep(interval)
 
 
+def _daily_data_collect_loop():
+    """后台每日数据采集：行业日线 + 行业全景(资金流/估值/快照) + 行情增量。
+
+    采集策略：
+    - 启动后延迟 15s 先跑一次补采
+    - 之后每天 16:30（收盘后）自动跑
+    - 仅交易日有意义；非交易日接口返回空也不崩，自动跳过
+    """
+    import time
+    time.sleep(15)  # 等服务完全启动 + warmup 完成
+    while True:
+        today = date.today()
+        _LOGGER.info("daily_collect_start", date=str(today))
+
+        # ── 1. 行业日线增量（OHLCV，约90行业）──
+        try:
+            from deep_fusion.tools.industry import industry_daily_collect as _idl
+            _LOGGER.info("daily_collect_industry_daily_start")
+            r1 = _idl(force=False)  # 增量模式：DB已最新则跳过
+            _LOGGER.info("daily_collect_industry_daily_done", result=str(r1)[:200])
+        except Exception as e:
+            _LOGGER.warning("daily_collect_industry_daily_failed", error=str(e)[:120])
+
+        # ── 2. 行业全景采集（资金流 + 估值 + 行情快照 + 申万分级）──
+        try:
+            from deep_fusion.tools.industry import industry_collect as _ic
+            _LOGGER.info("daily_collect_industry_full_start")
+            r2 = _ic()
+            _LOGGER.info("daily_collect_industry_full_done", result=str(r2)[:300])
+        except Exception as e:
+            _LOGGER.warning("daily_collect_industry_full_failed", error=str(e)[:120])
+
+        # ── 3. 行情数据增量（个股日线+指数日线）──
+        try:
+            from deep_fusion.data.sources.market_collector import (
+                collect_stock_daily, collect_index_daily, all_stock_codes,
+            )
+            _LOGGER.info("daily_collect_market_start")
+            # 个股增量（取最近5日，DB已最新则跳过）；codes 必填，取库内全部股票
+            codes = all_stock_codes()
+            r3a = collect_stock_daily(codes=codes, days_back=5)
+            # 指数日线增量
+            r3b = collect_index_daily(days_back=5)
+            _LOGGER.info("daily_collect_market_done",
+                         stock=str(r3a)[:150], index=str(r3b)[:150])
+        except Exception as e:
+            _LOGGER.warning("daily_collect_market_failed", error=str(e)[:120])
+
+        # ── 4. M2/PPI/CPI 宏观指标：依赖 warmup 周期预热自动增量刷新 ──
+        # warmup 调用 cycle_collect() → IndicatorDef.fetch() 走 data_lake-first + 增量更新
+        # 此处不重复触网，避免双层缓存冲突
+
+        _LOGGER.info("daily_collect_complete")
+
+        # 算到下一个 16:30 的秒数
+        now = datetime.now()
+        next_run = now.replace(hour=16, minute=30, second=0, microsecond=0)
+        if now >= next_run:
+            next_run += datetime.timedelta(days=1)
+        wait_sec = max(60, (next_run - now).total_seconds())
+        _LOGGER.info("daily_collect_next", next_run=str(next_run), wait_sec=wait_sec)
+        time.sleep(wait_sec)
+
+
+def _daily_report_loop():
+    """后台定时跑「日报类」任务并写入 reports.db（收盘后自动执行）。
+
+    本仓库可真实自包含生成的两类：
+    1) 连板潜力股：limit_up_calibrate（低频，周一跑）+ limit_up_scan（每个交易日），
+       结果写 reports.db 的 limit_up_stocks 表 + rtype=score_calibration 回溯。
+    2) 金融大事日历：scripts/calendar_collect.py（独立子进程，隔离 akshare 线程泄漏），
+       写 reports.db 的 calendar_events 表。
+
+    说明（非本仓库自包含，保持外部写入或后续搬入）：
+    - 4 类文本日报（premarket/noonnews/qualitystock/dailyreview）生成逻辑在外部 Claw 仓库，
+      通过 scripts/report_writer.py --action save_report 写入 reports 表，本循环不重复生成。
+    - 热点/投资方向（invest_theme）需外部 agent 喂数据，无自动采集器，本循环不跑。
+
+    调度：启动延迟 30s；之后锚定每个交易日 16:00（收盘后）执行，周末跳过。
+    """
+    import subprocess
+    import time
+    from datetime import datetime, date, timedelta
+
+    time.sleep(30)  # 等 warmup / 行情采集先稳定，避免资源争抢
+    REPO = os.path.dirname(os.path.abspath(__file__))
+    CALENDAR_SCRIPT = os.path.join(REPO, "scripts", "calendar_collect.py")
+
+    def _next_run_dt():
+        now = datetime.now()
+        nxt = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        if now >= nxt:
+            nxt += timedelta(days=1)
+        return nxt
+
+    while True:
+        today = date.today()
+        weekday = today.weekday()  # 0=周一 ... 6=周日
+
+        # 周末非交易日：跳过往后睡，避免无谓联网（节假日接口返回空也不崩，此处仅省资源）
+        if weekday >= 5:
+            _LOGGER.info("daily_report_skip_weekend", date=str(today))
+            time.sleep(3600)
+            continue
+
+        _LOGGER.info("daily_report_start", date=str(today), weekday=weekday)
+
+        # ── 1. 连板潜力股：每周一跑校准（重，联网），每日跑扫描 ──
+        try:
+            from deep_fusion.tools.limit_up import limit_up_scan, limit_up_calibrate
+            if weekday == 0:  # 周一：实证校准（拉真实涨停池，较重）
+                _LOGGER.info("daily_report_calibrate_start")
+                try:
+                    print(limit_up_calibrate(40))
+                except Exception as e:
+                    _LOGGER.warning("daily_report_calibrate_failed", error=str(e)[:120])
+            _LOGGER.info("daily_report_limitup_start")
+            print(limit_up_scan())
+            _LOGGER.info("daily_report_limitup_done")
+        except Exception as e:
+            _LOGGER.warning("daily_report_limitup_failed", error=str(e)[:120])
+
+        # ── 2. 金融大事日历：独立子进程跑，隔离 akshare 线程泄漏（脚本末尾 os._exit）──
+        try:
+            _LOGGER.info("daily_report_calendar_start")
+            env = dict(os.environ)
+            env.setdefault("DF_LOG_LEVEL", "WARNING")
+            proc = subprocess.run(
+                [sys.executable, CALENDAR_SCRIPT, "--days", "75"],
+                cwd=REPO, env=env,
+                capture_output=True, text=True, timeout=600,
+            )
+            if proc.returncode != 0:
+                _LOGGER.warning("daily_report_calendar_failed",
+                                rc=proc.returncode, err=proc.stderr[-300:])
+            else:
+                _LOGGER.info("daily_report_calendar_done", out=proc.stdout.strip()[-200:])
+        except Exception as e:
+            _LOGGER.warning("daily_report_calendar_failed", error=str(e)[:120])
+
+        _LOGGER.info("daily_report_complete", date=str(today))
+
+        # 锚定下一个交易日 16:00
+        wait_sec = max(60, (datetime.now().replace(hour=16, minute=0, second=0, microsecond=0)
+                            - datetime.now()).total_seconds())
+        if datetime.now().hour >= 16:
+            # 已错过今天 16:00：睡到明天 16:00（下个循环周末会再跳）
+            nxt = _next_run_dt()
+            wait_sec = max(60, (nxt - datetime.now()).total_seconds())
+        _LOGGER.info("daily_report_next", wait_sec=wait_sec)
+        time.sleep(wait_sec)
+
+
 import uvicorn
 
 _LOGGER.info("server_start", url="http://localhost:5173/api")
 threading.Thread(target=_warmup_cycle_cache, daemon=True).start()
 threading.Thread(target=_policy_collect_loop, daemon=True).start()
+threading.Thread(target=_daily_data_collect_loop, daemon=True).start()
+threading.Thread(target=_daily_report_loop, daemon=True).start()
 
 # 多 worker：用模块字符串传 app，uvicorn 才能 fork 多进程
 # 单 worker（默认）：直接传 app 实例，避免 import 开销

@@ -1,0 +1,33 @@
+{
+  "started": "20260811_025023",
+  "sections": [
+    {
+      "section": "daily",
+      "label": "每日看板",
+      "ops": 0,
+      "passed": 0,
+      "failed": 1,
+      "freshness_ok": "0/0",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "fatal",
+          "detail": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\".top-tab\").filter(has_text=\"每日\").first\n    - locator resolved to <button class=\"top-tab active\">每日</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div class=\"sidebar-overlay visible\"></div> intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <div class=\"sidebar-overlay visible\"></div> intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    51 × waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - <div class=\"sidebar-overlay visible\"></div> intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n    - waiting for element to be visible, enabled and stable\n"
+        }
+      ],
+      "checks": []
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "resp",
+      "a": "500",
+      "b": "http://localhost:8080/api/tools/call"
+    },
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    }
+  ]
+}

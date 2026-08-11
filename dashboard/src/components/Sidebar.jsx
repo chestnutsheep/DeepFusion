@@ -392,7 +392,7 @@ function SidebarContent() {
         className={`sidebar-slide-panel ${sidebarCollapsed ? 'collapsed-mode' : 'open'}${mobileOpen ? ' mobile-active' : ''}`}
       >
         {/* 折叠/展开按钮 */}
-        <div style={{
+        <div data-testid="sidebar-toggle" style={{
           position: 'absolute', top: 24,
           right: sidebarCollapsed ? 'auto' : 8,
           left: sidebarCollapsed ? '50%' : 'auto',

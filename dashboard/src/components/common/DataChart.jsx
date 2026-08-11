@@ -1,6 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import * as echarts from 'echarts';
 
+/* 系列默认调色板 — 调用方未传 color 时兜底，避免 LinearGradient 收到 undefined 崩溃 */
+const SERIES_PALETTE = ['#7c3aed', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+
 /* 注册一个极简暗色主题 — 只覆盖背景/文字/分割线，不碰系列色 */
 echarts.registerTheme('df-dark', {
   backgroundColor: 'transparent',
@@ -144,6 +147,8 @@ export default function DataChart({
               formatter: isReturnMode ? (v) => v.toFixed(1) + '%' : undefined },
             name: isReturnMode ? '对数收益率(%)' : '' },
       series: processedSeries.map((s, sIdx) => {
+        // 兜底系列颜色，避免未传 color 时 LinearGradient 收到 undefined 崩溃
+        const sc = s.color || SERIES_PALETTE[sIdx % SERIES_PALETTE.length];
         // 根据模式选择数据源
         let seriesData;
         if (s.type === 'candlestick') {
@@ -178,13 +183,16 @@ export default function DataChart({
           data: seriesData,
           smooth: !isReturnMode, // 收益率模式不平滑，保留波动细节
           connectNulls: !isReturnMode, // 收益率模式不连接 null（首个点）
-          lineStyle: { color: s.color, width: isReturnMode ? 1.5 : (s.lineWidth || 2.5), ...(s.lineStyle || {}) },
+          lineStyle: { color: sc, width: isReturnMode ? 1.5 : (s.lineWidth || 2.5), ...(s.lineStyle || {}) },
           areaStyle: s.type !== 'bar' && !isReturnMode
-            ? { opacity: s.areaOpacity ?? 0.08, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: s.color }, { offset: 1, color: 'transparent' },
-              ]) }
+            ? {
+                opacity: s.areaOpacity ?? 0.08,
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: sc }, { offset: 1, color: 'transparent' },
+                ]),
+              }
             : (isReturnMode ? { opacity: 0.04 } : undefined),
-          itemStyle: s.type === 'bar' ? { color: s.color } : undefined,
+          itemStyle: s.type === 'bar' ? { color: sc } : undefined,
           symbol: isReturnMode ? 'none' : 'none',
           ...(s.yAxisIndex != null ? { yAxisIndex: s.yAxisIndex } : {}),
         };

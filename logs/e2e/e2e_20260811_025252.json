@@ -1,0 +1,73 @@
+{
+  "started": "20260811_025252",
+  "sections": [
+    {
+      "section": "daily",
+      "label": "每日看板",
+      "ops": 7,
+      "passed": 5,
+      "failed": 2,
+      "freshness_ok": "1/1",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "侧栏折叠切换",
+          "detail": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"nav."
+        },
+        {
+          "op": "主题切换面板存在",
+          "detail": "未找到主题入口"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入每日看板板块(store.activeTab=daily)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "渲染主面板[每日看板] (文本4000字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[每日看板]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": false,
+          "detail": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"nav."
+        },
+        {
+          "op": "主题切换面板存在",
+          "ok": false,
+          "detail": "未找到主题入口"
+        },
+        {
+          "op": "二次进入[每日看板]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "resp",
+      "a": "500",
+      "b": "http://localhost:8080/api/tools/call"
+    },
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    }
+  ]
+}

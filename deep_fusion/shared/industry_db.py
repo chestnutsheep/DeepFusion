@@ -269,11 +269,95 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db():
-    """初始化数据库（建表）。幂等，可重复调用。"""
+    """初始化数据库（建表）。幂等，可重复调用。
+
+    旧库迁移：SCHEMA_SQL 全部使用 IF NOT EXISTS，对已存在的旧表不会补列。
+    已知历史漂移：
+    1. meso_industry_fund_flow 旧版用 PRIMARY KEY(industry_name, updated_at) 且列结构不同
+       → 重建为新 schema 并保留历史数据（SQLite 不支持 DROP CONSTRAINT）。
+    2. 其他表缺列 → ALTER TABLE 补齐。
+    """
     conn = _connect()
     conn.executescript(SCHEMA_SQL)
+
+    # ── 其他表缺列补齐（幂等安全）──
+    _migrate_add_column(conn, "meso_industry_fund_flow", "industry_code", "TEXT")
+
     conn.commit()
     conn.close()
+
+    # ── 旧表迁移：重建 meso_industry_fund_flow（若仍为旧版 PK）──
+    # 必须在主连接关闭后单独执行，避免 WAL 下 DROP TABLE 触发 table is locked
+    _migrate_fund_flow_table()
+
+
+def _migrate_add_column(conn, table: str, column: str, col_type: str):
+    """若表 table 不存在 column，则 ALTER TABLE 补列。幂等安全。"""
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    existing = {row[1] for row in cur.fetchall()}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
+def _migrate_fund_flow_table():
+    """重建 meso_industry_fund_flow：若仍是旧版 PK(industry_name, updated_at) 则迁移。
+
+    SQLite 不支持 DROP CONSTRAINT，只能建新表→搬数据→改名。新 schema 用自增 seq 主键，
+    保留全部历史行（旧列映射到新列，缺失列留 NULL）。使用独立连接执行，避免与 init_db
+    主连接事务冲突导致 table is locked。
+    """
+    conn = _connect()
+    master = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='meso_industry_fund_flow'"
+    ).fetchone()
+    is_legacy = master and "PRIMARY KEY (industry_name, updated_at)" in (master[0] or "")
+    if not is_legacy:
+        conn.close()
+        return  # 已是新 schema，无需迁移
+
+    print("[industry_db] migrate_fund_flow_legacy_detected -> rebuild", flush=True)
+    # 建临时新表
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS _meso_industry_fund_flow_new
+        (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            industry_name TEXT,
+            industry_code TEXT,
+            industry_pct_change REAL,
+            inflow REAL,
+            outflow REAL,
+            net_amount REAL,
+            company_count INTEGER,
+            leader_stock TEXT,
+            leader_pct_change REAL,
+            current_price REAL,
+            trade_date TEXT,
+            updated_at TEXT
+        );
+        """
+    )
+    # 搬数据（旧列 → 新列，按列名交集）
+    conn.execute(
+        """
+        INSERT INTO _meso_industry_fund_flow_new
+            (industry_name, industry_pct_change, inflow, outflow, net_amount,
+             company_count, leader_stock, leader_pct_change, current_price,
+             trade_date, updated_at)
+        SELECT
+            industry_name, industry_pct_change, inflow, outflow, net_amount,
+            company_count, leader_stock, leader_pct_change, current_price,
+            trade_date, updated_at
+        FROM meso_industry_fund_flow
+        """
+    )
+    conn.execute("DROP TABLE meso_industry_fund_flow")
+    conn.execute(
+        "ALTER TABLE _meso_industry_fund_flow_new RENAME TO meso_industry_fund_flow"
+    )
+    conn.commit()
+    conn.close()
+    print("[industry_db] migrate_fund_flow_done", flush=True)
 
 
 def _log_collection(table: str, rows: int, status: str = "ok"):
@@ -473,10 +557,18 @@ def get_valuation() -> pd.DataFrame:
 
 
 def save_fund_flow(df: pd.DataFrame):
-    """保存行业资金流。"""
+    """保存行业资金流。
+
+    按当天 trade_date 先删后插，避免旧表遗留的 UNIQUE(industry_name, updated_at)
+    约束导致每日重复写入冲突；同时保留历史每日快照。
+    """
     conn = _connect()
     now = datetime.now().isoformat()
     today = datetime.now().strftime("%Y%m%d")
+    # 覆盖当天已存在的快照（防止 UNIQUE 冲突 / 重复累积）
+    conn.execute(
+        "DELETE FROM meso_industry_fund_flow WHERE trade_date = ?", (today,)
+    )
     rows = 0
     for _, r in df.iterrows():
         conn.execute(

@@ -223,6 +223,10 @@ body::after {
   pointer-events: none;
 }
 .sidebar-overlay.visible {
+  opacity: 0;
+  pointer-events: none;
+}
+.sidebar-overlay.mobile-active {
   opacity: 0.80;
   pointer-events: auto;
 }

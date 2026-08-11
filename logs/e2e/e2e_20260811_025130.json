@@ -1,0 +1,33 @@
+{
+  "started": "20260811_025130",
+  "sections": [
+    {
+      "section": "daily",
+      "label": "每日看板",
+      "ops": 0,
+      "passed": 0,
+      "failed": 1,
+      "freshness_ok": "0/0",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "fatal",
+          "detail": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\".pro-menu-item, li\").filter(has_text=\"每日看板\").first\n"
+        }
+      ],
+      "checks": []
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "resp",
+      "a": "500",
+      "b": "http://localhost:8080/api/tools/call"
+    },
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    }
+  ]
+}

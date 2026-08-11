@@ -1342,4 +1342,160 @@ uv run python scripts/industry_full_report.py --window 120
 uv run python scripts/industry_full_report.py --window 120 --limit 500
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 数据地图与传导机制（全链路 Data Flow Map）
+# 2026-08-11 全量梳理：每条数据的「来源 → 落库 → 计算定义 → 消费方」绝对关系
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# 设计铁律（贯穿全链路）：
+#   - Actual（原始数据，如 PMI/GDP/行业K线/行情）：永不过期，增量追加，进永久库
+#   - Derived（处理/信号，如相位/技术指标/聚类）：版本号锁定缓存键 + TTL 分级
+#   - 修改任何计算定义（相位/信号公式/阈值）须遵守顶部「红线禁令」
+
+## 0. 总览：三层数据流
+```
+[数据源] ak/新浪/东财/NBS/FRED/WB/监管爬虫/OKX
+   │ 采集/抓取（sources/ + scripts/）
+   ▼
+[永久库 SQLite] industry_data.db / market_data.db / reports.db
+                cycle_cache.db / data_lake.db / policy_cache.db
+   │ 读取（MCP 工具 / 计算引擎）
+   ▼
+[Derived 计算] 周期定位 / 行业主线 / 个股分析 / 反诈（diskcache 版本号锁定）
+   │ 注册为 @mcp.tool
+   ▼
+[消费方] 前端 Dashboard（/api/tools/call）→ 或 Claude/外部 agent（MCP JSON-RPC）
+```
+
+## 1. 采集层（谁写、从哪来、写到哪）
+
+### 1.1 行情/市场 — `deep_fusion/data/sources/market_collector.py`
+| 内容 | 数据源 | 落库表（market_data.db） | 代理 |
+|------|--------|--------------------------|------|
+| 个股日K（前复权） | 新浪 `stock_zh_a_daily` 直连 | `stock_daily` | 否 |
+| 指数日K | 新浪 `stock_zh_index_daily` 直连 | `index_daily` | 否 |
+| 股票代码→名称 | akshare `stock_info_a_code_name` | `stock_info` | **需 7897** |
+- CLI：`scripts/market_collect.py`（--mode full/index/stock/prime）→ MCP `market_data_refresh`
+- 唯一联网入口；桥接层 `market_bridge.py`：先读库→缺失/过期回退新浪写回
+
+### 1.2 行业（中观）— `deep_fusion/data/sources/industry_collector.py` + `industry_sw.py`/`industry_ths.py`/`industry_cninfo.py`
+| 内容 | 数据源 | 落库表（industry_data.db） | 代理 |
+|------|--------|----------------------------|------|
+| 行业日行情 OHLCV | 同花顺 akshare（直连） | `meso_industry_daily` | 否 |
+| 行业资金流 | 东财 `industry_capital_flow` | `meso_industry_fund_flow` | **需 7897** |
+| 资金流排行 | 东财 `stock_sector_fund_flow_rank` | `meso_industry_fund_flow` | **需 7897** |
+| 申万分类树/日报表/成分股 | akshare sw_index + 申万官网（绕代理） | `meso_sw_classify` / 实时 | 否（trust_env=False） |
+| 行业估值/分类 | 巨潮 akshare（源 `stock_industry_valuation_em` 已删） | `meso_industry_valuation` | **缺口** |
+| 行业财务 | **无采集入口**（源 `stock_industry_financial_em` 已删） | `meso_industry_financial` | **缺口** |
+- 触发：MCP `industry_daily_collect`（增量）、`industry_collect`（全景）；serve.py `_daily_data_collect_loop` 每天 16:30 自动跑
+
+### 1.3 宏观/周期 — `nbs_client.py` / `fred.py` / `world_bank.py` / `tools/macro.py`
+| 内容 | 数据源 | 落库 | 代理 |
+|------|--------|------|------|
+| CPI/PPI/工业增加值/固投/房地产/库存/失业率/GDP/产能利用率/房价 | **NBS 国家统计局直连（主动 pop 代理）** | `cycle_cache.db`（`cycle_db.cache_all`） | 否 |
+| FRED 40+序列（美债/通胀） | FRED API | `cycle_cache.db`（`cycle_data`） | **需 7897** |
+| 世界银行（全球/中美日韩 GDP） | WB API | `cycle_cache.db`（`cycle_data`） | **需 7897** |
+| GDP/CPI/PPI/PMI/M2/LPR/社融 | akshare 宏观 china 系列 | `data_lake.db`（`macro_data`） | 部分 `_em` 需 7897 |
+
+### 1.4 政策/监管 — `policy.py` + `scrapers/`
+- 证监会/央行：爬虫直连（**需 7897**）；金监总局 JS 渲染抓不到（不纳入）
+- 落 `policy_cache.db`；serve.py `_policy_collect_loop` 每 6h 自动跑
+
+### 1.5 实时/其他
+- 加密货币 `crypto_adapter.py`：Binance 公开 REST（无持久库）
+- 商品现货/财新/题材：akshare 实时（无落库）
+
+## 2. 数据库与缓存坐标
+| 库 | 路径（运行时） | 核心表 |
+|----|----------------|--------|
+| industry_data.db | `<repo>/data/industry_data.db` | meso_industry_daily / meso_industry_fund_flow / meso_industry_valuation / meso_industry_financial / meso_sw_classify |
+| market_data.db | `MARKET_DATA_DB_PATH` 默认 `<repo>/data/market_data.db` | stock_daily / index_daily / stock_info / meta |
+| reports.db | `REPORTS_DB_PATH` 默认 `<repo>/data/reports.db` | reports(rtype,date) / limit_up_stocks / calendar_events |
+| cycle_cache.db | `~/output/data/cycle_cache.db` | cycle_data（NBS/FRED/WB 原始+周期缓存） |
+| data_lake.db | `~/.cache/deep_fusion/data_lake.db` | macro_data（akshare 宏观） |
+| policy_cache.db | `~/output/data/policy_cache.db` | policy_docs |
+| diskcache | `~/.cache/deep_fusion/` | 周期/指标版本号缓存键 |
+
+## 3. 计算定义层（工具 → 输入来源 → 算法 → 输出）
+
+### 3.1 周期定位（tools/cycles.py + analysis/macro/cycles/）
+| 周期 | 输入原始指标（来源） | 相位判定 | 缓存键（版本锁定） |
+|------|----------------------|----------|---------------------|
+| 基钦（库存） | 工业增加值同比/工业企业库存/PPI/M2/PMI（NBS+akshare） | 四阶段：主动/被动去补库存 | `cycles_data_kitchin_v2` |
+| 朱格拉（投资） | 固投/设备购置/制造业投资/产能利用率（NBS） | 宏观四相 | `cycles_data_juglar_v2` |
+| 库兹涅茨（地产） | 地产开发投资/销售面积/新开工/房价（NBS） | 宏观四相 | `cycles_data_kuznets_v2` |
+| 康波（长波） | 全球线 FRED PPIACO+GS10+WB全球GDP；中国线 WB中国GDP+平减+城市化率 | PCA(3线)→CF带通(40-70y)→level+momentum 四相 | `cycles_data_kondratiev_{m}_v5` / `cycles_report_kondratiev_{m}_v3` |
+- 引擎：`analysis/macro/cycles/engine.py`（`IndicatorDef.fetch` DB-first+增量）
+- 嵌套：`cycle_nesting_v4`（四周期相位叠加）
+
+### 3.2 行业主线（tools/industry.py）
+- `industry_themes`：读 `meso_industry_daily`（收益率矩阵）+ `meso_industry_fund_flow` → 去PC1 beta → 层次聚类 → 评分（0.4相关+0.35动量+0.25资金流）→ shared/correlation.py
+- `industry_themes_dcc`：shared/dcc_garch.py（arch GARCH + Engle两步法）
+- `industry_themes_causality`：shared/causality.py（Granger + 领先行业识别）
+
+### 3.3 个股/反诈/资金
+- `tools/stocks.py`：search/market_overview（akshare新浪直连）/individual_info（akshare东财+雪球+同花顺+巨潮）/individual_hist（新浪K线）
+- `tools/anti_fraud.py`：个股深度反诈分析（数值口径归量化）
+
+### 3.4 数据新鲜度（shared/freshness.py）
+- `DATA_CLASSIFICATION` 注册表：频率分级（实时5m/日4h/月3d/季15d/年60d）
+- 原始数据检查 `needs_incremental_update()`；修改算法须 +1 版本号（见顶部「所有周期：缓存版本锁定」）
+
+## 4. 报告体系（reports.db）— ⚠️ 日报漏录根因
+**本仓库只提供存储层 + 落库脚本，不提供定时调度。4 类每日报告的写入方在另一个仓库「Claw 定时任务」(automation a / automation-2 / automation-3)。**
+
+| 报告 rtype | 写入脚本/工具 | 依赖调度 | 当前风险 |
+|------------|---------------|----------|----------|
+| dailyreview（每日复盘 21:00） | `scripts/report_writer.py --action save_report` | Claw automation | automation 未跑即停更 |
+| premarket（盘前简报 09:00） | 同上 | Claw automation | 同上 |
+| qualitystock（优质股 16:30） | 同上 | Claw automation | 同上 |
+| noonnews（午间推送 12:50） | `scripts/build_noonnews.py` → report_writer | Claw automation | 同上 |
+| dailyscan（每日选股） | report_writer / invest_theme | Claw automation | 同上 |
+| limit_up_stocks（连板） | `scripts/limit_up_pipeline.py`→`limit_up_scan` | Claw automation（16:00） | akshare 需 7897 |
+| calendar_events（大事日历） | `scripts/calendar_collect.py` | Claw automation | 东财源需 7897 |
+
+**落库脚本清单（需被外部调度才运行，本仓库无 cron）：**
+- `scripts/report_writer.py`（--action save_report/save_limit_up/seed_calendar，有 --json-file）
+- `scripts/build_noonnews.py`（午间，主源 policy_cache，兜底 /tmp/noon_raw.json）
+- `scripts/limit_up_pipeline.py`（连板校准+扫描，收盘后）
+- `scripts/calendar_collect.py`（解禁/IPO/业绩披露，结尾 os._exit(0) 防线程泄漏）
+- `scripts/import_legacy_reports.py`（一次性历史回溯，源 /home/scapegoat_data）
+
+**读取端（只读不写）：** `tools/reports_view.py` 的 report_latest/history/types/by_date；`tools/limit_up.py` 的 latest（非交易时段无涨停数据直接返回不写）；`tools/event_calendar.py` 的 calendar_*（calendar_refresh_collect 手动刷新按钮，调 calendar_collect.py）
+
+> ⚠️ 前端 `report_latest` 若返回「暂无数据，定时任务尚未写入」= Claw 侧 automation 未成功执行，不是本仓库 bug。
+
+## 5. 消费层（前端如何取数）
+- **前端不直接 fetch 数据路由，唯一入口 `/api/tools/call`（POST）**：`{name, arguments}` → serve.py `mcp.call_tool` → 对应 `@mcp.tool` Python 函数
+- serve.py（Starlette，端口 5173）仅 3 路由：`/api/tools/call`、`/api/tools/list`、`/api/logs` + `/metrics` Mount。**没有 data_kitchin/PANEL_MAP 这类 HTTP 数据路由**（那些是 MCP 工具名 / 前端组件选择器）
+- 前端取数链：`useMCP.js` → `services/mcp.js` fetch `/api/tools/call` → serve.py → MCP 工具
+- store 状态（`dashboard/src/store/index.js`）：`activeTab` + `activeMacroSub/MesoSub/MicroSub/PolicySub/GlobalSub` 驱动面板渲染（宏/中观/微观/政策/国际）
+- react-query stale 时间按工具前缀：`macro_*`=24h / `policy_*`=30min / `industry_*`=5min
+- MCP 工具注册：`deep_fusion/__init__.py` `_TOOL_MODULES`（23 个模块）→ `__init__.py` 导入触发 @mcp.tool 装饰器注册
+
+## 6. 数据缺口清单（实测/代码确认）
+| 数据项 | 状态 | 说明 |
+|--------|------|------|
+| meso_industry_financial（行业财务） | ❌ 真实缺口 | 采集入口 0 命中，源 `stock_industry_financial_em` 已删 |
+| meso_industry_valuation（行业估值） | ❌ 缺口 | 源 `stock_industry_valuation_em` 已删 |
+| 申万口径 meso_industry_daily | ⚠️ 源废 | `sw_index_daily` 已删，无干净替代（同花顺口径仍在） |
+| M2/PPI/CPI/GDP | ⚠️ 月/季频天然滞后 | 入口正常，断档天数取决于上次成功拉取 |
+| index_daily / stock_daily / limit_up | ✅ 有入口缺调度 | 需 Claw automation 或 cron 每日触发 |
+| 4 类每日报告 | ✅ 有入口缺调度 | 写入方在 Claw 仓库，本仓库无 scheduler |
+
+## 7. 代理依赖（单点故障）
+- **需 7897（clash-verge）**：东财 `_em` 系列、FRED/WB 国外源、监管爬虫、连板校准、部分宏观 `_em`、行业完整报告
+- **直连不受影响**：申万（trust_env=False）、NBS（主动 pop 代理）、腾讯 gtimg 实时、新浪/财联社、同花顺行业日线
+- 代理宕机 → 上述需代理数据断档；直连源照常
+- 检测/拉起：`scripts/api_health_lib.py` ensure_proxy()（clash-verge 全局接管）
+
+## 8. 自检与运维
+- 新鲜度巡检：`uv run python scripts/data_freshness_check.py`（退出码 0/1/2，支持 --json）
+- 手动采集行情：`uv run python scripts/market_collect.py --mode full`
+- 手动行业采集：`industry_daily_collect`（MCP）/ `industry_collect`（MCP）
+- serve.py 后台线程：_warmup_cycle_cache（预热周期缓存）/ _policy_collect_loop（6h 政策）/ _daily_data_collect_loop（16:30 行业+行情）
+- ⚠️ serve.py 修改后必须重启进程才生效（无热重载）
+
+
+
 ```

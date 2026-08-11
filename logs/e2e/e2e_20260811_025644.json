@@ -1,0 +1,608 @@
+{
+  "started": "20260811_025644",
+  "sections": [
+    {
+      "section": "daily",
+      "label": "每日看板",
+      "ops": 9,
+      "passed": 9,
+      "failed": 0,
+      "freshness_ok": "1/1",
+      "accepted": true,
+      "errors": [],
+      "checks": [
+        {
+          "op": "进入每日看板板块(store.activeTab=daily)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "渲染主面板[每日看板] (文本4000字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[每日看板]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[每日看板]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "section": "macro",
+      "label": "宏观",
+      "ops": 21,
+      "passed": 21,
+      "failed": 0,
+      "freshness_ok": "7/7",
+      "accepted": true,
+      "errors": [],
+      "checks": [
+        {
+          "op": "进入宏观板块(store.activeTab=macro)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[宏观覆盖] (activeSub=coverage, 文本298字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[宏观覆盖]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[基钦] (activeSub=kitchin, 文本785字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[基钦]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[朱格拉] (activeSub=juglar, 文本716字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[朱格拉]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[库兹涅茨] (activeSub=kuznets, 文本762字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[库兹涅茨]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[康波] (activeSub=kondratiev, 文本525字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[康波]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[周期嵌套] (activeSub=nesting, 文本198字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[周期嵌套]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[相位分布] (activeSub=gantt, 文本376字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[相位分布]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[宏观覆盖]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "section": "meso",
+      "label": "中观",
+      "ops": 19,
+      "passed": 18,
+      "failed": 1,
+      "freshness_ok": "5/6",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "新鲜度信号[趋势与信号]",
+          "detail": "无日期信号(可能静态)"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入中观板块(store.activeTab=meso)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[趋势与信号] (activeSub=signals, 文本194字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[趋势与信号]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[行业热力图] (activeSub=heatmap, 文本261字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[行业热力图]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[排名详情] (activeSub=ranking, 文本650字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[排名详情]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[产业链] (activeSub=chain, 文本433字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[产业链]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[能源脉动] (activeSub=energy, 文本226字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[能源脉动]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[季节性] (activeSub=seasonal, 文本544字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[季节性]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[趋势与信号]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "section": "micro",
+      "label": "微观",
+      "ops": 17,
+      "passed": 13,
+      "failed": 4,
+      "freshness_ok": "2/4",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "切换并渲染子面板[个股] (activeSub=stock, 文本371字)",
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[基金] (activeSub=fund, 文本232字)",
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "新鲜度信号[债券]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "新鲜度信号[期权]",
+          "detail": "无日期信号(可能静态)"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入微观板块(store.activeTab=micro)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[待机速览] (activeSub=standby, 文本4000字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[待机速览]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[个股] (activeSub=stock, 文本371字)",
+          "ok": false,
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[基金] (activeSub=fund, 文本232字)",
+          "ok": false,
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[期货] (activeSub=futures, 文本158字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[期货]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[债券] (activeSub=bond, 文本94字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[债券]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[期权] (activeSub=option, 文本105字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[期权]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[待机速览]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "section": "policy",
+      "label": "政策",
+      "ops": 13,
+      "passed": 13,
+      "failed": 0,
+      "freshness_ok": "3/3",
+      "accepted": true,
+      "errors": [],
+      "checks": [
+        {
+          "op": "进入政策板块(store.activeTab=policy)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[政策统计] (activeSub=stats, 文本232字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[政策统计]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[文件列表] (activeSub=list, 文本140字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[文件列表]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[采集管理] (activeSub=collect, 文本150字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[采集管理]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[政策统计]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "section": "global",
+      "label": "国际",
+      "ops": 17,
+      "passed": 13,
+      "failed": 4,
+      "freshness_ok": "1/5",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "新鲜度信号[金融压力]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "新鲜度信号[债务可持续]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "新鲜度信号[资本流动]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "新鲜度信号[泡沫监视]",
+          "detail": "无日期信号(可能静态)"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入国际板块(store.activeTab=global)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[金融压力] (activeSub=stress, 文本123字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[金融压力]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[债务可持续] (activeSub=debt, 文本124字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[债务可持续]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[资本流动] (activeSub=capital, 文本118字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[资本流动]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[泡沫监视] (activeSub=bubble, 文本115字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[泡沫监视]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[衍生品市场] (activeSub=markets, 文本253字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[衍生品市场]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[金融压力]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "resp",
+      "a": "500",
+      "b": "http://localhost:8080/api/tools/call"
+    },
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    }
+  ]
+}

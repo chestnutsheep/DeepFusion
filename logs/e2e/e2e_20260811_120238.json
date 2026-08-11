@@ -1,0 +1,113 @@
+{
+  "started": "20260811_120238",
+  "sections": [
+    {
+      "section": "global",
+      "label": "国际",
+      "ops": 16,
+      "passed": 14,
+      "failed": 2,
+      "freshness_ok": "3/4",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "新鲜度信号[泡沫监视]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[衍生品市场] (activeSub=markets, 文本317字)",
+          "detail": "命中关键字'error'"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入国际板块(store.activeTab=global)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[金融压力] (activeSub=stress, 文本651字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[金融压力]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[债务可持续] (activeSub=debt, 文本420字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[债务可持续]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[资本流动] (activeSub=capital, 文本373字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[资本流动]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[泡沫监视] (activeSub=bubble, 文本115字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[泡沫监视]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[衍生品市场] (activeSub=markets, 文本317字)",
+          "ok": false,
+          "detail": "命中关键字'error'"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[金融压力]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on ev"
+    }
+  ]
+}

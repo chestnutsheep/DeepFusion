@@ -6,6 +6,12 @@ from fastmcp import Context
 from pydantic import Field
 
 from ..cache import ak_cache_async
+from ..data.sources.sina_tencent_quote import (
+    sina_intraday,
+    sina_realtime,
+    tencent_minute_kline,
+    tencent_realtime,
+)
 from ..server import mcp
 from ..shared.fields import field_market
 from ..shared.utils import ak_cache, ak_search_async
@@ -13,6 +19,17 @@ from ..shared.utils import ak_cache, ak_search_async
 # 代码→名称列映射：不同数据源返回的列名不同
 _CODE_COLS = ["code", "证券代码", "A股代码", "symbol", "基金代码", "代码"]
 _NAME_COLS = ["name", "证券简称", "A股简称", "cname", "基金名称", "名称", "中文名称"]
+
+
+def _val(v, default=""):
+    """解包 FastMCP 传入的 FieldInfo 默认值（兼容直接 Python 调用）。
+
+    与 industry.py 的 _val 保持一致：MCP 框架调用时 Field 默认值传入的是
+    FieldInfo 对象而非字符串，直接比较会失败（如 asset != 'equity' 永远成立）。
+    """
+    if hasattr(v, "default"):
+        return v.default if v.default is not None else default
+    return v if v is not None else default
 
 
 def _extract_code_name(info) -> dict:
@@ -163,62 +180,23 @@ async def individual_info(
 )
 def stock_quote(
         symbol: str = Field(description="6位股票代码，如 600519"),
+        market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
-    # 东财实时行情（单源即含 PE/PB/市值/换手率，覆盖报价快照全部字段）
+    # 直连行情优先：腾讯 qt.gtimg.cn（含实时价/换手率，已验证直连可达）
+    # 回退：新浪 hq.sinajs.cn（含实时价，已验证直连可达）
+    # 二者均不含 PE/PB/市值/量比（东财特色），缺失字段置 None，前端以 "--" 兜底显示，
+    # 数值口径不变。避免依赖东方财富（当前网络出口不可达且 cooldown 会阻塞面板）。
     try:
-        df = ak_cache(ak.stock_zh_a_spot_em, ttl=300, ttl2=600)
-        if df is not None and not df.empty:
-            row = df[df["代码"] == symbol]
-            if not row.empty:
-                r = row.iloc[0]
-                result = {
-                    "symbol": symbol,
-                    "name": str(r.get("名称", "")),
-                    "price": _num(r.get("最新价")),
-                    "change": _num(r.get("涨跌额")),
-                    "change_pct": _num(r.get("涨跌幅")),
-                    "amplitude": _num(r.get("振幅")),
-                    "open": _num(r.get("今开")),
-                    "high": _num(r.get("最高")),
-                    "low": _num(r.get("最低")),
-                    "prev_close": _num(r.get("昨收")),
-                    "volume": _num(r.get("成交量")) * 100 if _num(r.get("成交量")) is not None else None,  # 手→股
-                    "amount": _num(r.get("成交额")),
-                    "turnover": _num(r.get("换手率")),
-                    "pe": _num(r.get("市盈率-动态")),
-                    "pb": _num(r.get("市净率")),
-                    "total_mv": _num(r.get("总市值")),
-                    "float_mv": _num(r.get("流通市值")),
-                    "volume_ratio": _num(r.get("量比")),
-                    "source": "em",
-                }
-                # 跳过全空行（退市/无行情）
-                if result["price"] is not None:
-                    return json.dumps(result, ensure_ascii=False)
+        tq = tencent_realtime(symbol, market)
+        if tq and tq.get("price") is not None:
+            return json.dumps(tq, ensure_ascii=False)
     except Exception:
         pass
 
-    # 回退：新浪实时行情（含最新价/涨跌/成交额/量，但无 PE/PB/市值）
     try:
-        df = ak_cache(ak.stock_zh_a_spot, ttl=300, ttl2=600)
-        if df is not None and not df.empty:
-            row = df[df["代码"].str.endswith(symbol)]
-            if not row.empty:
-                r = row.iloc[0]
-                return json.dumps({
-                    "symbol": symbol,
-                    "name": str(r.get("名称", "")),
-                    "price": _num(r.get("最新价")),
-                    "change": _num(r.get("涨跌额")),
-                    "change_pct": _num(r.get("涨跌幅")),
-                    "open": _num(r.get("今开")),
-                    "high": _num(r.get("最高")),
-                    "low": _num(r.get("最低")),
-                    "prev_close": _num(r.get("昨收")),
-                    "volume": _num(r.get("成交量")) * 100 if _num(r.get("成交量")) is not None else None,
-                    "amount": _num(r.get("成交额")),
-                    "source": "sina",
-                }, ensure_ascii=False)
+        sq = sina_realtime(symbol, market)
+        if sq and sq.get("price") is not None:
+            return json.dumps(sq, ensure_ascii=False)
     except Exception:
         pass
 
@@ -244,14 +222,12 @@ def stock_concepts(
         symbol: str = Field(description="6位股票代码，如 600519"),
         market: str = Field("sh", description="市场: sh=沪, sz=深, bj=京"),
 ) -> str:
-    # 取股票名称（用于与概念板块领涨股匹配）
+    # 取股票名称（用于与概念板块领涨股匹配），优先腾讯直连，失败则留空
     name = ""
     try:
-        spot = ak_cache(ak.stock_zh_a_spot_em, ttl=300, ttl2=600)
-        if spot is not None and not spot.empty:
-            row = spot[spot["代码"] == symbol]
-            if not row.empty:
-                name = str(row.iloc[0].get("名称", ""))
+        tq = tencent_realtime(symbol, market)
+        if tq and tq.get("name"):
+            name = tq["name"]
     except Exception:
         pass
 
@@ -330,20 +306,27 @@ def individual_hist(
     if kline is not None and not kline.empty:
         results["K线数据"] = kline.tail(limit).to_csv(index=False, float_format="%.2f")
 
-    min_data = ak_cache(
-        ak.stock_zh_a_hist_min_em, symbol=symbol, period=minute_period,
-        ttl=3600,
-    )
-    if min_data is not None and not min_data.empty:
-        results[f"{minute_period}分钟线"] = min_data.tail(limit).to_csv(index=False, float_format="%.2f")
+    # 分钟线：腾讯直连 ifzq.gtimg.cn（已验证可达），替代东财 stock_zh_a_hist_min_em
+    try:
+        minute_rows = tencent_minute_kline(
+            symbol, minute_period=minute_period, market=market
+        )
+        if minute_rows:
+            import pandas as pd
+            min_df = pd.DataFrame(minute_rows)
+            results[f"{minute_period}分钟线"] = min_df.tail(limit).to_csv(index=False, float_format="%.2f")
+    except Exception:
+        pass
 
-    tick = ak_cache(ak.stock_intraday_em, symbol=symbol, ttl=300)
-    if tick is not None and not tick.empty:
-        results["分笔数据"] = tick.tail(limit).to_csv(index=False, float_format="%.2f")
-
-    pre_open = ak_cache(ak.stock_zh_a_hist_pre_min_em, symbol=symbol, ttl=300)
-    if pre_open is not None and not pre_open.empty:
-        results["盘前数据"] = pre_open.tail(limit).to_csv(index=False, float_format="%.2f")
+    # 分笔/盘前：新浪分时直连 quotes.sina.cn（已验证可达），替代东财 stock_intraday_em / pre_min_em
+    try:
+        intraday_rows = sina_intraday(symbol, market=market, datalen=min(limit, 240))
+        if intraday_rows:
+            import pandas as pd
+            tick_df = pd.DataFrame(intraday_rows)
+            results["分笔数据"] = tick_df.tail(limit).to_csv(index=False, float_format="%.2f")
+    except Exception:
+        pass
 
     output = []
     for title, data in results.items():
@@ -354,7 +337,23 @@ def individual_hist(
 
 
 def _stock_a_daily_robust(symbol, market, period, start_date):
-    """A股日线：腾讯源优先（稳定），东方财富回退。返回含中文列名的 df。"""
+    """A股日线：腾讯直连优先（proxies=None 绕过代理不可达），腾讯akshare回退，东财最后。
+
+    返回含中文列名的 df。"""
+    # 0) 腾讯日K直连（proxies=None，serve 走代理时东财/腾讯akshare 不可达，直连稳定）
+    try:
+        df = tencent_daily_kline(symbol, market, limit=365, adjust="qfq")
+        if df is not None and not df.empty:
+            df = df.rename(columns={
+                "date": "日期", "open": "开盘", "high": "最高", "low": "最低",
+                "close": "收盘", "volume": "成交量",
+            })
+            if "成交额" not in df.columns:
+                df["成交额"] = None
+            return df
+    except Exception:
+        pass
+    # 1) 腾讯日线（akshare 封装，走代理，网络恢复时可用）
     try:
         df = ak_cache(ak.stock_zh_a_daily, symbol=f"{market}{symbol}", adjust="qfq", ttl=3600)
         if df is not None and not df.empty:
@@ -369,6 +368,7 @@ def _stock_a_daily_robust(symbol, market, period, start_date):
             return df
     except Exception:
         pass
+    # 2) 东财日线（回退）
     return ak_cache(ak.stock_zh_a_hist, symbol=symbol, period=period,
                     start_date=start_date, end_date="22220101", ttl=3600)
 
@@ -384,6 +384,8 @@ def market_prices(
         limit: int = Field(30, description="返回数量"),
         asset: str = Field("equity", description="资产类型: equity/etf"),
 ) -> str:
+    # 解包 FastMCP 传入的 FieldInfo（MCP 框架会把 Field 默认值传成 FieldInfo 对象）
+    asset = _val(asset, "equity")
     from datetime import datetime, timedelta
 
     import pandas as pd

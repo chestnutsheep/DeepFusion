@@ -1,0 +1,126 @@
+{
+  "started": "20260811_120312",
+  "sections": [
+    {
+      "section": "micro",
+      "label": "微观",
+      "ops": 17,
+      "passed": 13,
+      "failed": 4,
+      "freshness_ok": "2/4",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "切换并渲染子面板[个股] (activeSub=stock, 文本642字)",
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[基金] (activeSub=fund, 文本232字)",
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "新鲜度信号[债券]",
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "新鲜度信号[期权]",
+          "detail": "无日期信号(可能静态)"
+        }
+      ],
+      "checks": [
+        {
+          "op": "进入微观板块(store.activeTab=micro)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "切换并渲染子面板[待机速览] (activeSub=standby, 文本4000字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[待机速览]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[个股] (activeSub=stock, 文本642字)",
+          "ok": false,
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[基金] (activeSub=fund, 文本232字)",
+          "ok": false,
+          "detail": "命中关键字'加载中'"
+        },
+        {
+          "op": "切换并渲染子面板[期货] (activeSub=futures, 文本158字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[期货]",
+          "ok": true,
+          "detail": "含日期/更新信号"
+        },
+        {
+          "op": "切换并渲染子面板[债券] (activeSub=bond, 文本94字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[债券]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "切换并渲染子面板[期权] (activeSub=option, 文本105字)",
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "op": "新鲜度信号[期权]",
+          "ok": false,
+          "detail": "无日期信号(可能静态)"
+        },
+        {
+          "op": "侧栏折叠切换",
+          "ok": true,
+          "detail": "collapsed=True"
+        },
+        {
+          "op": "侧栏展开恢复",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调面板可打开",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调滑块可拖动",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "视觉微调重置按钮可用",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "op": "二次进入[待机速览]稳定渲染",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "pageerror",
+      "a": "error",
+      "b": "Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('undefined') could not be parsed as a color."
+    }
+  ]
+}

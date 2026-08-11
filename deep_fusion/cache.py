@@ -117,7 +117,6 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from unittest.mock import patch
 
 import pandas as pd
 
@@ -139,10 +138,9 @@ _SLOG = _get_structlog(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=int(os.getenv("DF_EXECUTOR_WORKERS", "8")))
 
-# EM (East Money) API cooldown and fallback
-_last_em_error: float = 0.0
-_em_lock = threading.Lock()
-_EM_COOLDOWN = 60.0  # EM 限流通常以分钟计，5s 太短
+# EM (East Money) API 快速失败（当前网络出口不可达，不再 cooldown 阻塞）
+# EM 调用用更短专用超时，避免东财不可达时长时间阻塞（默认 8s，可环境变量覆盖）
+EM_TIMEOUT = int(os.getenv("DF_EM_TIMEOUT", "8"))
 
 
 def _is_em_function(fun) -> bool:
@@ -156,36 +154,13 @@ def _has_proxy() -> bool:
 
 
 def _em_fallback_retry(fun, *args, **kwargs) -> pd.DataFrame | None:
-    """Retry an _em call without proxy. Returns DataFrame on success, None on failure.
+    """EM 接口快速失败：当前网络下 eastmoney 出口不可达，不再长时间 cooldown 阻塞。
 
-    用 _em_lock 串行化所有 EM fallback，避免并发下 os.environ 改写互相踩；
-    用 mock.patch.dict 原子地临时移除 proxy 环境变量，异常时自动恢复。
+    改为：直接返回 None，让上层以降级（空数据）返回，避免面板被 EM cooldown 锁死。
+    若日后网络恢复，可在此恢复去代理重试逻辑。保留签名以兼容调用方。
     """
-    global _last_em_error
-    with _em_lock:
-        now = time.time()
-        if now - _last_em_error < _EM_COOLDOWN:
-            _LOGGER.warning("EM cooldown active (%.1fs since last error), skipping retry",
-                            now - _last_em_error)
-            return None
-
-        # 临时移除 proxy 环境变量（mock.patch.dict 保证原子恢复）
-        env_override = {
-            "HTTP_PROXY": None, "http_proxy": None,
-            "HTTPS_PROXY": None, "https_proxy": None,
-            "ALL_PROXY": None, "all_proxy": None,
-        }
-        try:
-            _LOGGER.info("EM fallback: retrying without proxy: %s-%s", fun.__name__, args)
-            with patch.dict(os.environ, env_override, clear=False):
-                result = fun(*args, **kwargs)
-            _last_em_error = 0.0
-            _LOGGER.info("EM fallback succeeded without proxy")
-            return result
-        except Exception as exc2:
-            _last_em_error = time.time()
-            _LOGGER.error("EM fallback also failed without proxy: %s", exc2)
-            return None
+    _LOGGER.warning("EM source unavailable, fast-fail (no retry) for: %s", getattr(fun, "__name__", fun))
+    return None
 
 
 def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
@@ -207,13 +182,15 @@ def ak_cache(fun, *args, **kwargs) -> pd.DataFrame | None:
             EXECUTOR_ACTIVE.inc()
             try:
                 # 用 Future.result(timeout) 强制超时，避免 akshare 内部 requests 挂死
+                # EM 接口用更短超时（DF_EM_TIMEOUT），快速失败避免面板长时间等待
+                call_timeout = EM_TIMEOUT if _is_em_function(fun) else REQUEST_TIMEOUT
                 future = _executor.submit(partial(fun, *args, **kwargs))
                 try:
-                    all_df = future.result(timeout=REQUEST_TIMEOUT)
+                    all_df = future.result(timeout=call_timeout)
                 except TimeoutError:
                     AKSHARE_TIMEOUT.labels(fun=fun.__name__).inc()
-                    _LOGGER.warning("ak_cache timeout after %ds: %s", REQUEST_TIMEOUT, fun.__name__)
-                    _SLOG.warning("akshare_timeout", tool=fun.__name__, timeout=REQUEST_TIMEOUT)
+                    _LOGGER.warning("ak_cache timeout after %ds: %s", call_timeout, fun.__name__)
+                    _SLOG.warning("akshare_timeout", tool=fun.__name__, timeout=call_timeout)
                     all_df = None
             finally:
                 EXECUTOR_ACTIVE.dec()
@@ -265,9 +242,10 @@ async def ak_cache_async(fun, *args, **kwargs) -> pd.DataFrame | None:
                 # asyncio.wait_for 强制超时；超时后底层线程可能仍在跑（akshare 不可中断），
                 # 但事件循环不阻塞，靠 executor 容量 + EM cooldown 兜底
                 try:
+                    call_timeout = EM_TIMEOUT if _is_em_function(fun) else REQUEST_TIMEOUT
                     all_df = await asyncio.wait_for(
                         loop.run_in_executor(_executor, partial(fun, *args, **kwargs)),
-                        timeout=REQUEST_TIMEOUT,
+                        timeout=call_timeout,
                     )
                 except asyncio.TimeoutError:
                     AKSHARE_TIMEOUT.labels(fun=fun.__name__).inc()

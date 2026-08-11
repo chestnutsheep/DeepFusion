@@ -1,0 +1,33 @@
+{
+  "started": "20260811_120440",
+  "sections": [
+    {
+      "section": "micro",
+      "label": "微观",
+      "ops": 0,
+      "passed": 0,
+      "failed": 1,
+      "freshness_ok": "0/0",
+      "accepted": false,
+      "errors": [
+        {
+          "op": "fatal",
+          "detail": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\".pro-menu-item, li\").filter(has_text=\"基金\").first\n"
+        }
+      ],
+      "checks": []
+    }
+  ],
+  "page_errors": [
+    {
+      "kind": "pageerror",
+      "a": "error",
+      "b": "Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('undefined') could not be parsed as a color."
+    },
+    {
+      "kind": "console",
+      "a": "error",
+      "b": "The above error occurred in the <DataChart> component:\n\n    at DataChart (http://localhost:8080/src/components/common/DataChart.jsx:38:3)\n    at div\n    at div\n    at StockPanel (http://localhost:8080"
+    }
+  ]
+}
