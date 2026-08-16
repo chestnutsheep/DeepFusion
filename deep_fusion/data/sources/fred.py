@@ -10,7 +10,7 @@ historical macro data doesn't change, so no expiry is needed.
 from __future__ import annotations
 
 from .wb_fred_adapter import fetch_fred as _fetch_fred
-from ...shared.cycle_db import get as _db_get, set as _db_set
+from ...shared.cycle_db import get as _db_get, upsert as _db_set
 
 # 注册表: cache_key → (FRED series_id, 描述)
 SERIES: dict[str, tuple[str, str]] = {

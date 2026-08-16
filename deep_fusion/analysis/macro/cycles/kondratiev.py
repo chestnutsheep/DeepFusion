@@ -455,7 +455,7 @@ def _calc_kondratiev_bandpass() -> tuple[dict, list]:
 
 def _fetch_fred_series(cache_key: str) -> tuple[list[str], list[float]]:
     """DB-first 拉取 FRED 序列，未入库则实时拉取并持久化"""
-    from ....shared.cycle_db import get as db_get, set as db_set
+    from ....shared.cycle_db import get as db_get, upsert as db_set
     from ....data.sources.fred import get as fred_get
     # 1. DB 缓存（永久存储，不设过期）
     df = db_get(cache_key)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .wb_fred_adapter import fetch_wb as _fetch_wb
-from ...shared.cycle_db import get as _db_get, set as _db_set
+from ...shared.cycle_db import get as _db_get, upsert as _db_set
 
 # 注册表: cache_key → (WB indicator, country, 描述)
 INDICATORS: dict[str, tuple[str, str, str]] = {

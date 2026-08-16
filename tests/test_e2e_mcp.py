@@ -11,6 +11,9 @@ async def _open_proc():
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        # tools/list 的完整清单 JSON 在 129 个工具下远超 asyncio 默认 64KB 行缓冲，
+        # 必须放大 limit 否则 readline 抛 LimitOverrunError。
+        limit=2**20,
     )
 
 
@@ -43,7 +46,14 @@ async def _call(method: str, params: dict | None = None) -> dict:
         return await _write_read(proc, method, params)
     finally:
         try:
-            proc.kill()
+            # 优雅终止：让子进程正常退出并 flush 管道，避免 pytest capture
+            # 在 teardown 时读取已强制关闭的 stdout/stderr pipe 报
+            # "ValueError: I/O operation on closed file"。
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=10)
+            except asyncio.TimeoutError:
+                proc.kill()
         except ProcessLookupError:
             pass
 

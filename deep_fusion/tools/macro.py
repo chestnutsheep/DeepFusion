@@ -140,7 +140,7 @@ def _fetch_with_priority(
                     data_lake.store(indicator, df, source="akshare")
                     source = "akshare"
         except Exception as e:
-            pass
+            logger.warning("_fetch_with_priority: %s 全量拉取失败，降级 stale: %s", indicator, e)
 
     if (df is None or df.empty) and data_lake.has_data(indicator):
         df = data_lake.query(indicator, limit=0)

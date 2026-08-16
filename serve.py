@@ -113,9 +113,9 @@ def _warmup_cycle_cache():
         import json
         from deep_fusion.analysis.macro.cycles.dispatch import _compute
         for cid, ckey in [
-            ("kitchin", "cycles_data_kitchin_v2"),
-            ("juglar", "cycles_data_juglar_v2"),
-            ("kuznets", "cycles_data_kuznets_v2"),
+            ("kitchin", "cycles_data_kitchin_v3"),
+            ("juglar", "cycles_data_juglar_v3"),
+            ("kuznets", "cycles_data_kuznets_v3"),
         ]:
             try:
                 _ck = CacheKey.init(ckey, ttl=604800, ttl2=2592000)
@@ -213,7 +213,19 @@ def _daily_data_collect_loop():
         except Exception as e:
             _LOGGER.warning("daily_collect_market_failed", error=str(e)[:120])
 
-        # ── 4. M2/PPI/CPI 宏观指标：依赖 warmup 周期预热自动增量刷新 ──
+        # ── 4. 最优资产配置：基于最新周期数据动态重算并预热缓存 ──
+        # 周期数据由 warmup 增量刷新，此处触发 asset_allocation 重算，
+        # 确保侧栏「资产配置」每日新鲜（缓存 ttl=1天，这里主动刷新）。
+        try:
+            from deep_fusion.tools.allocation import asset_allocation as _aa
+            _LOGGER.info("daily_collect_allocation_start")
+            r4 = _aa()  # 命中缓存则直接返回；周期数据更新后自动重算
+            _LOGGER.info("daily_collect_allocation_done",
+                         weights=str(r4)[:200])
+        except Exception as e:
+            _LOGGER.warning("daily_collect_allocation_failed", error=str(e)[:120])
+
+        # ── 5. M2/PPI/CPI 宏观指标：依赖 warmup 周期预热自动增量刷新 ──
         # warmup 调用 cycle_collect() → IndicatorDef.fetch() 走 data_lake-first + 增量更新
         # 此处不重复触网，避免双层缓存冲突
 

@@ -152,7 +152,7 @@ class IndicatorDef:
         elif self.akshare_fn:
             # DB-first + 增量更新：
             # 原始数据(Actual)永不过期，但检查是否有新数据可追加
-            from ....shared.cycle_db import get as db_get, set as db_set
+            from ....shared.cycle_db import get as db_get, upsert as db_set
             from ....shared.cycle_db import get_latest_date, append as db_append
             from ....shared.freshness import needs_incremental_update
 

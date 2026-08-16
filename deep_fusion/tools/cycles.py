@@ -139,7 +139,8 @@ def _rolling_mean(vals: list[float], window: int = 9) -> list[float]:
     description="获取基钦周期（库存周期）各阶段定位数据（JSON数组）",
 )
 def data_kitchin() -> str:
-    _ck = CacheKey.init("cycles_data_kitchin_v2", ttl=604800, ttl2=2592000)
+    # v3: 修正 kitchin phase_names 映射(原 dispatch 将 1/2 标反)，并修复 cycle_db.set 遮蔽导致增量更新失败
+    _ck = CacheKey.init("cycles_data_kitchin_v3", ttl=604800, ttl2=2592000)
     cached = _ck.get()
     if cached is not None and isinstance(cached, str):
         return cached
@@ -450,9 +451,9 @@ def cycle_collect() -> str:
     # ── 高级缓存器：预热各周期分析计算结果 ──
     lines.append("")
     lines.append("=== 计算结果预热 ===")
-    for cid, ckey in [("kitchin", "cycles_data_kitchin_v2"),
-                      ("juglar", "cycles_data_juglar_v2"),
-                      ("kuznets", "cycles_data_kuznets_v2")]:
+    for cid, ckey in [("kitchin", "cycles_data_kitchin_v3"),
+                      ("juglar", "cycles_data_juglar_v3"),
+                      ("kuznets", "cycles_data_kuznets_v3")]:
         try:
             _ck = CacheKey.init(ckey, ttl=604800, ttl2=2592000)
             if _ck.get() is None:

@@ -14,6 +14,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 from starlette.middleware.cors import CORSMiddleware
 
+from .logging_config import configure_logging
 from .server import mcp
 
 # Tool 模块名列表（lazy import，避免顶层 import 拖慢启动）
@@ -22,7 +23,7 @@ _TOOL_MODULES = [
     "funds", "futures", "industry", "international", "macro", "market",
     "policy", "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
     "tech_indicators", "market_data", "limit_up", "reports_view", "market_snapshot",
-    "invest_theme",
+    "invest_theme", "allocation",
 ]
 
 # prompts/resources 轻量，顶层 import
@@ -88,6 +89,11 @@ def main():
     parser.add_argument("--port", type=int, default=port, help=f"Port to listen on (default: {port})")
 
     args = parser.parse_args()
+
+    # 所有入口统一配置日志：stdio 模式下 stdout 是 JSON-RPC 协议通道，
+    # 必须把日志重定向到 stderr（configure_logging 已如此处理），否则
+    # structlog 默认 PrintLogger 打到 stdout 会污染协议流导致客户端解析失败。
+    configure_logging(os.getenv("DF_LOG_LEVEL", "WARNING"))
 
     # 在解析参数后、执行命令前加载所有 tool（触发 @mcp.tool 注册）
     _load_tools()

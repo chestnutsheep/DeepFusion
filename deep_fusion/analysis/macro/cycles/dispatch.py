@@ -18,7 +18,7 @@ def _nbs(name: str, key: str) -> IndicatorDef:
     _cache_key = name.replace("fetch_", "").replace("_nbs_", "")
 
     def _resolve():
-        from ....shared.cycle_db import get, set as db_set
+        from ....shared.cycle_db import get, upsert as db_set
         from ....tools.cycles import _FN_MAP
         cached = get(_cache_key)
         if cached is not None:
@@ -48,7 +48,9 @@ CYCLES: dict[str, CycleConfig] = {
         ],
         core_key="inventory_yoy", requires=["demand_yoy"], ma_window=3,
         classify_fn=_classify_kitchin,
-        phase_names={1: "被动去库存", 2: "主动去库存", 3: "主动补库存", 4: "被动补库存"},
+        # 与 common._classify_kitchin / phase_utils.KITCHIN_PHASE_NAMES 对齐：
+        # 1=主动去库存(需求↓库存↓) 2=被动去库存(需求↑库存↓)
+        phase_names={1: "主动去库存", 2: "被动去库存", 3: "主动补库存", 4: "被动补库存"},
     ),
     "juglar": CycleConfig(
         id="juglar", name="朱格拉周期(固定资本投资周期)",

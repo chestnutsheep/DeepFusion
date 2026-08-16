@@ -32,11 +32,14 @@ def _load_bridge(db_path):
     return mb
 
 
-# 伪 Sina 响应
+# 伪 Sina 响应（日期动态取最近 3 个自然日，模拟"刚抓取"的新鲜状态，
+# 否则 needs_refresh 按自然日判过期会把陈旧假数据误判为需刷新而回退联网）。
+from datetime import date as _date, timedelta as _td
+
 _FAKE_JSON = [
-    {"day": "2026-07-28", "open": "10.0", "high": "10.5", "low": "9.8", "close": "10.2", "volume": "1000"},
-    {"day": "2026-07-29", "open": "10.2", "high": "10.6", "low": "10.1", "close": "10.4", "volume": "1200"},
-    {"day": "2026-07-30", "open": "10.4", "high": "10.9", "low": "10.3", "close": "10.7", "volume": "900"},
+    {"day": (_date.today() - _td(days=2)).isoformat(), "open": "10.0", "high": "10.5", "low": "9.8", "close": "10.2", "volume": "1000"},
+    {"day": (_date.today() - _td(days=1)).isoformat(), "open": "10.2", "high": "10.6", "low": "10.1", "close": "10.4", "volume": "1200"},
+    {"day": _date.today().isoformat(), "open": "10.4", "high": "10.9", "low": "10.3", "close": "10.7", "volume": "900"},
 ]
 
 

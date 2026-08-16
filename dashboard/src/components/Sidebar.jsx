@@ -29,15 +29,15 @@ const SUB_GETTERS = {
 
 // ── 资产类别→跳转目标映射 ──
 const ASSET_NAV_MAP = {
-  '权益': { tab: 'micro', sub: 'stock' },
+  '股票': { tab: 'micro', sub: 'stock' },
   '债券': { tab: 'micro', sub: 'bond' },
-  '基金': { tab: 'micro', sub: 'fund' },
+  '商品': { tab: 'global', sub: 'commodity' },
   '现金': { tab: 'global', sub: 'markets' },
 };
 
 // ── 基于周期数据动态计算资产类别提示卡片 ──
 // cycleDirection / attitude / subAlloc 全部由周期 zscore + phase 动态推导
-function computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash) {
+function computeAssetDetail(kit, jug, kuz, kon, equity, bond, commodity, cash) {
   const kz = kit?.composite_z ?? 0;
   const jz = jug?.composite_z ?? 0;
   const kp = kon?.phase ?? 0;
@@ -57,11 +57,12 @@ function computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash) {
   else if (kz > 0.3) { bondDir = '顺周期减配'; bondAttitude = '适度减配'; }
   else { bondDir = '均衡配置'; bondAttitude = '标配持有'; }
 
-  // ── 基金方向 ──
-  let fundDir, fundAttitude;
-  if (kz > 0.3 && jz > 0.2) { fundDir = '顺周期偏股'; fundAttitude = '偏股型为主'; }
-  else if (kz < -0.3) { fundDir = '逆周期偏债'; fundAttitude = '偏债型为主'; }
-  else { fundDir = '均衡配置'; fundAttitude = '分散风险'; }
+  // ── 商品方向 ──
+  let commodityDir, commodityAttitude;
+  if (kp <= 2) { commodityDir = '通胀上行周期'; commodityAttitude = '超配抗通胀'; }
+  else if (kz > 0.3 && jz > 0.2) { commodityDir = '顺周期需求'; commodityAttitude = '积极配置'; }
+  else if (kz < -0.3) { commodityDir = '需求走弱'; commodityAttitude = '适度减配'; }
+  else { commodityDir = '震荡均衡'; commodityAttitude = '标配持有'; }
 
   // ── 现金方向 ──
   let cashDir, cashAttitude;
@@ -92,15 +93,15 @@ function computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash) {
   bdCredit = Math.round(bdCredit / bdSum * 100);
   bdConv = 100 - bdRate - bdCredit;
 
-  // 基金细分：根据周期偏股/偏债
-  let fdIndex, fdMixed, fdQdii;
-  if (kz > 0.3) { fdIndex = 45; fdMixed = 30; fdQdii = 25; }
-  else if (kz < -0.3) { fdIndex = 30; fdMixed = 40; fdQdii = 30; }
-  else { fdIndex = 40; fdMixed = 35; fdQdii = 25; }
-  const fdSum = fdIndex + fdMixed + fdQdii;
-  fdIndex = Math.round(fdIndex / fdSum * 100);
-  fdMixed = Math.round(fdMixed / fdSum * 100);
-  fdQdii = 100 - fdIndex - fdMixed;
+  // 商品细分：根据康波(通胀)与周期位置调整贵金属/工业/能源
+  let cmPrecious, cmIndustrial, cmEnergy;
+  if (kp <= 2) { cmPrecious = 45; cmIndustrial = 25; cmEnergy = 30; }
+  else if (kz > 0.3) { cmPrecious = 25; cmIndustrial = 40; cmEnergy = 35; }
+  else { cmPrecious = 35; cmIndustrial = 30; cmEnergy = 35; }
+  const cmSum = cmPrecious + cmIndustrial + cmEnergy;
+  cmPrecious = Math.round(cmPrecious / cmSum * 100);
+  cmIndustrial = Math.round(cmIndustrial / cmSum * 100);
+  cmEnergy = 100 - cmPrecious - cmIndustrial;
 
   // 现金细分
   let csMoney, csShort, csFx;
@@ -108,9 +109,9 @@ function computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash) {
   else { csMoney = 60; csShort = 30; csFx = 10; }
 
   return {
-    '权益': { cycleDirection: equityDir, attitude: equityAttitude, subAlloc: { '大盘蓝筹': eqLarge, '中小盘': eqMid, '行业主题': eqTheme } },
+    '股票': { cycleDirection: equityDir, attitude: equityAttitude, subAlloc: { '大盘蓝筹': eqLarge, '中小盘': eqMid, '行业主题': eqTheme } },
     '债券': { cycleDirection: bondDir, attitude: bondAttitude, subAlloc: { '国债/利率债': bdRate, '信用债': bdCredit, '可转债': bdConv } },
-    '基金': { cycleDirection: fundDir, attitude: fundAttitude, subAlloc: { '指数基金': fdIndex, '混合基金': fdMixed, 'QDII': fdQdii } },
+    '商品': { cycleDirection: commodityDir, attitude: commodityAttitude, subAlloc: { '贵金属': cmPrecious, '工业金属': cmIndustrial, '能源化工': cmEnergy } },
     '现金': { cycleDirection: cashDir, attitude: cashAttitude, subAlloc: { '货币基金': csMoney, '短期理财': csShort, '外币存款': csFx } },
   };
 }
@@ -281,6 +282,8 @@ function SidebarContent() {
   const [cyclePhases, setCyclePhases] = useState([]);
   const [assetAlloc, setAssetAlloc] = useState(null);
   const [assetDetail, setAssetDetail] = useState(null);
+  const [allocRegime, setAllocRegime] = useState(null);
+  const [allocUpdatedAt, setAllocUpdatedAt] = useState(null);
   const [marketStatus, setMarketStatus] = useState(getMarketStatus());
   // 移动端侧边栏抽屉状态（默认隐藏，点击汉堡按钮才滑出）
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -303,8 +306,10 @@ function SidebarContent() {
     return () => clearInterval(timer);
   }, []);
 
+  // 周期相位 + 资产配置：挂载拉一次，之后每 5 分钟自动轮询刷新（解决"死样子"）
   useEffect(() => {
-    async function f() {
+    let alive = true;
+    async function refreshCycleAndAlloc() {
       try {
         const [kitRaw, jugRaw, kuzRaw, konRaw] = await Promise.all([
           mcp.call('data_kitchin'),
@@ -321,40 +326,41 @@ function SidebarContent() {
         const kon = parseLast(konRaw);
         const zDir = (z) => z != null ? (z > 0.2 ? '↑' : z < -0.2 ? '↓' : '→') : '·';
         const zColor = (z) => z != null ? (z > 0.2 ? '#3fb950' : z < -0.2 ? '#f85149' : '#D4A853') : '#888';
+        if (!alive) return;
         setCyclePhases([
           { name: '基钦', phase: kit.stage_name || kit.phase_name || '—', dir: zDir(kit.composite_z), color: zColor(kit.composite_z) },
           { name: '朱格拉', phase: jug.stage_name || jug.phase_name || '—', dir: zDir(jug.composite_z), color: zColor(jug.composite_z) },
           { name: '库兹涅茨', phase: kuz.stage_name || kuz.phase_name || '—', dir: zDir(kuz.composite_z), color: zColor(kuz.composite_z) },
           { name: '康波', phase: kon.phase_name || kon.global_phase_name || '—', dir: (kon.phase || 0) <= 2 ? '↑' : '↓', color: (kon.phase || 0) <= 2 ? '#3fb950' : '#f85149' },
         ]);
-        // 基于周期计算建议资产配置
-        let equity = 35, bond = 40, fund = 15, cash = 10;
-        const kz = kit.composite_z || 0;
-        const jz = jug.composite_z || 0;
-        const kp = kon.phase || 0;
-        if (kz > 0.3) { equity += 8; bond -= 8; }
-        else if (kz < -0.3) { equity -= 8; bond += 5; cash += 3; }
-        if (jz > 0.2) { equity += 5; cash -= 5; }
-        else if (jz < -0.2) { equity -= 5; cash += 5; }
-        if (kp <= 2) { equity += 4; bond -= 4; }
-        else { equity -= 6; cash += 3; bond += 3; }
-        equity = Math.max(10, Math.min(65, equity));
-        bond = Math.max(15, Math.min(65, bond));
-        cash = Math.max(5, Math.min(30, cash));
-        fund = 100 - equity - bond - cash;
-        fund = Math.max(5, fund);
-        setAssetAlloc([
-          { label: '权益', ratio: equity, color: '#D4A853' },
-          { label: '债券', ratio: bond, color: '#5B8FA8' },
-          { label: '基金', ratio: fund, color: '#3E6B5C' },
-          { label: '现金', ratio: cash, color: '#C49BA5' },
-        ]);
-        // 基于周期数据动态计算提示卡片详情
-        setAssetDetail(computeAssetDetail(kit, jug, kuz, kon, equity, bond, fund, cash));
+        // 基于后端 asset_allocation 工具（风险平价 + 周期 regime 战术倾斜）
+        // 实时动态计算配置比例，每日新鲜。失败则保留上一轮结果。
+        try {
+          const allocRaw = await mcp.call('asset_allocation');
+          if (!alive) return;
+          const alloc = JSON.parse(allocRaw);
+          const wp = alloc.weights_pct || {};
+          const ASSET_COLOR = { '股票': '#D4A853', '债券': '#5B8FA8', '商品': '#3E6B5C', '现金': '#C49BA5' };
+          const ORDER = ['股票', '债券', '商品', '现金'];
+          const allocArr = ORDER
+            .filter((k) => wp[k] != null)
+            .map((k) => ({ label: k, ratio: wp[k], color: ASSET_COLOR[k] }));
+          if (allocArr.length) setAssetAlloc(allocArr);
+          setAllocRegime(alloc.regime || null);
+          setAllocUpdatedAt(alloc.updated_at || null);
+          // 基于周期数据动态计算提示卡片详情（方向提示仍由周期相位驱动）
+          const equity = wp['股票'] ?? 0;
+          const bond = wp['债券'] ?? 0;
+          const commodity = wp['商品'] ?? 0;
+          const cash = wp['现金'] ?? 0;
+          setAssetDetail(computeAssetDetail(kit, jug, kuz, kon, equity, bond, commodity, cash));
+        } catch (e) { console.error('asset_allocation error', e); }
       } catch(e) { console.error('cycle data error', e); }
-      try { const s=await mcp.call('policy_stats'); const m=s.match(/(\d+)\s*篇/); if(m) setPolicyCnt(m[1]); const r=await mcp.call('policy_search',{keyword:'',limit:5}); setPolicyBriefs(r.split('\n').slice(1,4).filter(Boolean)); } catch(e){}
+      try { const s=await mcp.call('policy_stats'); if(!alive) return; const m=s.match(/(\d+)\s*篇/); if(m) setPolicyCnt(m[1]); const r=await mcp.call('policy_search',{keyword:'',limit:5}); if(!alive) return; setPolicyBriefs(r.split('\n').slice(1,4).filter(Boolean)); } catch(e){}
     }
-    f();
+    refreshCycleAndAlloc();
+    const timer = setInterval(refreshCycleAndAlloc, 5 * 60 * 1000); // 5 分钟轮询
+    return () => { alive = false; clearInterval(timer); };
   }, []);
 
   const subKeys = SUB_NAV[activeTab] || SUB_NAV.macro;
@@ -431,7 +437,13 @@ function SidebarContent() {
 
           {/* 资产配置环形图 */}
           <div style={{ margin:'4px var(--sp-md) var(--sp-sm)' }}>
-            <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>周期动态建议</span></div>
+            <div style={{ fontSize:'var(--fs-sm)',fontWeight:700,letterSpacing:1,color:'var(--text-secondary)',padding:'0 4px 6px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>💼 资产配置 <span style={{ fontSize:'var(--fs-2xs)',fontWeight:400,color:'var(--text-muted)' }}>风险平价·周期动态</span></div>
+            {allocRegime && (
+              <div style={{ fontSize:'var(--fs-2xs)', color:'var(--text-muted)', padding:'0 4px 4px', display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ padding:'1px 6px', borderRadius:4, background:'rgba(212,168,83,0.18)', color:'#D4A853', fontWeight:600 }}>{allocRegime.label}</span>
+                {allocUpdatedAt && <span>更新 {allocUpdatedAt.slice(0,16).replace('T',' ')}</span>}
+              </div>
+            )}
             <div style={{ padding:'var(--sp-md)', background:'rgba(0,0,0,0.2)', borderRadius:'var(--radius)', border:'1px solid var(--border-subtle)' }}>
               <AssetDonut assetAlloc={assetAlloc} assetDetail={assetDetail} collapsed={sidebarCollapsed} />
             </div>

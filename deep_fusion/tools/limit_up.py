@@ -18,10 +18,13 @@
 """
 import akshare as ak
 import json
+import logging
 import os
 from datetime import date
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from ..server import mcp
 from ..shared.utils import ak_cache, recent_trade_date
@@ -49,8 +52,9 @@ def _load_calibration_weights():
             w = rep.get("recommended_weights")
             if w:
                 return w
-    except Exception:
-        pass
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("calibration_load_corrupt", path=_CALIB_PATH, error=str(e))
+        _backup_corrupt(_CALIB_PATH)
     return None
 
 
@@ -60,9 +64,20 @@ def _load_calibration():
         if os.path.exists(_CALIB_PATH):
             with open(_CALIB_PATH, encoding="utf-8") as f:
                 return json.load(f)
-    except Exception:
-        pass
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("calibration_load_corrupt", path=_CALIB_PATH, error=str(e))
+        _backup_corrupt(_CALIB_PATH)
     return None
+
+
+def _backup_corrupt(path: str) -> None:
+    """校准文件损坏时备份坏文件，避免下次读取再次崩溃且无迹可查（对齐 shared/utils._safe_json）。"""
+    bad = path + ".corrupt"
+    try:
+        if os.path.exists(path):
+            os.replace(path, bad)
+    except OSError:
+        pass
 
 
 def _proxy_score(items, weights):

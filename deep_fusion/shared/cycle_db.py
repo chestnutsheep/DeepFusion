@@ -172,8 +172,11 @@ def append(indicator: str, dates: list[str], values: list[float]) -> int:
     return len(new_pairs)
 
 
-def set(indicator: str, dates: list[str], values: list[float]):
-    """行级替换（INSERT OR REPLACE），每条数据独立更新。"""
+def upsert(indicator: str, dates: list[str], values: list[float]):
+    """行级替换（INSERT OR REPLACE），每条数据独立更新。
+
+    注意：不要用 `set` 命名，否则会遮蔽内置 set() 并破坏 append() 内的集合构造。
+    """
     conn = _connect()
     pairs = [(indicator, d, v) for d, v in zip(dates, values) if v is not None]
     conn.executemany(
@@ -237,7 +240,7 @@ def cache_all():
         try:
             dates, vals = fn()
             if dates:
-                set(name, dates, vals)
+                upsert(name, dates, vals)
                 results[name] = len(vals)
                 log("UPDATE_OK", f"{name}: {len(vals)} 行")
             else:
@@ -252,7 +255,7 @@ def cache_all():
             if raw:
                 dates = [r[0][:10] for r in raw]
                 vals = [r[1] for r in raw]
-                set(cache_key, dates, vals)
+                upsert(cache_key, dates, vals)
                 results[cache_key] = len(vals)
                 log("UPDATE_OK", f"{cache_key}: {len(vals)} 行")
             else:
@@ -267,7 +270,7 @@ def cache_all():
             if raw:
                 dates = [str(r[0]) for r in raw]
                 vals = [r[1] for r in raw]
-                set(cache_key, dates, vals)
+                upsert(cache_key, dates, vals)
                 results[cache_key] = len(vals)
                 log("UPDATE_OK", f"{cache_key}: {len(vals)} 行")
             else:
@@ -285,7 +288,7 @@ def cache_all():
             if df is not None and not df.empty and col in df.columns:
                 dates = df["日期" if "日期" in df.columns else df.columns[0]].tolist()
                 vals = df[col].tolist()
-                set(name, [str(d)[:10] for d in dates], vals)
+                upsert(name, [str(d)[:10] for d in dates], vals)
                 results[name] = len(vals)
                 log("UPDATE_OK", f"{name}: {len(vals)} 行")
         except Exception as e:

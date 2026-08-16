@@ -6,14 +6,6 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10) AppleWebKit/537.36 Chro
 PORTFOLIO_FILE = os.path.expanduser("~/.cache/deep_fusion/portfolio.json")
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": int(os.getenv("DB_PORT", 5432)),
-    "dbname": os.getenv("DB_NAME", "finagent"),
-    "user": os.getenv("DB_USER", "finagent"),
-    "password": os.getenv("DB_PASSWORD", ""),
-}
-
 DATA_LAKE_DIR = os.path.expanduser(os.getenv("DATA_LAKE_DIR", "~/.cache/deep_fusion"))
 DATA_LAKE_FILE = os.path.join(DATA_LAKE_DIR, "data_lake.db")
 

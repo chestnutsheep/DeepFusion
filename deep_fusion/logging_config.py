@@ -45,12 +45,15 @@ def configure_logging(level: str = "WARNING") -> None:
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 标准库 logging 兜底：stdout + 文件（JSON 行，UTF-8）
+    # 标准库 logging 兜底：stderr + 文件（JSON 行，UTF-8）。
+    # 注意：本进程既是 MCP stdio 服务（stdout 是 JSON-RPC 协议通道），
+    # 也常作为 CLI 使用。日志打到 stdout 会污染 stdio 协议流导致客户端
+    # JSON 解析失败，因此只能走 stderr（CLI 模式 stderr 同样安全可见）。
     _file_handler = logging.FileHandler(str(RUNTIME_LOG), encoding="utf-8")
     _file_handler.setFormatter(logging.Formatter("%(message)s"))
     logging.basicConfig(
         level=log_level,
-        handlers=[logging.StreamHandler(sys.stdout), _file_handler],
+        handlers=[logging.StreamHandler(sys.stderr), _file_handler],
         format="%(message)s",
     )
 
