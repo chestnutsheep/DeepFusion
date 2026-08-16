@@ -3137,5 +3137,17 @@
       256,
       8
     ]
+  },
+  "article_ff_crr": {
+    "columns": [
+      "item",
+      "June  2026",
+      "Last 3  Months",
+      "Last 12  Months"
+    ],
+    "shape": [
+      32,
+      4
+    ]
   }
 }

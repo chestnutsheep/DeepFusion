@@ -352,14 +352,25 @@ def _get_nbs_client():
 def _clean_df(df) -> tuple[list[str], list[float]]:
     if df is None or df.empty:
         return [], []
-    periods = [p[:6] for p in df["period"].tolist()]
-    val_col = [c for c in df.columns if c not in ("period",)][0]
+    periods = [str(p)[:6] for p in df["period"].tolist()]
+    # 排除非数值列（period / period_name / 口径标记），取第一个真实值列
+    val_col = [c for c in df.columns if c not in ("period", "period_name", "_口径_")][0]
     values = df[val_col].tolist()
     clean_p, clean_v = [], []
     for p, v in zip(periods, values):
-        if v is not None and np.isfinite(v):
-            clean_p.append(p)
-            clean_v.append(float(v))
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            # 缺失/非数值（"-" / None / 空串）→ 跳过该期，不计入序列
+            continue
+        if not np.isfinite(fv):
+            continue
+        clean_p.append(p)
+        clean_v.append(fv)
+    # 统一按时间升序，与 fetch_merged 输出契约一致，避免周期相位计算错位
+    order = sorted(range(len(clean_p)), key=lambda i: clean_p[i])
+    clean_p = [clean_p[i] for i in order]
+    clean_v = [clean_v[i] for i in order]
     return clean_p, clean_v
 
 
@@ -445,18 +456,32 @@ def _fetch_nbs_unemployment() -> tuple[list[str], list[float]]:
     return _clean_df(_get_nbs_client().search_and_fetch("城镇调查失业率", "失业率"))
 
 
+# 设备工器具购置固定资产投资（朱格拉周期核心指标）
+# NBS 官方 data API 中该指标挂在「固定资产投资增速」月度节点下，
+# 指标名为「设备工器具购置固定资产投资额累计增长 (%)」。
+# cid / indicator_id 已固化（NBS 树节点 _id 稳定，不受分类层级微调影响）。
+# 之前误判为「只有分行业/年度、需爬新闻稿」，实为全国月度汇总序列，直接走官方 API。
+_EQUIP_INVEST_CID = "aac38c7aa152478ebea254ac412aa0a1"
+_EQUIP_INVEST_IND = "59b2716c393f4861bfb30e244358005b"
+
+
 def _fetch_nbs_equip_invest() -> tuple[list[str], list[float]]:
     """设备工器具购置固定资产投资（朱格拉周期核心指标）
-    数据仅存在于年度树（2018-），通过 search_and_fetch 取年度数据。
+
+    走 NBS 官方 data API（与 fix_inv / mfg / cap 同源），
+    用固化的 (cid, indicator_id) 拉全国月度累计同比序列，无需关键词搜索、无需爬网页。
     """
-    return _clean_df(_get_nbs_client().search_and_fetch(
-        "设备工器具", "增长", freq="YY", start="2018"
-    ))
+    client = _get_nbs_client()
+    df = client.fetch_data(
+        _EQUIP_INVEST_CID, [_EQUIP_INVEST_IND], start="2000", end="", freq="MM"
+    )
+    return _clean_df(df)
 
 
 def _fetch_nbs_manufacturing_invest() -> tuple[list[str], list[float]]:
     """制造业固定资产投资（朱格拉周期辅助指标）
-    搜索两个CID段：分行业固定资产投资(2004-2017) + 固定资产投资增速(2018-)。
+
+    NBS 官方 data API 能提供历史序列（优先），新闻稿爬虫作兜底补齐最新期。
     """
     result = _clean_df(_get_nbs_client().search_and_fetch("分行业固定资产投资", "制造业固定资产投资额累计增长"))
     if result[0]:
@@ -470,6 +495,8 @@ def _fetch_nbs_manufacturing_invest() -> tuple[list[str], list[float]]:
                     p.append(per)
                     v.append(ev[i])
             result = (p, v)
+    if not result[0]:
+        result = _manufacturing_from_release()
     return result
 
 
@@ -485,11 +512,76 @@ def _fetch_nbs_re_new_start() -> tuple[list[str], list[float]]:
 
 def _fetch_nbs_capacity_util() -> tuple[list[str], list[float]]:
     """产能利用率（朱格拉周期辅助信号）
-    季度数据，2021起。NBS 按三大门类分工业产能利用率。
+
+    NBS 官方 data API 能提供历史季度序列（优先），新闻稿爬虫作兜底补齐最新期。
     """
-    return _clean_df(_get_nbs_client().search_and_fetch(
+    periods, values = _clean_df(_get_nbs_client().search_and_fetch(
         "工业产能利用率", "产能利用率", freq="SS", start="2021"
     ))
+    if not periods:
+        periods, values = _capacity_util_from_release()
+    return periods, values
+
+
+# ── 朱格拉指标兜底：国家统计局新闻稿爬虫（仅制造业/产能利用率，best-effort）──
+# equipment_yoy 已改为直接走官方 data API（固化 cid+indicator_id，见 _EQUIP_INVEST_*）。
+# 以下的爬虫仅作为 mfg / capacity_util 的兜底补齐（官方 API 优先，爬不到也不致命）。
+from .scrapers.nbs_release_scraper import (  # noqa: E402
+    collect_equip_mfg_history,
+    collect_capacity_util_history,
+)
+
+
+# 爬虫结果缓存（避免 eng.run 重复启动 playwright + 保证两次调用一致性）
+_RELEASE_CACHE: dict = {}
+
+
+def _cached_release(key: str, fn):
+    import time
+    cached = _RELEASE_CACHE.get(key)
+    if cached and time.time() - cached[0] < 3600:
+        return cached[1]
+    result = fn()
+    _RELEASE_CACHE[key] = (time.time(), result)
+    return result
+
+
+def _manufacturing_from_release() -> tuple[list[str], list[float]]:
+    """制造业固投：爬新闻稿历史月度序列，upsert 进 cycle_db 后返回完整序列。"""
+    def _do():
+        try:
+            periods, _, mfgs = collect_equip_mfg_history()
+        except Exception as e:
+            logger.warning(f"制造业固投新闻稿抓取失败: {e}")
+            return [], []
+        if not periods:
+            return [], []
+        try:
+            from deep_fusion.shared.cycle_db import upsert
+            upsert("manufacturing_yoy", periods, [v for v in mfgs])
+        except Exception as e:
+            logger.warning(f"upsert manufacturing_yoy 失败: {e}")
+        return periods, [v for v in mfgs]
+    return _cached_release("manufacturing_yoy", _do)
+
+
+def _capacity_util_from_release() -> tuple[list[str], list[float]]:
+    """产能利用率：爬新闻稿历史季度序列，upsert 进 cycle_db 后返回完整序列。"""
+    def _do():
+        try:
+            periods, values = collect_capacity_util_history()
+        except Exception as e:
+            logger.warning(f"产能利用率新闻稿抓取失败: {e}")
+            return [], []
+        if not periods:
+            return [], []
+        try:
+            from deep_fusion.shared.cycle_db import upsert
+            upsert("capacity_util", periods, [v for v in values])
+        except Exception as e:
+            logger.warning(f"upsert capacity_util 失败: {e}")
+        return periods, [v for v in values]
+    return _cached_release("capacity_util", _do)
 
 
 def _fetch_house_price_yoy() -> tuple[list[str], list[float]]:
