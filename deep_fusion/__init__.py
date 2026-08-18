@@ -23,7 +23,7 @@ _TOOL_MODULES = [
     "funds", "futures", "industry", "international", "macro", "market",
     "policy", "portfolio", "precious_metals", "spectral", "stock_reports", "stocks",
     "tech_indicators", "market_data", "limit_up", "reports_view", "market_snapshot",
-    "invest_theme", "allocation",
+    "invest_theme", "allocation", "quality",
 ]
 
 # prompts/resources 轻量，顶层 import

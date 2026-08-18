@@ -12,18 +12,9 @@ import {
   ReportsWidget,
   CalendarWidget,
   NewsWidget,
+  QualityStockWidget,
 } from "../components/Widgets/DailyWidgets.jsx";
 import InvestThemeWidget from "../components/Reports/InvestThemeWidget.jsx";
-
-// 顶部场景切换小卡：与宏观/中观/微观/政策/国际模块同步
-const SCENE_CARDS = [
-  { key: "daily", label: "概览", theme: "reve", path: "/", icon: "🗂" },
-  { key: "macro", label: "宏观", theme: "matin", path: "/macro", icon: "🌐" },
-  { key: "meso", label: "中观", theme: "crepuscule", path: "/meso", icon: "🏭" },
-  { key: "micro", label: "微观", theme: "eclat", path: "/micro", icon: "🔬" },
-  { key: "policy", label: "政策", theme: "reve", path: "/policy", icon: "📜" },
-  { key: "global", label: "国际", theme: "lumiere", path: "/global", icon: "🌍" },
-];
 
 export default function DailyBoardPage() {
   const scene = useMarketScene();
@@ -31,9 +22,13 @@ export default function DailyBoardPage() {
   const navigate = useNavigate();
   const activeTab = useAppStore((s) => s.activeTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
-  const setStoreTheme = useAppStore((s) => s.setTheme);
   const lu = useMCP("limit_up_latest", {});
   const calib = useMCP("limit_up_calibration_latest", {});
+
+  // 修复：进入每日看板时锁定侧栏到 daily，避免侧栏子导航误显其它模块面板
+  useEffect(() => {
+    if (activeTab !== "daily") setActiveTab("daily");
+  }, [activeTab, setActiveTab]);
 
   const luData = useMemo(() => safeParse(lu.data), [lu.data]);
   const calibData = useMemo(() => safeParse(calib.data), [calib.data]);
@@ -51,47 +46,15 @@ export default function DailyBoardPage() {
   // 备抵场景(收盘后/非交易日)：实时刷新无意义，禁用并提示
   const liveAllowed = scene === "live";
 
-  const goScene = (sc) => {
-    setActiveTab(sc.key);
-    setStoreTheme(sc.theme);
-    navigate(sc.path);
-  };
-
   return (
     <div>
       <div style={{ marginBottom: "var(--sp-lg)" }}>
         <h1 className="df-h1" style={{ margin: 0 }}>
-          每日看板 · 埋伏提示
+          每日看板 · 决策工作台
         </h1>
         <p className="df-body" style={{ margin: "6px 0 0" }}>
-          连板潜力股量化评分 + 金融大事日历提前埋伏 + 每日定时报告。可拖拽 / 自定义看板请在「微观 · 待机速览」中编排。
+          连板潜力股埋伏 + 金融大事日历提前布局 + 投资方向主题追踪 + 每日定时报告 + 优质股推送。左侧「配置圈」给出当日推荐资产组合，点击任一资产段可直达对应实战产品市场。
         </p>
-      </div>
-
-      {/* 场景切换小卡：与各大模块同步 */}
-      <div style={{ display: "flex", gap: "var(--sp-sm)", marginBottom: 18, flexWrap: "wrap" }}>
-        {SCENE_CARDS.map((sc) => {
-          const active = activeTab === sc.key;
-          return (
-            <button
-              key={sc.key}
-              onClick={() => goScene(sc)}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "10px 16px", borderRadius: "var(--radius)",
-                cursor: "pointer", transition: "all 0.2s ease",
-                background: active ? "rgba(212,168,83,0.18)" : "rgba(255,255,255,0.04)",
-                border: active ? "1.5px solid rgba(212,168,83,0.6)" : "1.5px solid var(--border-subtle)",
-                color: active ? "var(--accent-gold)" : "var(--text-secondary)",
-                fontSize: "var(--fs-sm)", fontWeight: active ? 700 : 600,
-                boxShadow: active ? "0 0 22px rgba(212,168,83,0.22)" : "none",
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{sc.icon}</span>
-              {sc.label}
-            </button>
-          );
-        })}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
@@ -117,49 +80,52 @@ export default function DailyBoardPage() {
         </span>
       </div>
 
-      {/* 连板潜力股埋伏 */}
-      <SectionHeader title="连板潜力股埋伏" />
+      {/* ① 连板分析（潜质股评分 + 评分校准透明） */}
+      <SectionHeader title="① 连板分析 · 潜质股埋伏" />
       <ErrorBoundary>
         <LimitUpWidget stocks={luStocks} />
       </ErrorBoundary>
+      <div style={{ marginTop: "var(--sp-md)" }}>
+        <CalibrationWidget data={calibData} />
+      </div>
 
-      {/* 连板评分校准 */}
+      {/* ② 金融大事日历（固定张数 + 翻页） */}
       <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="连板评分 · 校准透明" />
+        <SectionHeader title="② 金融大事日历 · 事件卡片" />
         <ErrorBoundary>
-          <CalibrationWidget data={calibData} />
+          <CalendarWidget pageSize={6} paged />
         </ErrorBoundary>
       </div>
 
-      {/* 金融大事日历 + 热点/投资方向 */}
+      {/* ③ 7×24 财经快讯 */}
       <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="金融大事日历 · 月历 / 甘特" />
-        <ErrorBoundary>
-          <CalendarWidget />
-        </ErrorBoundary>
-      </div>
-
-      {/* 热点 / 投资方向（关键词触发采集 + 次日回测） */}
-      <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="热点 / 投资方向 · 主题追踪" />
-        <ErrorBoundary>
-          <InvestThemeWidget />
-        </ErrorBoundary>
-      </div>
-
-      {/* 7×24 财经快讯（卡片堆收起，悬浮展开） */}
-      <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="7×24 财经快讯" />
+        <SectionHeader title="③ 7×24 财经快讯" />
         <ErrorBoundary>
           <NewsWidget />
         </ErrorBoundary>
       </div>
 
-      {/* 每日报告 */}
+      {/* ④ 投资方向 · 主题追踪 */}
       <div style={{ marginTop: "var(--sp-xl)" }}>
-        <SectionHeader title="每日报告" />
+        <SectionHeader title="④ 投资方向 · 主题追踪" />
+        <ErrorBoundary>
+          <InvestThemeWidget />
+        </ErrorBoundary>
+      </div>
+
+      {/* ⑤ 每日报告（盘前 / 午间 / 每日复盘） */}
+      <div style={{ marginTop: "var(--sp-xl)" }}>
+        <SectionHeader title="⑤ 每日报告 · 盘前 / 午间 / 复盘" />
         <ErrorBoundary>
           <ReportsWidget reloadToken={reloadToken} />
+        </ErrorBoundary>
+      </div>
+
+      {/* ⑥ 优质股推送（含 5 日胜率回测 + 反思） */}
+      <div style={{ marginTop: "var(--sp-xl)" }}>
+        <SectionHeader title="⑥ 优质股推送 · 回测追踪" />
+        <ErrorBoundary>
+          <QualityStockWidget />
         </ErrorBoundary>
       </div>
     </div>

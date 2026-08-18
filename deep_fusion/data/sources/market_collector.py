@@ -225,20 +225,21 @@ def fetch_index_daily(
     df = ak.stock_zh_index_daily(symbol=symbol)
     if df is None or df.empty:
         return []
+    # akshare 不同版本列名为中文(日期/开盘…)或英文(date/open…)，统一兼容
     out = []
     for _, r in df.iterrows():
-        d = _norm_date(r.get("日期"))
+        d = _norm_date(r.get("date") or r.get("日期"))
         if not d or d < cal_start.strftime("%Y-%m-%d"):
             continue
         out.append(
             {
                 "code": symbol,
                 "date": d,
-                "open": _f(r.get("开盘")),
-                "high": _f(r.get("最高")),
-                "low": _f(r.get("最低")),
-                "close": _f(r.get("收盘")),
-                "volume": _f(r.get("成交量")),
+                "open": _f(r.get("open") or r.get("开盘")),
+                "high": _f(r.get("high") or r.get("最高")),
+                "low": _f(r.get("low") or r.get("最低")),
+                "close": _f(r.get("close") or r.get("收盘")),
+                "volume": _f(r.get("volume") or r.get("成交量")),
                 "amount": None,
             }
         )
@@ -251,15 +252,16 @@ def fetch_stock_info() -> list[dict]:
     df = ak.stock_info_a_code_name()
     if df is None or df.empty:
         return []
+    # akshare 不同版本列名为中文(代码/名称)或英文(code/name)，统一兼容
     out = []
     for _, r in df.iterrows():
-        code = str(r.get("代码", "")).strip()
+        code = str(r.get("code") or r.get("代码") or "").strip()
         if not code:
             continue
         out.append(
             {
                 "code": code,
-                "name": str(r.get("名称", "")).strip(),
+                "name": str(r.get("name") or r.get("名称") or "").strip(),
                 "market": _market_of(code),
             }
         )

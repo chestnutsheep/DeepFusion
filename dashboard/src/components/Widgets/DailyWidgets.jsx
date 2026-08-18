@@ -494,8 +494,215 @@ export function ReportsWidget({ reloadToken }) {
   );
 }
 
-export function CalendarWidget() {
+export function CalendarWidget({ paged = false, pageSize = 6 }) {
+  if (paged) return <CalendarPaged pageSize={pageSize} />;
   return <CalendarMonth />;
 }
 
+/** 简化事件卡（翻页视图用，不依赖成分股弹窗） */
+function EventCardSimple({ e }) {
+  const stars = "★".repeat(e.rating || 0);
+  const dateStr = e.date ? e.date.slice(5) : "";
+  const sentimentColor = e.sentiment === "利好" ? "#5BAE7A" : e.sentiment === "利空" ? "#C0584F" : "#8A8AA0";
+  return (
+    <CardWrapper hoverable style={{
+      border: e.bury_window ? "1px solid rgba(192,124,124,0.6)" : "1px solid var(--border-subtle)",
+      background: e.bury_window ? "linear-gradient(160deg, rgba(192,124,124,0.12), rgba(26,23,38,0.4))" : undefined,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{dateStr}</span>
+        <span style={{ color: "#C9A861", fontSize: "var(--fs-sm)", letterSpacing: 1 }}>{stars}</span>
+      </div>
+      <div style={{ fontSize: "var(--fs-md)", fontWeight: 700, color: "var(--text-primary)", marginBottom: 6, lineHeight: 1.35 }}>
+        {e.name}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+        {e.category && <span style={evChip("#6FA088")}>{e.category}</span>}
+        {e.sentiment && e.sentiment !== "中性" && (
+          <span style={evChip(sentimentColor)}>{e.sentiment}</span>
+        )}
+      </div>
+      {e.note && (
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", margin: "8px 0", lineHeight: 1.5 }}>{e.note}</div>
+      )}
+      {(e.domains || []).length > 0 && (
+        <div style={{ marginTop: 8, fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>
+          可能催化：{e.domains.map((d) => d.name).join("、")}
+        </div>
+      )}
+    </CardWrapper>
+  );
+}
+
+function evChip(color) {
+  return {
+    fontSize: "var(--fs-2xs)", padding: "2px 8px", borderRadius: 4,
+    background: `${color}1A`, border: `1px solid ${color}55`, color, whiteSpace: "nowrap",
+  };
+}
+
+/** 金融事件卡片翻页视图：固定张数 + 上/下翻页按钮 */
+function CalendarPaged({ pageSize = 6 }) {
+  const { data, isLoading } = useMCP("calendar_month", null);
+  const events = useMemo(() => {
+    const md = parse(data);
+    const list = md?.events || [];
+    // 按日期升序、评分降序
+    return list
+      .slice()
+      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (b.rating || 0) - (a.rating || 0));
+  }, [data]);
+
+  const totalPages = Math.max(1, Math.ceil(events.length / pageSize));
+  const [page, setPage] = useState(0);
+  const safePage = Math.min(page, totalPages - 1);
+  const pageEvents = events.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
+  const prev = () => setPage((p) => Math.max(0, p - 1));
+  const next = () => setPage((p) => Math.min(totalPages - 1, p + 1));
+
+  if (isLoading) return <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>加载中…</div>;
+  if (events.length === 0)
+    return <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", padding: "12px 0" }}>暂无金融事件。</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
+          共 {events.length} 个事件 · 第 {safePage + 1}/{totalPages} 页
+        </span>
+        <div style={{ display: "inline-flex", gap: 6 }}>
+          <button onClick={prev} disabled={safePage === 0} style={pageBtn(safePage === 0)}>‹ 上一页</button>
+          <button onClick={next} disabled={safePage >= totalPages - 1} style={pageBtn(safePage >= totalPages - 1)}>下一页 ›</button>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "var(--sp-md)" }}>
+        {pageEvents.map((e, k) => (
+          <EventCardSimple key={e.id || k} e={e} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function pageBtn(disabled) {
+  return {
+    fontSize: "var(--fs-xs)", padding: "6px 14px", borderRadius: 6, cursor: disabled ? "not-allowed" : "pointer",
+    background: disabled ? "rgba(255,255,255,0.04)" : "rgba(201,168,97,0.15)",
+    border: "1px solid rgba(201,168,97,0.5)", color: disabled ? "var(--text-muted)" : "var(--accent-gold)",
+    opacity: disabled ? 0.6 : 1,
+  };
+}
+
 export { ErrorBoundary };
+
+/** 优质股推送 + 5 日胜率回测 + 反思心得 */
+export function QualityStockWidget() {
+  const latest = useMCP("report_latest", { rtype: "qualitystock" });
+  const review = useMCP("quality_stock_review", { days: 20 });
+
+  const cur = parse(latest.data);
+  const curStocks = cur?.payload?.stocks || [];
+  const rv = parse(review.data);
+  const summary = rv?.summary || null;
+  const reflection = rv?.reflection || "";
+  const batches = rv?.batches || [];
+
+  const winColor = (w) => (w == null ? "#8A8AA0" : w >= 60 ? "#5BAE7A" : w >= 45 ? "#D4A853" : "#C0584F");
+
+  return (
+    <div>
+      {/* 风险提示条 */}
+      <div style={{
+        fontSize: "var(--fs-xs)", color: "var(--text-secondary)",
+        background: "rgba(192,124,124,0.10)", border: "1px solid rgba(192,124,124,0.4)",
+        borderRadius: 8, padding: "8px 12px", marginBottom: 14, lineHeight: 1.5,
+      }}>
+        ⚠ 股票有风险，入市需谨慎。以下推送与回测仅供研究参考，不构成任何投资建议。
+      </div>
+
+      {/* 当前推送股 */}
+      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", marginBottom: 8 }}>
+        今日推送（{cur?.date || "—"}）
+      </div>
+      {curStocks.length === 0 ? (
+        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginBottom: 14 }}>
+          定时任务尚未写入，每日 16:30 推送后自动填充。
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "var(--sp-md)", marginBottom: 16 }}>
+          {curStocks.map((s, i) => (
+            <CardWrapper key={s.code || i} hoverable>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "var(--fs-md)", fontWeight: 700, color: "var(--text-primary)" }}>{s.name}</span>
+                <span style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>{s.code}</span>
+              </div>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginTop: 4 }}>
+                现价 {s.price ?? "—"} · 质量评分 {s.quality ?? "—"}
+              </div>
+              {s.reason && (
+                <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+                  {s.reason}
+                </div>
+              )}
+            </CardWrapper>
+          ))}
+        </div>
+      )}
+
+      {/* 5 日胜率回测 */}
+      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--accent-gold)", margin: "8px 0" }}>
+        历史回测 · 推送后 5 日
+      </div>
+      {review.isLoading && <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>回测计算中…</div>}
+      {summary && (
+        <div style={{ display: "flex", gap: "var(--sp-md)", flexWrap: "wrap", marginBottom: 12 }}>
+          <Stat label="样本数" value={summary.total} />
+          <Stat label="5日胜率" value={`${summary.win_rate}%`} color={winColor(summary.win_rate)} />
+          <Stat label="平均收益" value={`${summary.avg_return > 0 ? "+" : ""}${summary.avg_return}%`} color={summary.avg_return >= 0 ? "#5BAE7A" : "#C0584F"} />
+        </div>
+      )}
+
+      {/* 反思心得 */}
+      {reflection && (
+        <div style={{
+          fontSize: "var(--fs-xs)", color: "var(--text-secondary)", lineHeight: 1.6,
+          background: "rgba(212,168,83,0.08)", border: "1px solid rgba(212,168,83,0.35)",
+          borderRadius: 8, padding: "10px 14px", marginBottom: 14,
+        }}>
+          💡 <b style={{ color: "var(--accent-gold)" }}>反思心得：</b>{reflection}
+        </div>
+      )}
+
+      {/* 历史批次 */}
+      {batches.length > 0 && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginBottom: 6 }}>近批次胜率</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {batches.slice(-8).reverse().map((b, i) => (
+              <span key={b.date + i} style={{
+                fontSize: "var(--fs-2xs)", padding: "3px 9px", borderRadius: 6,
+                background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)",
+                color: b.win_rate == null ? "var(--text-muted)" : winColor(b.win_rate),
+              }}>
+                {b.date} · {b.count}只 · 胜率{b.win_rate == null ? "—" : `${b.win_rate}%`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, color }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)",
+      borderRadius: 8, padding: "8px 16px", minWidth: 110,
+    }}>
+      <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>{label}</div>
+      <div style={{ fontSize: "var(--fs-lg)", fontWeight: 700, color: color || "var(--text-primary)", marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}

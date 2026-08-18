@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {Menu, MenuItem} from 'react-pro-sidebar';
 import {useAppStore} from '../store/index.js';
 import {mcp} from '../services/mcp.js';
@@ -29,10 +30,10 @@ const SUB_GETTERS = {
 
 // ── 资产类别→跳转目标映射 ──
 const ASSET_NAV_MAP = {
-  '股票': { tab: 'micro', sub: 'stock' },
-  '债券': { tab: 'micro', sub: 'bond' },
-  '商品': { tab: 'global', sub: 'commodity' },
-  '现金': { tab: 'global', sub: 'markets' },
+  '股票': { tab: 'micro', sub: 'stock', path: '/micro' },
+  '债券': { tab: 'micro', sub: 'bond', path: '/micro' },
+  '商品': { tab: 'micro', sub: 'futures', path: '/micro' },
+  '现金': { tab: 'micro', sub: 'fund', path: '/micro' },
 };
 
 // ── 基于周期数据动态计算资产类别提示卡片 ──
@@ -166,6 +167,7 @@ function getMarketStatus() {
 function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!chartRef.current || !assetAlloc?.length || collapsed) return;
@@ -242,7 +244,7 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
     chart.setOption(option, { notMerge: true });
     chart.resize();
 
-    // 点击扇区跳转
+    // 点击扇区跳转（个人投资者实战产品市场 + 携带配置圈来源标记）
     chart.on('click', (params) => {
       const nav = ASSET_NAV_MAP[params.name];
       if (nav) {
@@ -250,6 +252,7 @@ function AssetDonut({ assetAlloc, assetDetail, collapsed }) {
         store.setActiveTab(nav.tab);
         if (nav.tab === 'micro') store.setActiveMicroSub(nav.sub);
         else if (nav.tab === 'global') store.setActiveGlobalSub(nav.sub);
+        navigate(`${nav.path}?from=alloc`);
       }
     });
 

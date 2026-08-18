@@ -152,3 +152,51 @@ DeepFusion 四周期引擎（基钦/朱格拉/库兹涅茨/康波）输出的 `c
 - Related Files: deep_fusion/shared/cycle_db.py, deep_fusion/analysis/macro/cycles/dispatch.py, tools/cycles.py, common.py, phase_utils.py
 - Tags: python-builtin-shadowing, incremental-update-silent-fail, phase-names-mismatch, kitchin-stagnation
 - Pattern-Key: data_pipeline.never_shadow_builtins
+
+---
+
+## [LRN-20260819-007] correction
+
+**Logged**: 2026-08-19T12:00:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: ops / self-evolution
+
+### Summary
+维护职责是"项目整体流畅运行"，不是"回答用户当前问的那一个点"。用户提醒"不要一叶障目"后，我把单点疑问扩成全栈巡检，发现真正问题在别处。
+
+### Details
+用户问市场数据是否陈旧（疑影响回测）。我查 `stock_daily` 后便草率结论"新鲜、无需操作"。用户纠正："影响。不要一叶障目，维护这个项目整体流畅运行是你的任务。" 扩大巡检后真问题暴露：`index_daily` 空（指数基准对比缺数据）、`stock_info` 仅 1 行（个股名映射失效）、`cycle_data` 有 2 行 `date='background'` 脏数据（会让 `max(date)` 返回字符串致前端排序崩）。这些都和"回测"无关，却是整体流畅的隐患。
+
+### Suggested Action
+接到"数据/运行是否异常"类问题时，执行**全栈健康检查 SOP**（见 AGENTS.md）：① 进程/端口存活（`pgrep`+端口）；② 各核心 DB 真实路径与表名下的新鲜度；③ 脏数据扫描（`max(date)` 是否含非日期字符串）。不锁单一库、不下局部结论。把 Self-Evolution「不确定→立即查证(P0)」「一次纠正=永久防御」内化。
+
+### Metadata
+- Source: user_feedback
+- Related Files: market_collector.py, cycle_db.py, restart_all.sh
+- Tags: one-leaf-blind, whole-system-health, self-evolution, ops-sop
+- Pattern-Key: ops.whole_system_health_sop
+
+---
+
+## [LRN-20260819-008] best_practice
+
+**Logged**: 2026-08-19T12:00:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: backend / data-collector
+
+### Summary
+akshare 不同版本返回**中文列名**（日期/开盘/代码/名称）或**英文列名**（date/open/code/name），取数代码硬编码任一种都会在某版本下静默返回 0 行。
+
+### Details
+`market_collector.py` 的 `fetch_index_daily` 用 `r.get("日期")`、`fetch_stock_info` 用 `r.get("代码"/"名称")`。当前 akshare 1.18.64 返回英文列 → 全部 `if not x: continue` 过滤 → 函数返回空 → `index_daily`/`stock_info` 落库 0 行（前端指数基准对比、个股名映射全失灵）。底层 `ak.stock_zh_index_daily`/`ak.stock_info_a_code_name` 实测有数据，证明是映射 bug 非接口失效。已改为 `r.get("date") or r.get("日期")` 中英兼容。同文件 `fetch_stock_daily` 本就用 `_map()` 做兼容，风格应统一。
+
+### Suggested Action
+所有 akshare 取数做**中英文列名双兼容**（`r.get("en") or r.get("中文")`）。改完重跑补全 + 校验落库行数，别只看函数返回。
+
+### Metadata
+- Source: investigation
+- Related Files: deep_fusion/data/sources/market_collector.py
+- Tags: akshare-column-compat, silent-empty, data-collector
+- Pattern-Key: data_collector.akshare_bilingual_columns

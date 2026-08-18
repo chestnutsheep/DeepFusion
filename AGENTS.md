@@ -83,6 +83,16 @@ DeepFusion 同时是 (a) 一个 **FastMCP 服务器**（为 AI Agent 提供 140 
 2. Actual 脏表（只清脏表，不清整库）：`from deep_fusion.shared.cycle_db import clear; clear("<indicator>")`
 3. 后端内存 L1：`bash restart_all.sh` 重启
 
+### 整体健康检查 SOP（接到"数据/运行是否异常"类问题时必做，2026-08-19）
+用户说"整体流畅/一叶障目/维护整体运行"= 触发全栈巡检，**不锁单一库、不下局部结论**。
+1. **进程/端口存活**：`pgrep -af serve.py` + `ss -ltnp | grep -E '5173|8080'`；进程死则 `restart_all.sh`（后台线程全失效）。
+2. **各核心 DB 真实路径与表名下的新鲜度**（巡检前先 `glob('data/*.db')` + `PRAGMA table_info` 核实，禁止凭记忆拼路径/表名）：
+   - `data/market_data.db`：`stock_daily`(date)/`index_daily`(date)/`stock_info`(code,name,market)
+   - `data/industry_data.db`：表 `meso_industry_daily`(trade_date)/`meso_industry_fund_flow`(updated_at)/`meso_industry_valuation`(updated_at) — 注意非 `industry_daily`
+   - `/home/scapegoat/output/data/cycle_cache.db`：表 `cycle_data`(indicator,date,value) — **不在 `data/` 下**
+   - `/home/scapegoat/output/data/policy_cache.db`：表 `policy_docs` — **不在 `data/` 下**
+3. **脏数据扫描**：`max(date)` / 日期列是否含非日期字符串（如 `date='background'` 会让前端 `max()` 比较/排序崩溃）；只清脏行，不删整表。
+
 ---
 
 ## 代码架构：共享模块与消费方契约
