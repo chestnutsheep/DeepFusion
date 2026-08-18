@@ -53,7 +53,7 @@ export default function StockStandby() {
       colSpan: 1,
       node: (
         <ErrorBoundary>
-          <LimitUpWidget stocks={luGroups[d.key]} compact />
+          <LimitUpWidget stocks={luGroups[d.key]} compact stackable />
         </ErrorBoundary>
       ),
     }));
@@ -65,13 +65,13 @@ export default function StockStandby() {
           id: "limitup",
           defaultTitle: "连板潜力股埋伏",
           colSpan: 1,
-          node: <ErrorBoundary><LimitUpWidget stocks={[]} /></ErrorBoundary>,
+          node: <ErrorBoundary><LimitUpWidget stocks={[]} stackable /></ErrorBoundary>,
         },
       ];
 
-  const [card, setCard] = useHoverCard();
-  const onHover = (e, t, r) => setCard({ x: e.clientX, y: e.clientY, title: t, rows: r });
-  const onLeave = () => setCard(null);
+  const [card, openCard, closeCard] = useHoverCard();
+  const onHover = (anchorEl, t, r) => openCard(anchorEl, t, r);
+  const onLeave = () => closeCard();
 
   const auto = useAppStore((s) => s.boardAutoRefresh);
   const setAuto = useAppStore((s) => s.setBoardAutoRefresh);
@@ -116,7 +116,7 @@ export default function StockStandby() {
       colSpan: 1,
       node: (
         <ErrorBoundary>
-          <MarketSectorsWidget sectors={broadData?.sectors || []} onHover={onHover} onLeave={onLeave} />
+          <MarketSectorsWidget sectors={broadData?.sectors || []} onHover={onHover} onLeave={onLeave} stackable />
         </ErrorBoundary>
       ),
     },
@@ -192,7 +192,7 @@ export default function StockStandby() {
         <WidgetBoard widgets={widgets} headerExtra={headerExtra} title="待机速览看板" storageKey="df_standby_layout_v1" />
       </div>
 
-      {card && <InfoCard x={card.x} y={card.y} title={card.title} rows={card.rows} />}
+      {card && <InfoCard anchorRef={{ current: card.anchor }} title={card.title} rows={card.rows} />}
     </ErrorBoundary>
   );
 }

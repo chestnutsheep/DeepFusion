@@ -5,6 +5,7 @@ import ErrorBoundary from "../common/ErrorBoundary.jsx";
 import UpdateTimestamp from "../common/UpdateTimestamp.jsx";
 import CalendarMonth from "../Calendar/CalendarMonth.jsx";
 import ReportModal from "./ReportModal.jsx";
+import {CollapsibleStack} from "./marketShared.jsx";
 
 /** AUC 判别力进度条（label + 0~100 分横向条） */
 function ScoreBar({ label, score }) {
@@ -120,7 +121,7 @@ function BoardInfo({ label, value, accent }) {
 
 export function LimitUpCard({ s, compact = false }) {
   const items = s.items || [];
-  const pad = compact ? "10px 12px" : "var(--sp-lg)";
+  const pad = compact ? "12px 14px" : "18px 20px";
   const bury = (s.score != null && s.score >= 80) || (s.stage && s.stage.includes("加速"));
   const gradeColor = s.score >= 80 ? "#6FA088" : s.score >= 65 ? "#C9A861" : s.score >= 50 ? "#B89B6E" : "#C07C7C";
   // 最强 / 最弱因子（按 score）
@@ -138,21 +139,21 @@ export function LimitUpCard({ s, compact = false }) {
       border: bury ? "1px solid rgba(192,124,124,0.55)" : "1px solid var(--border-subtle)",
       background: bury ? "linear-gradient(160deg, rgba(192,124,124,0.10), rgba(26,23,38,0.4))" : undefined,
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 12 }}>
         <div>
-          <div style={{ fontSize: "var(--fs-md)", fontWeight: 700, color: "var(--text-primary)" }}>{s.name}</div>
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{s.code}</div>
+          <div style={{ fontSize: "var(--fs-md)", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "0.3px" }}>{s.name}</div>
+          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginTop: 3 }}>{s.code}</div>
         </div>
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right", lineHeight: 1.2 }}>
           <div style={{ fontSize: "var(--fs-xl)", fontWeight: 800, color: gradeColor, lineHeight: 1 }}>{s.score ?? "—"}</div>
-          <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>综合评分</div>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 3, letterSpacing: "0.5px" }}>综合评分</div>
           {s.calibrated_prob != null && (
-            <div style={{ marginTop: 6 }}>
+            <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: "var(--fs-md)", fontWeight: 800, color: calColor(s.calibrated_prob), lineHeight: 1 }}>
                 {(s.calibrated_prob * 100).toFixed(0)}%
               </div>
-              <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>
-                校准概率{calVerdict(s.calibrated_prob) ? `·${calVerdict(s.calibrated_prob)}` : ""}
+              <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 3 }}>
+                校准概率{calVerdict(s.calibrated_prob) ? ` · ${calVerdict(s.calibrated_prob)}` : ""}
               </div>
             </div>
           )}
@@ -160,11 +161,11 @@ export function LimitUpCard({ s, compact = false }) {
       </div>
       {/* 基础属性 + 板型 + 最强/最弱因子 tag */}
       {s.board_type && (
-        <div style={{ fontSize: "var(--fs-2xs)", color: bt.fg, marginBottom: 8, fontWeight: 500 }}>
+        <div style={{ fontSize: "var(--fs-2xs)", color: bt.fg, marginBottom: 10, fontWeight: 500, letterSpacing: "0.3px" }}>
           {boardTypeCaption(s.board_type)}
         </div>
       )}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={chip("#C9A861")}>{s.board_height}连板</span>
         {s.stage && <span style={chip("#8FD6FF")}>{s.stage}</span>}
         {s.board_type && (
@@ -391,7 +392,8 @@ const gridStyle = {
 
 // ── 封装为看板 widget 内容（不含 ErrorBoundary，由调用方包裹） ──
 // compact: 分组看板场景下用更紧凑的双列网格，避免单组仍显过长。
-export function LimitUpWidget({ stocks, compact = false, limit = 12 }) {
+// stackable: 收起为卡片堆，hover 自适应方向弹出（内容多时保持清爽）。
+export function LimitUpWidget({ stocks, compact = false, limit = 12, stackable = false }) {
   if (!stocks || stocks.length === 0) {
     return (
       <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", padding: "var(--sp-lg)", border: "1px dashed var(--border-subtle)", borderRadius: "var(--radius-sm)" }}>
@@ -399,13 +401,81 @@ export function LimitUpWidget({ stocks, compact = false, limit = 12 }) {
       </div>
     );
   }
+  const shown = stocks.slice(0, limit);
+  const cards = shown.map((s) => <LimitUpCard key={s.code} s={s} compact={compact} />);
+  if (stackable) {
+    return (
+      <CollapsibleStack
+        title="涨停 / 连板潜力"
+        count={stocks.length}
+        icon="🚀"
+        accent="rgba(239,35,42,0.5)"
+        maxHeight={420}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-sm)" }}>
+          {cards}
+        </div>
+      </CollapsibleStack>
+    );
+  }
   const grid = compact
     ? { ...gridStyle, gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }
     : gridStyle;
   return (
     <div style={grid}>
-      {stocks.slice(0, limit).map((s) => <LimitUpCard key={s.code} s={s} compact={compact} />)}
+      {cards}
     </div>
+  );
+}
+
+// ── 7×24 财经快讯（美化 + 卡片堆收起） ──
+function parseNews(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  const items = [];
+  raw.split("\n").forEach((line) => {
+    const t = line.trim();
+    if (!t || t === "[]" || t === "—") return;
+    const m = t.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.*)$/);
+    if (m) items.push({ time: m[1], text: m[2] });
+    else items.push({ time: "", text: t });
+  });
+  return items;
+}
+
+export function NewsWidget({ stackable = true, limit = 40 }) {
+  const { data, isLoading } = useMCP("stock_news_global");
+  const items = useMemo(() => parseNews(data).slice(0, limit), [data, limit]);
+
+  const list = (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-sm)" }}>
+      {isLoading && <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-xs)", padding: 6 }}>加载中…</div>}
+      {!isLoading && items.length === 0 && (
+        <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-xs)", padding: 6 }}>暂无快讯</div>
+      )}
+      {items.map((it, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex", gap: 12, padding: "10px 12px", background: "rgba(255,255,255,0.03)",
+            borderLeft: "2px solid var(--gold)", borderRadius: "var(--radius-sm)", lineHeight: 1.65,
+          }}
+        >
+          {it.time && (
+            <span style={{ color: "var(--gold)", fontSize: "var(--fs-xs)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", flexShrink: 0, paddingTop: 1 }}>
+              {it.time}
+            </span>
+          )}
+          <span style={{ color: "var(--text-secondary)", fontSize: "var(--fs-sm)" }}>{it.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (!stackable) return list;
+  return (
+    <CollapsibleStack title="7×24 财经快讯" count={items.length} icon="📰" accent="rgba(77,166,255,0.55)" maxHeight={360}>
+      {list}
+    </CollapsibleStack>
   );
 }
 

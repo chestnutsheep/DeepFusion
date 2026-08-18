@@ -252,6 +252,59 @@ function CheckpointIndicator({ name, dates, matrix }) {
 }
 
 // ═══════════════════════════════════════════════════════
+//  决策结论条（可读性增强：把"是什么"补上"所以呢/怎么用"）
+// ═══════════════════════════════════════════════════════
+
+/**
+ * 统一的决策结论条：一句话结论 + 行动建议 + 置信度。
+ * tone: 'neutral' | 'bull' | 'bear' | 'caution'
+ */
+function DecisionConclusion({ conclusion, action, confidence, tone = 'neutral' }) {
+  if (!conclusion) return null;
+  const toneColor = {
+    bull: '#5bba57',
+    bear: '#f85149',
+    caution: '#D4A853',
+    neutral: 'var(--accent-gold)',
+  }[tone];
+  const confLabel = {
+    high: '高置信',
+    medium: '中置信',
+    low: '低置信',
+  }[confidence] || null;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 14px', marginBottom: 12, borderRadius: 8,
+      background: `${toneColor}12`, border: `1px solid ${toneColor}33`,
+      fontSize: 'var(--fs-sm)', lineHeight: 1.5,
+    }}>
+      <span style={{ fontSize: 15, lineHeight: 1, marginTop: 2 }}>💡</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: action ? 3 : 0 }}>
+          {conclusion}
+        </div>
+        {action && (
+          <div style={{ color: 'var(--text-secondary)' }}>
+            <b style={{ color: toneColor }}>操作参考：</b>{action}
+          </div>
+        )}
+      </div>
+      {confLabel && (
+        <span style={{
+          flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)',
+          border: '1px solid var(--border-subtle)', marginTop: 1,
+        }}>
+          {confLabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 //  因果传导链 + 传导状态灯
 // ═══════════════════════════════════════════════════════
 
@@ -263,17 +316,18 @@ function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Da
 
   // 计算传导状态
   const conductionStatus = useMemo(() => {
-    if (!parsed || !l1Industries.length || !l1Dates.length) return CONDUCTION_STATUS.normal;
+    const withKey = (s, k) => ({ ...s, key: k });
+    if (!parsed || !l1Industries.length || !l1Dates.length) return withKey(CONDUCTION_STATUS.normal, 'normal');
 
     const leading = parsed.leading_industries || [];
     const lagging = parsed.lagging_industries || [];
 
-    if (leading.length < 3 || lagging.length < 3) return CONDUCTION_STATUS.normal;
+    if (leading.length < 3 || lagging.length < 3) return withKey(CONDUCTION_STATUS.normal, 'normal');
 
     // 构建领先/滞后指数（5日累计收益）
     const sortedDates = [...l1Dates].sort();
     const recent = sortedDates.slice(-5);
-    if (recent.length < 5) return CONDUCTION_STATUS.normal;
+    if (recent.length < 5) return withKey(CONDUCTION_STATUS.normal, 'normal');
 
     const leadNames = leading.slice(0, THRESHOLDS.leadingLaggingTopK).map(i => i.industry);
     const lagNames = lagging.slice(0, THRESHOLDS.leadingLaggingTopK).map(i => i.industry);
@@ -295,12 +349,12 @@ function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Da
 
     // 使用 fallback 阈值（滚动分位数需要历史数据，此处简化）
     if (leadRet5d > THRESHOLDS.fallbackLeadRetBull && lagRet5d < THRESHOLDS.fallbackLagRetBear) {
-      return CONDUCTION_STATUS.blocked;
+      return withKey(CONDUCTION_STATUS.blocked, 'blocked');
     }
     if (leadRet5d > THRESHOLDS.fallbackLeadRetBull && lagRet5d > THRESHOLDS.fallbackLagRetBull) {
-      return CONDUCTION_STATUS.smooth;
+      return withKey(CONDUCTION_STATUS.smooth, 'smooth');
     }
-    return CONDUCTION_STATUS.normal;
+    return withKey(CONDUCTION_STATUS.normal, 'normal');
   }, [parsed, l1Industries, l1Matrix, l1Dates]);
 
   const topPairs = parsed?.top_causal_pairs || [];
@@ -327,6 +381,37 @@ function CausalTransmissionSection({ causalityData, l1Industries, l1Matrix, l1Da
           </span>
         )}
       </div>
+
+      {/* 决策结论：传导顺畅度 → 操作参考 */}
+      {(() => {
+        if (topPairs.length === 0) return null;
+        const map = {
+          blocked: {
+            tone: 'bear', conf: 'medium',
+            conclusion: '上游领涨但下游未跟上，产业链传导受阻，领先板块短期有回调压力。',
+            action: '领先组（绿）宜逢高兑现，谨慎追涨；可关注滞后组（红）是否补涨接力。',
+          },
+          smooth: {
+            tone: 'bull', conf: 'medium',
+            conclusion: '领先与滞后板块同步上行，产业链传导顺畅，主线行情健康。',
+            action: '趋势延续概率高，领先组可持有，滞后组（下游）存在补涨空间可择优跟进。',
+          },
+          normal: {
+            tone: 'neutral', conf: 'low',
+            conclusion: '领先/滞后板块分化不明显，主线传导节奏平缓，暂未形成强趋势。',
+            action: '以观望和轮动为主，等待传导信号（顺畅或受阻）进一步明确。',
+          },
+        };
+        const c = map[conductionStatus.key] || map.normal;
+        return (
+          <DecisionConclusion
+            conclusion={c.conclusion}
+            action={c.action}
+            confidence={c.conf}
+            tone={c.tone}
+          />
+        );
+      })()}
 
       {/* 传导链列表 */}
       {topPairs.length > 0 ? (
@@ -428,6 +513,30 @@ function CommunityComparisonSection({ themesData }) {
           </span>
         )}
       </div>
+
+      {/* 决策结论：阵营主导方的趋势与动量 → 操作参考 */}
+      {(() => {
+        const dom = communities.find(c => c.dominant) || a;
+        const trend = dom.trend;
+        const mom5 = dom.momentum?.avg_5d || 0;
+        const tone = mom5 > 0 ? 'bull' : mom5 < 0 ? 'bear' : 'neutral';
+        const conf = dom.score != null && dom.score > 60 ? 'high' : dom.score != null && dom.score > 45 ? 'medium' : 'low';
+        let conclusion, action;
+        if (trend === 'strengthening') {
+          conclusion = `${dom.representative} 等${dom.nMembers}行业为主导线索，且内部联动仍在强化，主线共识在聚集。`;
+          action = `主线确定性较高，可沿该阵营（${dom.representative} 系）择优布局，避免分散到弱势跟随阵营。`;
+        } else if (trend === 'weakening') {
+          conclusion = `${dom.representative} 阵营虽暂居主导，但内部联动已开始弱化，主线有松动迹象。`;
+          action = '不宜再加仓主线，注意高位派面；可留意跟随阵营是否接力或资金外溢方向。';
+        } else {
+          conclusion = `两阵营势均力敌（主导：${dom.representative}），趋势平稳未分胜负，处于轮动切换窗口。`;
+          action = '维持均衡、不押单边；等待某阵营趋势（强化/弱化）打破平衡再顺势加仓。';
+        }
+        return (
+          <DecisionConclusion conclusion={conclusion} action={action} confidence={conf} tone={tone} />
+        );
+      })()}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         {communities.map((c, idx) => (
           <CardWrapper key={idx} style={{ padding: '14px 16px' }}>
@@ -494,6 +603,30 @@ function LinkageMonitorSection({ dccData }) {
           </span>
         )}
       </div>
+
+      {/* 决策结论：联动增强/减弱的整体格局 → 操作参考 */}
+      {(() => {
+        const magInc = increased.reduce((s, c) => s + Math.abs(c.change || 0), 0);
+        const magDec = decreased.reduce((s, c) => s + Math.abs(c.change || 0), 0);
+        const conf = changes.length >= 8 ? 'medium' : 'low';
+        let tone, conclusion, action;
+        if (increased.length >= decreased.length && magInc >= magDec) {
+          tone = 'bull';
+          conclusion = `行业间联动以「增强」为主（${increased.length} 对增强 / ${decreased.length} 对减弱），板块协同上涨的共识在形成。`;
+          action = '风险偏好回升，可关注增强组合中的低位品种顺势参与；协同越强，轮动踏空风险越低。';
+        } else if (decreased.length > increased.length && magDec > magInc) {
+          tone = 'bear';
+          conclusion = `行业间联动以「减弱」为主（${decreased.length} 对减弱 / ${increased.length} 对增强），原有协同关系正在瓦解。`;
+          action = '旧主线联动松动，警惕高位板块独立回落；资金可能转向新的联动组合，宜降仓等待结构清晰。';
+        } else {
+          tone = 'neutral';
+          conclusion = `联动增强与减弱大致均衡（增 ${increased.length} / 减 ${decreased.length}），市场处于结构切换、方向待明的阶段。`;
+          action = '不急于站队，观察哪组联动关系率先走出持续性，再顺势跟随。';
+        }
+        return (
+          <DecisionConclusion conclusion={conclusion} action={action} confidence={conf} tone={tone} />
+        );
+      })()}
 
       {increased.length > 0 && (
         <div style={{ marginBottom: 10 }}>
