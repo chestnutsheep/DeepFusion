@@ -28,6 +28,47 @@ export default function StockStandby() {
   const calibData = useMemo(() => safeParse(calib.data), [calib.data]);
   const luStocks = luData?.stocks || [];
 
+  // 按涨停状况（连板梯队）分组，拆成多张小面板贴在前面的面板后，避免一整条长卡。
+  const luGroups = useMemo(() => {
+    const g = { first: [], second: [], thirdPlus: [] };
+    for (const s of luStocks) {
+      const bh = s.board_height || 1;
+      if (bh <= 1) g.first.push(s);
+      else if (bh === 2) g.second.push(s);
+      else g.thirdPlus.push(s);
+    }
+    return g;
+  }, [luStocks]);
+
+  const luGroupDefs = [
+    { key: "first", title: "连板梯队 · 首板" },
+    { key: "second", title: "连板梯队 · 二连板" },
+    { key: "thirdPlus", title: "连板梯队 · 三连及以上" },
+  ];
+  const luGroupWidgets = luGroupDefs
+    .filter((d) => luGroups[d.key].length > 0)
+    .map((d) => ({
+      id: `limitup_${d.key}`,
+      defaultTitle: `${d.title} (${luGroups[d.key].length})`,
+      colSpan: 1,
+      node: (
+        <ErrorBoundary>
+          <LimitUpWidget stocks={luGroups[d.key]} compact />
+        </ErrorBoundary>
+      ),
+    }));
+  // 完全无数据时保留一张带空态提示的卡片，避免看板缺块
+  const limitupWidgets = luGroupWidgets.length
+    ? luGroupWidgets
+    : [
+        {
+          id: "limitup",
+          defaultTitle: "连板潜力股埋伏",
+          colSpan: 1,
+          node: <ErrorBoundary><LimitUpWidget stocks={[]} /></ErrorBoundary>,
+        },
+      ];
+
   const [card, setCard] = useHoverCard();
   const onHover = (e, t, r) => setCard({ x: e.clientX, y: e.clientY, title: t, rows: r });
   const onLeave = () => setCard(null);
@@ -85,12 +126,7 @@ export default function StockStandby() {
       colSpan: 1,
       node: <ErrorBoundary><MarketCapitalWidget capitalData={capitalData} /></ErrorBoundary>,
     },
-    {
-      id: "limitup",
-      defaultTitle: "连板潜力股埋伏",
-      colSpan: 1,
-      node: <ErrorBoundary><LimitUpWidget stocks={luStocks} /></ErrorBoundary>,
-    },
+    ...limitupWidgets,
     {
       id: "calibration",
       defaultTitle: "连板评分 · 校准透明",

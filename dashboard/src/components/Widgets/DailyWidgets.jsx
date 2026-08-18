@@ -118,8 +118,9 @@ function BoardInfo({ label, value, accent }) {
   );
 }
 
-export function LimitUpCard({ s }) {
+export function LimitUpCard({ s, compact = false }) {
   const items = s.items || [];
+  const pad = compact ? "10px 12px" : "var(--sp-lg)";
   const bury = (s.score != null && s.score >= 80) || (s.stage && s.stage.includes("加速"));
   const gradeColor = s.score >= 80 ? "#6FA088" : s.score >= 65 ? "#C9A861" : s.score >= 50 ? "#B89B6E" : "#C07C7C";
   // 最强 / 最弱因子（按 score）
@@ -133,6 +134,7 @@ export function LimitUpCard({ s }) {
     : "—";
   return (
     <CardWrapper hoverable style={{
+      padding: pad,
       border: bury ? "1px solid rgba(192,124,124,0.55)" : "1px solid var(--border-subtle)",
       background: bury ? "linear-gradient(160deg, rgba(192,124,124,0.10), rgba(26,23,38,0.4))" : undefined,
     }}>
@@ -388,7 +390,8 @@ const gridStyle = {
 };
 
 // ── 封装为看板 widget 内容（不含 ErrorBoundary，由调用方包裹） ──
-export function LimitUpWidget({ stocks }) {
+// compact: 分组看板场景下用更紧凑的双列网格，避免单组仍显过长。
+export function LimitUpWidget({ stocks, compact = false, limit = 12 }) {
   if (!stocks || stocks.length === 0) {
     return (
       <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", padding: "var(--sp-lg)", border: "1px dashed var(--border-subtle)", borderRadius: "var(--radius-sm)" }}>
@@ -396,9 +399,12 @@ export function LimitUpWidget({ stocks }) {
       </div>
     );
   }
+  const grid = compact
+    ? { ...gridStyle, gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }
+    : gridStyle;
   return (
-    <div style={gridStyle}>
-      {stocks.slice(0, 12).map((s) => <LimitUpCard key={s.code} s={s} />)}
+    <div style={grid}>
+      {stocks.slice(0, limit).map((s) => <LimitUpCard key={s.code} s={s} compact={compact} />)}
     </div>
   );
 }

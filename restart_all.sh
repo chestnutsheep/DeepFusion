@@ -21,7 +21,7 @@ done
 # 兜底：直接按命令名杀
 pkill -f "serve.py" 2>/dev/null || true
 pkill -f "vite --host" 2>/dev/null || true
-sleep 2
+sleep 1
 
 # 2. 启动后端（nohup 常驻）
 cd "$BASE_DIR"
@@ -38,12 +38,38 @@ for i in $(seq 1 30); do
   fi
 done
 
-# 4. 启动前端（nohup 常驻）
+# 4. 启动前端（nohup 常驻 + 健康检查 + 重试）
+# 前端的 vite 文件监视器偶发 EMFILE(inotify 耗尽) 会直接崩溃导致 8080 起不来，
+# 因此加就绪探测与重试，避免“点图标后看板用不了”。
 cd "$FRONTEND_DIR"
-nohup npx vite --host 0.0.0.0 --port 8080 > "$LOG_DIR/frontend.log" 2>&1 &
-echo "  前端已拉起 (日志: $LOG_DIR/frontend.log)"
+MAX_TRIES=3
+for try in $(seq 1 $MAX_TRIES); do
+  # 启动前先清掉可能残留的 vite 进程
+  pkill -f "vite --host 0.0.0.0 --port 8080" 2>/dev/null || true
+  sleep 1
+  nohup npx vite --host 0.0.0.0 --port 8080 > "$LOG_DIR/frontend.log" 2>&1 &
+  echo "  前端尝试启动 (第 $try/$MAX_TRIES 次, 日志: $LOG_DIR/frontend.log)"
+  up=0
+  for i in $(seq 1 15); do
+    sleep 2
+    resp=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null)
+    if [ "$resp" = "200" ]; then
+      up=1
+      break
+    fi
+  done
+  if [ "$up" = "1" ]; then
+    echo "  前端就绪 (http://localhost:8080)"
+    break
+  else
+    echo "  前端第 $try 次未就绪，查看日志:"
+    tail -n 8 "$LOG_DIR/frontend.log" 2>/dev/null
+  fi
+done
+if [ "$up" != "1" ]; then
+  echo "  [警告] 前端多次启动失败，请检查 $LOG_DIR/frontend.log"
+fi
 
-sleep 3
 echo "=== 完成 ==="
 echo "  前端 UI: http://localhost:8080/"
 echo "  后端 API: http://localhost:5173/api/tools/call"

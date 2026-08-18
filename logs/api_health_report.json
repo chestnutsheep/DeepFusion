@@ -1,5 +1,5 @@
 {
-  "log_line": "2026-08-16 16:16:57 : 校验成果汇总，当前接口数量共 158 个，异常接口 33 个，良率 79.1 %，异常接口名称如下：fund_portfolio_bond_hold_em, fund_portfolio_hold_em, futures_foreign_commodity_realtime, get_us_stock_name, index_global_hist_em, macro_china_m, stock_bj_a_spot_em, stock_board_concept_cons_em, stock_board_concept_name_em, stock_board_industry_cons_em, stock_board_industry_hist_em, stock_board_industry_spot_em, stock_cg_lawsuit_cninfo, stock_cy_a_spot_em, stock_hk_spot_em, stock_individual_fund_flow, stock_individual_info_em, stock_industry_financial_em, stock_industry_valuation_em, stock_intraday_em, stock_jgdy_detail_em, stock_kc_a_spot_em, stock_new_a_spot_em, stock_sector_fund_flow_rank, stock_sh_a_spot_em, stock_sz_a_spot_em, stock_zh_a_hist, stock_zh_a_hist_min_em, stock_zh_a_hist_pre_min_em, stock_zh_a_spot_em, stock_zh_a_st_em, stock_zh_index_spot_em, sw_index_daily。经检修：问题接口共 33 个，现修复 1 个，修复率 3.0 %，仍有 32 个接口无法修复，名称为: [\"fund_portfolio_bond_hold_em\", \"fund_portfolio_hold_em\", \"futures_foreign_commodity_realtime\", \"get_us_stock_name\", \"index_global_hist_em\", \"stock_bj_a_spot_em\", \"stock_board_concept_cons_em\", \"stock_board_concept_name_em\", \"stock_board_industry_cons_em\", \"stock_board_industry_hist_em\", \"stock_board_industry_spot_em\", \"stock_cg_lawsuit_cninfo\", \"stock_cy_a_spot_em\", \"stock_hk_spot_em\", \"stock_individual_fund_flow\", \"stock_individual_info_em\", \"stock_industry_financial_em\", \"stock_industry_valuation_em\", \"stock_intraday_em\", \"stock_jgdy_detail_em\", \"stock_kc_a_spot_em\", \"stock_new_a_spot_em\", \"stock_sector_fund_flow_rank\", \"stock_sh_a_spot_em\", \"stock_sz_a_spot_em\", \"stock_zh_a_hist\", \"stock_zh_a_hist_min_em\", \"stock_zh_a_hist_pre_min_em\", \"stock_zh_a_spot_em\", \"stock_zh_a_st_em\", \"stock_zh_index_spot_em\", \"sw_index_daily\"]",
+  "log_line": "2026-08-18 16:12:25 : 校验成果汇总，当前接口数量共 158 个，异常接口 33 个，良率 79.1 %，异常接口名称如下：fund_open_fund_daily_em, fund_portfolio_bond_hold_em, fund_portfolio_hold_em, futures_foreign_commodity_realtime, get_us_stock_name, index_global_hist_em, macro_china_m, stock_bj_a_spot_em, stock_board_concept_cons_em, stock_board_concept_name_em, stock_board_industry_cons_em, stock_board_industry_hist_em, stock_board_industry_spot_em, stock_cg_lawsuit_cninfo, stock_cy_a_spot_em, stock_hk_spot_em, stock_individual_info_em, stock_industry_financial_em, stock_industry_valuation_em, stock_intraday_em, stock_jgdy_detail_em, stock_kc_a_spot_em, stock_new_a_spot_em, stock_sector_fund_flow_rank, stock_sh_a_spot_em, stock_sz_a_spot_em, stock_zh_a_hist, stock_zh_a_hist_min_em, stock_zh_a_hist_pre_min_em, stock_zh_a_spot_em, stock_zh_a_st_em, stock_zh_index_spot_em, sw_index_daily。经检修：问题接口共 33 个，现修复 1 个，修复率 3.0 %，仍有 32 个接口无法修复，名称为: [\"fund_open_fund_daily_em\", \"fund_portfolio_bond_hold_em\", \"fund_portfolio_hold_em\", \"futures_foreign_commodity_realtime\", \"get_us_stock_name\", \"index_global_hist_em\", \"stock_bj_a_spot_em\", \"stock_board_concept_cons_em\", \"stock_board_concept_name_em\", \"stock_board_industry_cons_em\", \"stock_board_industry_hist_em\", \"stock_board_industry_spot_em\", \"stock_cg_lawsuit_cninfo\", \"stock_cy_a_spot_em\", \"stock_hk_spot_em\", \"stock_individual_info_em\", \"stock_industry_financial_em\", \"stock_industry_valuation_em\", \"stock_intraday_em\", \"stock_jgdy_detail_em\", \"stock_kc_a_spot_em\", \"stock_new_a_spot_em\", \"stock_sector_fund_flow_rank\", \"stock_sh_a_spot_em\", \"stock_sz_a_spot_em\", \"stock_zh_a_hist\", \"stock_zh_a_hist_min_em\", \"stock_zh_a_hist_pre_min_em\", \"stock_zh_a_spot_em\", \"stock_zh_a_st_em\", \"stock_zh_index_spot_em\", \"sw_index_daily\"]",
   "total": 158,
   "abnormal_count": 33,
   "yield_rate": 79.1,
@@ -8,6 +8,7 @@
   "unfixed_count": 32,
   "fix_rate": 3.0,
   "abnormal_names": [
+    "fund_open_fund_daily_em",
     "fund_portfolio_bond_hold_em",
     "fund_portfolio_hold_em",
     "futures_foreign_commodity_realtime",
@@ -23,7 +24,6 @@
     "stock_cg_lawsuit_cninfo",
     "stock_cy_a_spot_em",
     "stock_hk_spot_em",
-    "stock_individual_fund_flow",
     "stock_individual_info_em",
     "stock_industry_financial_em",
     "stock_industry_valuation_em",
@@ -43,6 +43,7 @@
     "sw_index_daily"
   ],
   "unfixed_names": [
+    "fund_open_fund_daily_em",
     "fund_portfolio_bond_hold_em",
     "fund_portfolio_hold_em",
     "futures_foreign_commodity_realtime",
@@ -57,7 +58,6 @@
     "stock_cg_lawsuit_cninfo",
     "stock_cy_a_spot_em",
     "stock_hk_spot_em",
-    "stock_individual_fund_flow",
     "stock_individual_info_em",
     "stock_industry_financial_em",
     "stock_industry_valuation_em",
@@ -133,7 +133,7 @@
         "美国GDP年增率"
       ],
       "shape": [
-        9321,
+        9322,
         13
       ]
     },
@@ -164,7 +164,7 @@
         "postAmt"
       ],
       "shape": [
-        5221,
+        5222,
         10
       ]
     },
@@ -222,7 +222,7 @@
         "更新时间"
       ],
       "shape": [
-        1576,
+        1578,
         37
       ]
     },
@@ -325,7 +325,7 @@
     },
     {
       "name": "fund_open_fund_daily_em",
-      "status": "OK",
+      "status": "SCHEMA_CHANGED",
       "em": true,
       "files": [
         "akshare_adapter.py"
@@ -334,16 +334,16 @@
       "error_type": null,
       "candidates": [],
       "fixed": false,
-      "fix_note": "",
-      "transform_needed": false,
-      "transform_stub": null,
+      "fix_note": "返回列与基线不同，已生成调整脚本占位: /home/AI/workspace/Mcp Server/DeepFusion/scripts/transforms/transform_fund_open_fund_daily_em.py",
+      "transform_needed": true,
+      "transform_stub": "/home/AI/workspace/Mcp Server/DeepFusion/scripts/transforms/transform_fund_open_fund_daily_em.py",
       "columns": [
         "基金代码",
         "基金简称",
+        "2026-08-17-单位净值",
+        "2026-08-17-累计净值",
         "2026-08-14-单位净值",
         "2026-08-14-累计净值",
-        "2026-08-13-单位净值",
-        "2026-08-13-累计净值",
         "日增长值",
         "日增长率",
         "申购状态",
@@ -351,7 +351,7 @@
         "手续费"
       ],
       "shape": [
-        23829,
+        23825,
         11
       ]
     },
@@ -376,7 +376,7 @@
         "日增长率"
       ],
       "shape": [
-        3614,
+        3615,
         3
       ]
     },
@@ -416,7 +416,7 @@
         "手续费"
       ],
       "shape": [
-        20129,
+        20133,
         18
       ]
     },
@@ -502,7 +502,7 @@
         "COMEX黄金库存量-盎司"
       ],
       "shape": [
-        1241,
+        1240,
         4
       ]
     },
@@ -594,7 +594,7 @@
         "增减"
       ],
       "shape": [
-        72,
+        71,
         3
       ]
     },
@@ -624,7 +624,7 @@
         "动态结算价"
       ],
       "shape": [
-        4179,
+        4180,
         8
       ]
     },
@@ -783,7 +783,7 @@
         "变化幅度"
       ],
       "shape": [
-        1362,
+        1363,
         3
       ]
     },
@@ -866,7 +866,7 @@
         "变化幅度"
       ],
       "shape": [
-        2340,
+        2341,
         3
       ]
     },
@@ -914,7 +914,7 @@
         "变化值"
       ],
       "shape": [
-        4274,
+        4275,
         3
       ]
     },
@@ -1125,7 +1125,7 @@
         "变化幅度"
       ],
       "shape": [
-        23,
+        22,
         3
       ]
     },
@@ -1176,7 +1176,7 @@
         "close"
       ],
       "shape": [
-        2790,
+        2792,
         5
       ]
     },
@@ -1272,7 +1272,7 @@
         "变化幅度"
       ],
       "shape": [
-        2014,
+        2015,
         3
       ]
     },
@@ -1573,7 +1573,7 @@
         "自年初累计"
       ],
       "shape": [
-        159,
+        160,
         5
       ]
     },
@@ -1737,7 +1737,7 @@
         "二手住宅价格指数-定基"
       ],
       "shape": [
-        372,
+        374,
         8
       ]
     },
@@ -1928,7 +1928,7 @@
         "总价值"
       ],
       "shape": [
-        2851,
+        2852,
         5
       ]
     },
@@ -1954,7 +1954,7 @@
         "总价值"
       ],
       "shape": [
-        1649,
+        1650,
         5
       ]
     },
@@ -2083,7 +2083,7 @@
         "早盘价"
       ],
       "shape": [
-        2509,
+        2511,
         3
       ]
     },
@@ -2109,7 +2109,7 @@
         "high"
       ],
       "shape": [
-        2343,
+        2345,
         5
       ]
     },
@@ -2133,7 +2133,7 @@
         "现货价格"
       ],
       "shape": [
-        3273,
+        3274,
         3
       ]
     },
@@ -2180,7 +2180,7 @@
         "早盘价"
       ],
       "shape": [
-        1661,
+        1663,
         3
       ]
     },
@@ -3333,7 +3333,7 @@
         "相关信息"
       ],
       "shape": [
-        1393,
+        1542,
         5
       ]
     },
@@ -3792,7 +3792,7 @@
         "amount"
       ],
       "shape": [
-        5510,
+        5511,
         7
       ]
     },
@@ -3882,27 +3882,44 @@
         "领涨股-代码"
       ],
       "shape": [
-        2731,
+        2732,
         13
       ]
     },
     {
       "name": "stock_individual_fund_flow",
-      "status": "NETWORK",
+      "status": "OK",
       "em": false,
       "files": [
         "data_clusters.py",
         "stock_reports.py"
       ],
-      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
-      "error_type": "Network",
+      "error": null,
+      "error_type": null,
       "candidates": [],
       "fixed": false,
       "fix_note": "",
       "transform_needed": false,
       "transform_stub": null,
-      "columns": null,
-      "shape": null
+      "columns": [
+        "日期",
+        "收盘价",
+        "涨跌幅",
+        "主力净流入-净额",
+        "主力净流入-净占比",
+        "超大单净流入-净额",
+        "超大单净流入-净占比",
+        "大单净流入-净额",
+        "大单净流入-净占比",
+        "中单净流入-净额",
+        "中单净流入-净占比",
+        "小单净流入-净额",
+        "小单净流入-净占比"
+      ],
+      "shape": [
+        121,
+        13
+      ]
     },
     {
       "name": "stock_individual_info_em",
@@ -4046,7 +4063,7 @@
         "name"
       ],
       "shape": [
-        5543,
+        5545,
         2
       ]
     },
@@ -4138,7 +4155,7 @@
         "公告日期"
       ],
       "shape": [
-        22194,
+        22211,
         11
       ]
     },
@@ -4185,7 +4202,7 @@
         "卖出席位数"
       ],
       "shape": [
-        181,
+        175,
         8
       ]
     },
@@ -4287,7 +4304,7 @@
         "平均维持担保比例"
       ],
       "shape": [
-        3368,
+        3370,
         13
       ]
     },
@@ -4670,7 +4687,7 @@
         "报告PDF链接"
       ],
       "shape": [
-        225,
+        226,
         16
       ]
     },
@@ -4778,7 +4795,7 @@
         "volume"
       ],
       "shape": [
-        2747,
+        2748,
         6
       ]
     },
@@ -4812,7 +4829,7 @@
         "turnover"
       ],
       "shape": [
-        2292,
+        2293,
         9
       ]
     },
@@ -4992,7 +5009,7 @@
         "时间戳"
       ],
       "shape": [
-        5542,
+        5544,
         14
       ]
     },
