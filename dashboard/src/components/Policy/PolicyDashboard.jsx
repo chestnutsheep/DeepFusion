@@ -1,10 +1,13 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
+import {useNavigate} from 'react-router-dom';
 import {useMCP} from '../../hooks/useMCP.js';
 import {useAppStore} from '../../store/index.js';
 import {mcp} from '../../services/mcp.js';
 import CardWrapper from '../common/CardWrapper.jsx';
 import UpdateTimestamp from '../common/UpdateTimestamp.jsx';
+import SectionHeader from '../common/SectionHeader.jsx';
+import DataCard from '../common/DataCard.jsx';
 import '../../styles/policy-dashboard.css';
 
 // ── 月份名称 ──
@@ -39,6 +42,10 @@ export default function PolicyDashboard() {
   const [selected, setSelected] = useState(null); // 点击卡片弹出的"收录的政策卡片"
   const [selectedSector, setSelectedSector] = useState(null); // 点击板块头展开的该板块列表
   const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
+  // ── 列表筛选（本地，基于已加载的 timeline.latest，三维度互动筛选）──
+  const [filterKw, setFilterKw] = useState('');
+  const [filterSector, setFilterSector] = useState('');
+  const [filterSentiment, setFilterSentiment] = useState('');
   const activePolicySub = useAppStore((s) => s.activePolicySub);
 
   // ── 动态数据源 ──
@@ -58,6 +65,20 @@ export default function PolicyDashboard() {
 
   const tl = parseTimeline(timeline.data);
   const realStats = stats.data || '';
+
+  // ── 列表三维度过滤（本地，基于 timeline.latest）──
+  const latestAll = (tl && tl.latest) || [];
+  const filteredLatest = latestAll.filter((p) => {
+    const seps = (p.sector || []).filter(Boolean);
+    const kws = (p.keywords || []).filter(Boolean);
+    if (filterSector && !seps.includes(filterSector)) return false;
+    if (filterSentiment && (p.sentiment || '中性') !== filterSentiment) return false;
+    if (filterKw) {
+      const hay = ((p.title || '') + ' ' + kws.join(' ') + ' ' + seps.join(' ') + ' ' + (p.org || '')).toLowerCase();
+      if (!hay.includes(filterKw.trim().toLowerCase())) return false;
+    }
+    return true;
+  });
 
   // ── 十五五进度 ──
   const now = new Date();
@@ -186,8 +207,120 @@ export default function PolicyDashboard() {
     );
   };
 
+  // ── 派生指标：情绪分布 / 板块热度 / 月度分布（对齐 Meso 三分法 + Macro 快照条）──
+  const latestAllForStats = (tl && tl.latest) || [];
+  const sentimentAgg = useMemo(() => {
+    const cnt = {利好: 0, 中性: 0, 利空: 0};
+    latestAllForStats.forEach((p) => { cnt[p.sentiment || '中性'] = (cnt[p.sentiment || '中性'] || 0) + 1; });
+    const sum = cnt.利好 + cnt.中性 + cnt.利空 || 1;
+    return {
+      ...cnt,
+      goodPct: Math.round((cnt.利好 / sum) * 100),
+      badPct: Math.round((cnt.利空 / sum) * 100),
+    };
+  }, [latestAllForStats]);
+
+  const sectorHeatAgg = useMemo(() => {
+    const map = {};
+    latestAllForStats.forEach((p) => {
+      (p.sector || []).forEach((s) => {
+        if (!s) return;
+        map[s] = map[s] || {name: s, total: 0, good: 0};
+        map[s].total += 1;
+        if (p.sentiment === '利好') map[s].good += 1;
+      });
+    });
+    return Object.values(map)
+      .map((m) => ({...m, goodRatio: m.total ? m.good / m.total : 0}))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [latestAllForStats]);
+
   return (
     <div className="policy-dashboard-container" onMouseMove={moveHover}>
+      {activePolicySub === 'stats' && (
+      <>
+        {/* ── Hero 总览区（对齐 MesoLayout Hero + MacroSnapshot 快照条）── */}
+        <div className="policy-hero">
+          <div className="ph-left">
+            <span className="ph-eyebrow">REGULATORY RADAR</span>
+            <h1 className="ph-title">政策雷达</h1>
+            <p className="ph-desc">监管动态 · 政策解读 · 与行业 / 个股的市场联动穿透</p>
+          </div>
+          <div className="ph-right">
+            <UpdateTimestamp updatedAt={stats.updatedAt} />
+            <div className="ph-total">
+              <span className="ph-total-num">{realStats.match(/\d+/)?.[0] || '—'}</span>
+              <span className="ph-total-label">历史累计政策</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 关键指标快照条（对齐 MacroSnapshot DataGrid）── */}
+        <div className="policy-snapshot">
+          <DataCard
+            label="利好信号" value={sentimentAgg.利好} unit="条" higherBetter={null}
+            source="同步" tooltip="近期政策中偏向积极（利好）的条目数"
+          />
+          <DataCard
+            label="中性观察" value={sentimentAgg.中性} unit="条" higherBetter={null}
+            source="同步" tooltip="近期政策中表述中性、需持续跟踪的条目数"
+          />
+          <DataCard
+            label="谨慎信号" value={sentimentAgg.利空} unit="条" higherBetter={null}
+            source="同步" tooltip="近期政策中偏向收紧（利空）的条目数"
+          />
+          <DataCard
+            label="利好占比" value={sentimentAgg.goodPct} unit="%" higherBetter={null}
+            source="综合" tooltip="利好 ÷ (利好+中性+利空) 的比例，反映政策风向"
+          />
+        </div>
+
+        {/* ── 政策结构：情绪分布条 + 板块热度 TOP（对齐 Meso 三分法 / RankingTable）── */}
+        <SectionHeader badge="STRUCTURE" title="政策结构" highlight="近期画像" desc="最新一日政策的情绪倾向与板块关注热度" />
+        <div className="policy-structure">
+          <CardWrapper className="ps-sentiment" hoverable={false}>
+            <div className="pss-head">
+              <span className="pss-label">情绪分布</span>
+              <span className="pss-goodpct">利好占比 {sentimentAgg.goodPct}%</span>
+            </div>
+            <div className="pss-bar">
+              <span className="pss-seg seg-good" style={{ width: `${sentimentAgg.goodPct}%` }} />
+              <span className="pss-seg seg-neutral" style={{ width: `${100 - sentimentAgg.goodPct - sentimentAgg.badPct}%` }} />
+              <span className="pss-seg seg-bad" style={{ width: `${sentimentAgg.badPct}%` }} />
+            </div>
+            <div className="pss-legend">
+              <span><i className="dot dot-good" />利好 {sentimentAgg.利好}</span>
+              <span><i className="dot dot-neutral" />中性 {sentimentAgg.中性}</span>
+              <span><i className="dot dot-bad" />利空 {sentimentAgg.利空}</span>
+            </div>
+          </CardWrapper>
+
+          <CardWrapper className="ps-heat" hoverable={false}>
+            <div className="psh-head"><span className="psh-label">板块热度 TOP</span></div>
+            <div className="psh-list">
+              {sectorHeatAgg.map((s, i) => (
+                <div
+                  key={s.name}
+                  className="psh-row"
+                  onClick={() => { setFilterSector(s.name); setActivePolicySub('list'); }}
+                  title="点击查看该板块全部政策"
+                >
+                  <span className="psh-rank">{i + 1}</span>
+                  <span className="psh-name">{s.name}</span>
+                  <span className="psh-count">{s.total}</span>
+                  <span className={`psh-ratio ${s.goodRatio >= 0.5 ? 'r-good' : 'r-mid'}`}>
+                    {Math.round(s.goodRatio * 100)}%
+                  </span>
+                </div>
+              ))}
+              {sectorHeatAgg.length === 0 && <div className="psh-empty">暂无板块数据</div>}
+            </div>
+          </CardWrapper>
+        </div>
+      </>
+      )}
+
       {/* ── 顶部卡片 ── */}
       {activePolicySub === 'stats' && (
       <div className="top-cards">
@@ -333,10 +466,39 @@ export default function PolicyDashboard() {
           )}
         </CardWrapper>
 
+        {/* ── 列表筛选栏（互动性：搜索 + 板块 + 情绪三维度过滤）── */}
+        <div className="policy-filter-bar">
+          <input
+            className="policy-filter-input"
+            placeholder="🔍 搜索标题 / 关键词…"
+            value={filterKw}
+            onChange={(e) => setFilterKw(e.target.value)}
+          />
+          <select className="policy-filter-select" value={filterSector} onChange={(e) => setFilterSector(e.target.value)}>
+            <option value="">全部板块</option>
+            {((tl?.sector_groups || []).map((g) => g.sector)).filter((v, i, a) => a.indexOf(v) === i).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <select className="policy-filter-select" value={filterSentiment} onChange={(e) => setFilterSentiment(e.target.value)}>
+            <option value="">全部情绪</option>
+            <option value="利好">利好</option>
+            <option value="利空">利空</option>
+            <option value="中性">中性</option>
+          </select>
+          {(filterKw || filterSector || filterSentiment) && (
+            <button className="policy-filter-clear" onClick={() => { setFilterKw(''); setFilterSector(''); setFilterSentiment(''); }}>清除</button>
+          )}
+        </div>
+
         {/* ── 最新政策（细节更多的时间线）── */}
-        <h2 className="section-title">📰 最新政策动态</h2>
+        <h2 className="section-title">📰 最新政策动态
+          {filteredLatest.length !== (tl?.latest || []).length && (
+            <span className="policy-filter-count">（筛选 {filteredLatest.length} / {(tl?.latest || []).length}）</span>
+          )}
+        </h2>
         <div className="policy-latest-list">
-          {((tl && tl.latest) || []).map((p, i) => (
+          {filteredLatest.map((p, i) => (
             <PolicyListItem
               key={p.url || i}
               policy={p}
@@ -346,8 +508,10 @@ export default function PolicyDashboard() {
               onClick={() => setSelected(p)}
             />
           ))}
-          {((tl && tl.latest) || []).length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>该年暂无政策数据（请先采集）</div>
+          {filteredLatest.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {((tl && tl.latest) || []).length === 0 ? '该年暂无政策数据（请先采集）' : '无匹配筛选条件的政策'}
+            </div>
           )}
         </div>
 
@@ -479,6 +643,7 @@ function PolicyListItem({ policy, onHover, onMove, onLeave, onClick }) {
       <div className="policy-list-tags">
         {seps.map((s) => <span key={s} className="policy-sector-chip">{s}</span>)}
         {kws.slice(0, 5).map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
+        {kws.length > 0 && <span className="policy-link-hint">📈 含市场联动</span>}
         {policy.url && <span className="policy-link-hint">双击标题↗</span>}
       </div>
     </div>
@@ -579,6 +744,14 @@ function SectorListModal({ group, onClose, onPick }) {
 function PolicyDetailModal({ policy, onClose }) {
   // hooks 必须在任何 early return 之前调用，保证顺序稳定
   const detail = useMCP('policy_detail', policy && policy.url ? { url: policy.url } : null);
+  // ── 市场联动：政策 → 行业/个股 桥接（关键词为主 + 板块映射兜底）──
+  const linkKw = (policy && (policy.keywords || []).filter(Boolean).join(',')) || '';
+  const linkSec = (policy && (policy.sector || []).filter(Boolean).join(',')) || '';
+  const marketLink = useMCP('policy_market_link',
+    (policy && (linkKw || linkSec)) ? { keywords: linkKw, sector: linkSec, top_n: 8 } : null);
+  const navigate = useNavigate();
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const setActiveMesoSub = useAppStore((s) => s.setActiveMesoSub);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -589,6 +762,12 @@ function PolicyDetailModal({ policy, onClose }) {
   const body = parsed && parsed.body ? parsed.body : '';
   const seps = (policy.sector || []).filter(Boolean);
   const kws = (policy.keywords || []).filter(Boolean);
+  const link = marketLink.data ? safeParse(marketLink.data) : null;
+  const matchedIndustries = (link && link.matched_industries) || [];
+  const repStocks = (link && link.representative_stocks) || [];
+  // 跳转中观/个股：切 store + 路由到对应 tab
+  const gotoMeso = () => { setActiveTab('meso'); onClose(); };
+  const gotoMicro = () => { setActiveTab('micro'); onClose(); };
   return (
     <div className="policy-modal-overlay" onClick={onClose}>
       <div className="policy-modal" onClick={(e) => e.stopPropagation()} style={{ '--sector-color': (seps[0] && sectorColor(seps[0])) || '#C9A861' }}>
@@ -609,6 +788,58 @@ function PolicyDetailModal({ policy, onClose }) {
             {kws.map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
           </div>
         )}
+
+        {/* ── 市场联动面板（政策 → 行业/个股）── */}
+        <div className="policy-link-panel">
+          <div className="policy-link-head">
+            <span>📈 市场联动</span>
+            <span className="policy-link-method">
+              {link ? (link.link_method === 'keyword' ? '关键词桥接' : link.link_method === 'sector_map' ? '板块映射' : '关键词+板块') : ''}
+            </span>
+          </div>
+          {marketLink.loading && <div className="policy-link-loading">正在桥接相关行业与个股…</div>}
+          {!marketLink.loading && matchedIndustries.length > 0 && (
+            <>
+              <div className="policy-link-sub">相关行业（近期涨跌 / 主力净流入 / 龙头股）</div>
+              <div className="policy-link-industries">
+                {matchedIndustries.map((ind) => (
+                  <div key={ind.industry_code} className="policy-link-industry">
+                    <span className="pli-name">{ind.industry_name}</span>
+                    <span className={'pli-chg ' + ((ind.pct_change ?? 0) >= 0 ? 'up' : 'down')}>
+                      {ind.pct_change != null ? (ind.pct_change >= 0 ? '+' : '') + ind.pct_change + '%' : '—'}
+                    </span>
+                    <span className={'pli-flow ' + ((ind.net_inflow_yi ?? 0) >= 0 ? 'up' : 'down')}>
+                      {ind.net_inflow_yi != null ? (ind.net_inflow_yi >= 0 ? '+' : '') + ind.net_inflow_yi + '亿' : '—'}
+                    </span>
+                    {ind.leader_stock && (
+                      <span className="pli-leader" title="龙头股">{ind.leader_stock}{ind.leader_pct_change != null ? `(${ind.leader_pct_change >= 0 ? '+' : ''}${ind.leader_pct_change}%)` : ''}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {repStocks.length > 0 && (
+                <>
+                  <div className="policy-link-sub">代表个股（来自相关行业龙头）</div>
+                  <div className="policy-link-stocks">
+                    {repStocks.map((s) => (
+                      <span key={s.stock_name} className="policy-link-stock" title={`来自 ${s.from_industry}`}>
+                        {s.stock_name}{s.pct_change != null ? ` ${s.pct_change >= 0 ? '+' : ''}${s.pct_change}%` : ''}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="policy-link-actions">
+                <button className="policy-modal-btn" onClick={gotoMeso}>看中观行业 →</button>
+                <button className="policy-modal-btn" onClick={gotoMicro}>看个股微观 →</button>
+              </div>
+            </>
+          )}
+          {!marketLink.loading && matchedIndustries.length === 0 && (
+            <div className="policy-link-note">该政策暂无可桥接的行业关键词（无匹配行业板块）</div>
+          )}
+        </div>
+
         <div className="policy-modal-body">
           {detail.loading && <div className="policy-modal-loading">正在拉取原文摘要…</div>}
           {!detail.loading && body && <p>{body.length > 1800 ? body.slice(0, 1800) + '…' : body}</p>}

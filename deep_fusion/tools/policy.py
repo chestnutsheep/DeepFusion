@@ -16,6 +16,16 @@ from ..shared.policy_orgs import ORG_OFFICIAL_URLS as _OFFICIAL_LINKS
 _MONTH_NAMES = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
 
 
+def _val(v, default=""):
+    """解包 Field 默认值 — 兼容 MCP 框架传入的 FieldInfo 和直接 Python 调用。
+
+    详见 AGENTS.md「MCP 工具注册机制」。新增工具参数统一用此解包。
+    """
+    if hasattr(v, "default"):
+        return v.default if v.default is not None else default
+    return v if v is not None else default
+
+
 @mcp.tool(
     name="policy_collect",
     description="全站采集：国务院/统计局/央行/财政部/发改委/外管局 政策文件",
@@ -264,3 +274,218 @@ def policy_timeline(year: int | None = None) -> str:
         },
     }
     return json.dumps(result, ensure_ascii=False)
+
+
+# ── 政策板块 → 行业关键词桥接（兜底） ──
+# 关键词为主，板块映射兜底：政策 sector 用词较宏观（如"绿色能源"），
+# 直接映射为可命中 industry_classify.industry_name 的关键词集合。
+_SECTOR_TO_KEYWORDS: dict[str, list[str]] = {
+    "宏观金融": ["银行", "证券", "保险", "多元金融", "房地产", "信托", "期货", "数字货币", "金融科技"],
+    "房地产基建": ["房地产", "建筑", "建材", "水泥", "钢铁", "工程机械", "装修装饰", "园区开发", "装配式建筑"],
+    "绿色能源": ["光伏", "风电", "储能", "电力", "核电", "氢能", "电池", "新能源", "特高压", "电网", "水电", "绿电"],
+    "科技数字": ["半导体", "芯片", "人工智能", "软件", "计算机", "云计算", "大数据", "通信", "5G", "消费电子", "面板", "算力", "数据中心"],
+    "先进制造": ["工业母机", "机器人", "高端装备", "自动化", "军工", "航天", "无人机", "集成电路", "专精特新"],
+    "医疗健康": ["医药", "生物", "医疗", "疫苗", "创新药", "医疗器械", "中药", "CXO", "医疗服务"],
+    "消费民生": ["白酒", "食品", "饮料", "零售", "家电", "汽车", "旅游", "酒店", "餐饮", "纺织", "服装", "化妆品", "农牧"],
+    "农业农村": ["农业", "种业", "化肥", "农药", "养殖", "饲料", "乡村振兴", "农机"],
+    "教育人才": ["教育", "培训", "人力资源", "职业教育"],
+    "开放外贸": ["港口", "航运", "物流", "跨境电商", "外贸", "自贸港", "一带一路"],
+    "安全环保": ["环保", "水务", "燃气", "网络安全", "信创", "数据安全", "应急"],
+    "其他": [],
+}
+
+
+# ── 政策常用词 → 行业名片段 同义词扩展 ──
+# 政策口语（"新能源""储能"）≠ 行业分类名（"电池""能源金属"），
+# 展开同义词提升关键词命中率（行业分类口径固定，不强行改名）。
+_KEYWORD_SYNONYMS: dict[str, list[str]] = {
+    "新能源": ["光伏", "风电", "电池", "能源金属", "氢", "绿电", "电网", "核电", "水电", "特高压"],
+    "储能": ["电池", "光伏", "风电", "电网", "氢"],
+    "光伏": ["光伏", "电池", "能源金属"],
+    "风电": ["风电", "电力", "电网", "能源金属"],
+    "半导体": ["半导体", "芯片", "集成电路"],
+    "芯片": ["半导体", "芯片", "集成电路"],
+    "人工智能": ["人工智能", "算力", "计算机", "软件", "云计算", "大数据", "数据中心"],
+    "AI": ["人工智能", "算力", "计算机", "软件"],
+    "机器人": ["机器人", "自动化", "高端装备", "工业母机"],
+    "医药": ["医药", "生物", "医疗", "创新药", "中药", "CXO"],
+    "创新药": ["创新药", "医药", "生物", "CXO"],
+    "军工": ["军工", "航天", "无人机", "高端装备"],
+    "汽车": ["汽车", "新能源车", "电池", "零部件"],
+    "消费": ["白酒", "食品", "饮料", "零售", "家电", "汽车", "旅游", "酒店", "服装", "化妆品"],
+    "基建": ["建筑", "建材", "水泥", "钢铁", "工程机械", "房地产"],
+    "数字经济": ["软件", "计算机", "云计算", "大数据", "通信", "算力", "数据中心", "信创"],
+    "信创": ["信创", "软件", "计算机", "网络安全", "数据安全"],
+}
+
+
+def _policy_keywords_terms(keywords: str, sector: str) -> list[str]:
+    """把政策的 keywords + sector 展开为可匹配行业名的关键词集合。
+
+    关键词为主（含同义词扩展），板块映射兜底（SECTOR_TO_KEYWORDS 展开）。
+    """
+    terms: list[str] = []
+    if keywords:
+        for kw in re.split(r"[,，/、\s]+", keywords):
+            kw = kw.strip()
+            if not kw:
+                continue
+            terms.append(kw)
+            terms.extend(_KEYWORD_SYNONYMS.get(kw, []))
+    if sector:
+        for s in re.split(r"[,，/、\s]+", sector):
+            s = s.strip()
+            if s and s in _SECTOR_TO_KEYWORDS:
+                terms.extend(_SECTOR_TO_KEYWORDS[s])
+    # 去重保序
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in terms:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+@mcp.tool(
+    name="policy_market_link",
+    description=(
+        "政策→市场联动桥接：把一篇政策的 keywords / sector 映射到相关行业板块，"
+        "返回匹配行业的近期涨跌、资金净流入、龙头股（来自 meso_industry_fund_flow），"
+        "以及代表个股，打通政策与中观/微观数据的联动。供前端『市场联动』面板调用。"
+    ),
+)
+def policy_market_link(
+        keywords: str = Field("", description="政策关键词，逗号分隔，如 '新能源,光伏,储能'"),
+        sector: str = Field("", description="政策板块，逗号分隔，如 '绿色能源'；用于兜底映射"),
+        url: str = Field("", description="政策URL；若提供则从库中取该政策的 keywords/sector，可省略前两个参数"),
+        top_n: int = Field(8, description="返回的相关行业最多条数"),
+) -> str:
+    """返回 JSON：
+    - matched_industries: [{industry_name, industry_code, pct_change, net_inflow(亿元),
+                            leader_stock, leader_pct_change, match_terms}]
+    - representative_stocks: 从匹配行业龙头股去重汇总（最多 12 只）
+    - link_method: 'keyword' / 'sector_map' / 'both'
+    """
+    from ..shared.industry_db import get_classify, get_fund_flow
+
+    # 1. 解析关键词（解包 FieldInfo，兼容框架/直接调用）
+    url = _val(url)
+    keywords = _val(keywords)
+    sector = _val(sector)
+    if url:
+        from ..shared.policy_db import PolicyDB
+        doc = PolicyDB().get(url)
+        if not doc:
+            return json.dumps({"error": "未找到政策", "found": False}, ensure_ascii=False)
+        keywords = keywords or (doc.get("keywords") or "")
+        sector = sector or (doc.get("sector") or "")
+
+    terms = _policy_keywords_terms(keywords, sector)
+    if not terms:
+        return json.dumps(
+            {"error": "无可用关键词/板块，无法桥接", "found": False, "terms": []},
+            ensure_ascii=False,
+        )
+
+    # 2. 行业分类表（行业名 → code）
+    classify_df = get_classify("ths")
+    name_to_code = {
+        str(r["industry_name"]): str(r["industry_code"])
+        for _, r in classify_df.iterrows()
+    }
+    all_names = list(name_to_code.keys())
+
+    # 3. 关键词匹配行业名（包含即命中）
+    matched: dict[str, list[str]] = {}
+    for name in all_names:
+        hit_terms = [t for t in terms if t and t in name]
+        if hit_terms:
+            matched[name] = hit_terms
+
+    # 4. 资金流（含涨跌/龙头股）
+    ff_df = get_fund_flow(limit=200)
+    ff_by_name: dict[str, dict] = {}
+    for _, r in ff_df.iterrows():
+        ff_by_name[str(r["industry_name"])] = {
+            "industry_code": str(r["industry_code"]),
+            "pct_change": _to_float(r.get("industry_pct_change")),
+            "net_inflow": round(_to_float(r.get("net_amount")) or 0.0, 2),  # net_amount 单位已是亿元
+            "leader_stock": r.get("leader_stock"),
+            "leader_pct_change": _to_float(r.get("leader_pct_change")),
+            "company_count": _to_int(r.get("company_count")),
+        }
+
+    industries = []
+    for name, hit_terms in matched.items():
+        ff = ff_by_name.get(name)
+        if ff is None:
+            # 分类里有但资金流未覆盖（如该行业当日无行情），仍列出
+            ff = {"industry_code": name_to_code.get(name, ""), "pct_change": None,
+                  "net_inflow": None, "leader_stock": None, "leader_pct_change": None,
+                  "company_count": None}
+        industries.append({
+            "industry_name": name,
+            "industry_code": ff["industry_code"],
+            "pct_change": ff["pct_change"],
+            "net_inflow_yi": ff["net_inflow"],
+            "leader_stock": ff["leader_stock"],
+            "leader_pct_change": ff["leader_pct_change"],
+            "company_count": ff["company_count"],
+            "match_terms": hit_terms,
+        })
+
+    # 5. 排序：有资金流数据的优先（按净流入），其余靠后
+    industries.sort(
+        key=lambda x: (x["net_inflow_yi"] is not None, x["net_inflow_yi"] or 0),
+        reverse=True,
+    )
+    industries = industries[:top_n]
+
+    # 6. 代表个股（龙头股去重）
+    stocks: list[dict] = []
+    seen_stock: set[str] = set()
+    for ind in industries:
+        ls = ind.get("leader_stock")
+        if ls and ls not in seen_stock:
+            seen_stock.add(ls)
+            stocks.append({
+                "stock_name": ls,
+                "pct_change": ind.get("leader_pct_change"),
+                "from_industry": ind["industry_name"],
+            })
+        if len(stocks) >= 12:
+            break
+
+    # 7. 桥接方法标识
+    kw_only = bool(keywords) and not sector
+    sec_only = bool(sector) and not keywords
+    method = "both" if (keywords and sector) else ("keyword" if kw_only else ("sector_map" if sec_only else "keyword"))
+
+    result = {
+        "found": True,
+        "terms": terms,
+        "link_method": method,
+        "matched_count": len(industries),
+        "matched_industries": industries,
+        "representative_stocks": stocks,
+    }
+    return json.dumps(result, ensure_ascii=False)
+
+
+def _to_float(v):
+    try:
+        if v is None or v == "":
+            return None
+        return float(v)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_int(v):
+    try:
+        if v is None or v == "":
+            return None
+        return int(v)
+    except (ValueError, TypeError):
+        return None
