@@ -26,6 +26,8 @@ from .http_utils import http_get, http_get_json, parse_html
 from .regulatory_scraper import fetch_csrc, fetch_pbc, fetch_nfra, fetch_all as fetch_regulatory_all
 from .cls_scraper import fetch_cls_telegraph
 from .news_scraper import fetch_market_news, search_news, fetch_sina_roll
+from .xinhua_scraper import fetch_xinhua
+from .stcn_scraper import fetch_stcn
 
 
 def collect_regulatory(max_items: int = 15) -> list:
@@ -95,6 +97,30 @@ def search_news_cn(keyword: str, page: int = 1, page_size: int = 20) -> list:
         return []
 
 
+def collect_policy_signals(max_items: int = 20) -> list:
+    """政策吹风信号聚合：新华网（官方规划/会议吹风）+ 券商中国（券商平台吹风）。
+
+    补齐原采集调度缺口——用户每天在券商平台看到的"十五五文件 / 开会强调 xxxx 发展"
+    这类高价值政策信号，原 _FETCHERS 未覆盖。两源均直连无需代理。
+    返回统一结构 list[dict]：{date, title, url, org, org_code, summary}
+    """
+    out = []
+    for fn, label in ((fetch_xinhua, "新华网"), (fetch_stcn, "券商中国")):
+        try:
+            for it in fn(max_items=max_items):
+                out.append({
+                    "date": it.get("date", ""),
+                    "title": it.get("title", ""),
+                    "url": it.get("url", ""),
+                    "org": it.get("org", label),
+                    "org_code": it.get("org_code", ""),
+                    "summary": it.get("summary", ""),
+                })
+        except Exception as e:
+            print(f"[scrapers] collect_policy_signals {label} 失败: {e}")
+    return out
+
+
 def run_hot(platform: str = "all") -> dict:
     """调用本地 Node 热点脚本（hot/crawl-hot.js），行情外市场情绪/舆情热度源。
 
@@ -113,7 +139,23 @@ def run_hot(platform: str = "all") -> dict:
             capture_output=True, text=True, timeout=30)
         if proc.returncode != 0:
             return {"status": "error", "message": proc.stderr.strip() or "node 执行失败"}
-        return json.loads(proc.stdout)
+        raw = json.loads(proc.stdout)
+        # 归一化：脚本结构为 {results: {platform: {data: [...]}}}
+        # 提取为顶层 items，便于调用方统一消费；all 模式合并多平台。
+        items: list[dict] = []
+        results = raw.get("results") or {}
+        for _plat, blob in results.items():
+            if not isinstance(blob, dict):
+                continue
+            if not blob.get("success", True):
+                continue
+            for it in (blob.get("data") or []):
+                if isinstance(it, dict) and it.get("title"):
+                    it.setdefault("platform", _plat)
+                    items.append(it)
+        if not items:
+            return {"status": "error", "message": raw.get("message", "各平台无数据（可能需代理或接口变动）"), "items": []}
+        return {"status": "ok", "items": items, "by_platform": {k: len(v.get("data", [])) for k, v in results.items()}}
     except FileNotFoundError:
         return {"status": "error", "message": "node 未安装"}
     except Exception as e:
@@ -124,7 +166,9 @@ __all__ = [
     "http_get", "http_get_json", "parse_html",
     "fetch_csrc", "fetch_pbc", "fetch_nfra", "fetch_regulatory_all",
     "fetch_cls_telegraph", "fetch_market_news", "search_news", "fetch_sina_roll",
-    "collect_regulatory", "collect_cls", "collect_realtime", "search_news_cn", "run_hot",
+    "fetch_xinhua", "fetch_stcn",
+    "collect_regulatory", "collect_cls", "collect_realtime", "collect_policy_signals",
+    "search_news_cn", "run_hot",
 ]
 
 

@@ -4,8 +4,10 @@
 - 所有个股/指数日行情数据**只**经由本模块写入公共 SQL `market_data.db`；
   任何上层任务（Claw 定时任务、DeepFusion 工具、前端）都**只读**该库，禁止各自直连
   gtimg / Sina / akshare / 东方财富 现拉 K 线。
-- 取数优先使用 **Sina 直连端点**（`stock_zh_a_daily` / `stock_zh_index_daily`），
-  与 Claw 现有数据源一致且**无需代理**；重活（个股历史回填）不走东方财富。
+- 取数数据源优先级（项目约定 2026-08-19）：**通达信 > 腾讯 > 新浪 > 同花顺 > 东方财富**。
+  个股日 K 经 `quote_priority.fetch_stock_daily_priority` 按优先级降级（首个可达且非空源生效），
+  内置 Sina 直连作双保险兜底；取数通道选择不改动任何计算口径。
+- 指数日 K 默认走 **Sina 直连端点**（`stock_zh_index_daily`），无需代理且与 Claw 一致。
 - **按需懒加载 + 可选全量补齐**：任务查询某股时若库内缺失/过期，由本模块拉取写回；
   只有被查过的股票才进库，体积天然受控。历史深度可配置（默认 ~5 年交易日）。
 - 增量追加：用 `INSERT OR REPLACE`，只写比库内最新日期更新的行，不删旧数据。
@@ -19,6 +21,7 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from datetime import date, datetime, timedelta
@@ -49,6 +52,8 @@ except ImportError:  # 独立按文件加载时(桥接层/官方入口 venv 运�
 _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
+logger = logging.getLogger(__name__)
+
 DEFAULT_DB = os.getenv("MARKET_DATA_DB_PATH") or os.path.join(
     _REPO_ROOT, "data", "market_data.db"
 )
@@ -158,56 +163,70 @@ def fetch_stock_daily(
 ) -> list[dict]:
     """拉取单只个股日 K（前复权），返回 list[dict]，按日期升序。
 
-    使用 Sina 直连端点 stock_zh_a_daily（无需代理）。
+    数据源优先级（项目约定 2026-08-19）：
+        通达信 > 腾讯 > 新浪 > 同花顺 > 东方财富
+    统一经 ``quote_priority.fetch_stock_daily_priority`` 按优先级降级，
+    取首个可达且非空的源；不改动任何计算口径。Sina 直连作为无需代理的稳定兜底仍在链中。
+    若全部外部源失败，回退到本函数内置的 Sina 逻辑（双保险）。
     """
-    ak = _ak()
-    end = end or recent_trade_date()
-    cal_start = end - timedelta(days=int(days_back * 1.6))  # 日历日缓冲→交易日
-    symbol = f"{_market_of(code)}{code[-6:]}"
-    df = ak.stock_zh_a_daily(
-        symbol=symbol,
-        start_date=cal_start.strftime("%Y%m%d"),
-        end_date=end.strftime("%Y%m%d"),
-        adjust="qfq",
-    )
-    if df is None or df.empty:
-        return []
-    # akshare 不同版本列名可能为中文(日期/开盘…)或英文小写(date/open…)，统一兼容
-    _map = {
-        "date": ("date", "日期"),
-        "open": ("open", "开盘"),
-        "high": ("high", "最高"),
-        "low": ("low", "最低"),
-        "close": ("close", "收盘"),
-        "volume": ("volume", "成交量"),
-        "amount": ("amount", "成交额"),
-    }
+    from .quote_priority import fetch_stock_daily_priority
 
-    def _g(r, *keys):
-        for k in keys:
-            v = r.get(k)
-            if v is not None and not (isinstance(v, float) and v != v):  # v!=v 即 NaN
-                return v
-        return None
+    rows, src = fetch_stock_daily_priority(code, days_back=days_back)
+    if rows:
+        return rows
 
-    out = []
-    for _, r in df.iterrows():
-        d = _norm_date(_g(r, *_map["date"]))
-        if not d:
-            continue
-        out.append(
-            {
-                "code": code[-6:],
-                "date": d,
-                "open": _f(_g(r, *_map["open"])),
-                "high": _f(_g(r, *_map["high"])),
-                "low": _f(_g(r, *_map["low"])),
-                "close": _f(_g(r, *_map["close"])),
-                "volume": _f(_g(r, *_map["volume"])),
-                "amount": _f(_g(r, *_map["amount"])),
-            }
+    # 双保险：内置 Sina 直连（无需代理，与 Claw 现有数据源一致）
+    try:
+        ak = _ak()
+        end = end or recent_trade_date()
+        cal_start = end - timedelta(days=int(days_back * 1.6))  # 日历日缓冲→交易日
+        symbol = f"{_market_of(code)}{code[-6:]}"
+        df = ak.stock_zh_a_daily(
+            symbol=symbol,
+            start_date=cal_start.strftime("%Y%m%d"),
+            end_date=end.strftime("%Y%m%d"),
+            adjust="qfq",
         )
-    return out
+        if df is None or df.empty:
+            return []
+        _map = {
+            "date": ("date", "日期"),
+            "open": ("open", "开盘"),
+            "high": ("high", "最高"),
+            "low": ("low", "最低"),
+            "close": ("close", "收盘"),
+            "volume": ("volume", "成交量"),
+            "amount": ("amount", "成交额"),
+        }
+
+        def _g(r, *keys):
+            for k in keys:
+                v = r.get(k)
+                if v is not None and not (isinstance(v, float) and v != v):  # v!=v 即 NaN
+                    return v
+            return None
+
+        out = []
+        for _, r in df.iterrows():
+            d = _norm_date(_g(r, *_map["date"]))
+            if not d:
+                continue
+            out.append(
+                {
+                    "code": code[-6:],
+                    "date": d,
+                    "open": _f(_g(r, *_map["open"])),
+                    "high": _f(_g(r, *_map["high"])),
+                    "low": _f(_g(r, *_map["low"])),
+                    "close": _f(_g(r, *_map["close"])),
+                    "volume": _f(_g(r, *_map["volume"])),
+                    "amount": _f(_g(r, *_map["amount"])),
+                }
+            )
+        return out
+    except Exception as e:
+        logger.warning("fetch_stock_daily 全部源失败 %s: %s", code, e)
+        return []
 
 
 def fetch_index_daily(
@@ -247,7 +266,12 @@ def fetch_index_daily(
 
 
 def fetch_stock_info() -> list[dict]:
-    """拉取全市场代码→名称映射（一次性）。可能走东方财富，需要代理。"""
+    """拉取全市场代码→名称映射（一次性）。
+
+    数据源优先级（项目约定 2026-08-19）：通达信>腾讯>新浪>同花顺>东方财富。
+    其中基础信息（代码/名称/市值/行业）仅同花顺、东方财富提供，前三者不提供该
+    维度直接跳过，故此处按「同花顺 → 东方财富」两级降级；东方财富需代理。
+    """
     ak = _ak()
     df = ak.stock_info_a_code_name()
     if df is None or df.empty:

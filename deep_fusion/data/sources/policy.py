@@ -364,6 +364,38 @@ def fetch_policy_realtime(max_pages: int = 1, max_items: int = 15, cls_num: int 
     return out
 
 
+def fetch_policy_signals(max_pages: int = 1, max_items: int = 20) -> list[dict]:
+    """政策吹风信号（拓宽渠道）：新华网官方规划/会议吹风 + 券商中国券商平台吹风。
+
+    补齐原 _FETCHERS 缺口——用户每天在券商平台看到的"十五五文件 / 开会强调 xxxx 发展"
+    这类高价值政策信号，原采集调度未覆盖。两源均直连无需代理，url 为真实详情页。
+    返回 policy.py 标准记录（url 主键幂等写库）。
+    """
+    from .scrapers import collect_policy_signals
+    try:
+        rows = collect_policy_signals(max_items=max_items)
+    except Exception as e:
+        _LOGGER.warning("fetch_policy_signals 失败: %s", e)
+        return []
+    out = []
+    for r in rows:
+        url = r.get("url", "") or ""
+        if not url:
+            continue
+        out.append({
+            "url": url,
+            "title": r.get("title", ""),
+            "source": r.get("org", ""),
+            "organization": r.get("org", ""),
+            "publish_date": r.get("date", "") or datetime.now().strftime("%Y-%m-%d"),
+            "keywords": "",
+            "body": r.get("summary", "") or "",
+            "sentiment": "中性",
+            "_skip_detail": False,  # 真实详情页，保留 HTTP 正文抓取
+        })
+    return out
+
+
 # ── 统一调度 ─────────────────────────────────────────
 
 _FETCHERS: list[tuple[str, Callable]] = [
@@ -374,6 +406,7 @@ _FETCHERS: list[tuple[str, Callable]] = [
     ("发改委", fetch_ndrc),
     ("外管局", fetch_safe),
     ("实时政策", fetch_policy_realtime),
+    ("政策吹风", fetch_policy_signals),
 ]
 
 

@@ -221,6 +221,15 @@ score = 0.4 × norm(簇内平均相关) + 0.35 × norm(簇内5d动量均值) + 0
 
 ## 代理与数据源事实
 
+### 行情数据源权威优先级（2026-08-19 落地）
+**通达信 > 腾讯 > 新浪 > 同花顺 > 东方财富**
+
+- 语义：**按优先级从高到低依次尝试，取第一个「可达且返回非空」的源作为实际取数源**；未安装/不可达的源自动跳过，落到当前可用源。
+- 统一降级层：`deep_fusion/data/sources/quote_priority.py` 的 `fetch_stock_daily_priority(code, days_back)`，返回 `(数据, 实际源名)`；`tools/tech_indicators.py` 的 `fetch_kline` 与 `data/sources/market_collector.py` 的 `fetch_stock_daily` 均接入此层（Sina 直连作双保险兜底）。
+- 通达信（pytdx 原生 TCP，直连公共行情服务器 `180.153.18.170:7709`/`60.12.136.250:7709` 等，已实测可用；**不经 http 代理**，代理下反而连不上）。腾讯/新浪直连无需代理。同花顺/东方财富走 akshare 需代理（Clash Verge `7897`）。
+- 基础信息（代码/名称/市值/行业）仅同花顺、东方财富提供，故 `fetch_stock_info` 按「同花顺 → 东方财富」两级降级，前三者跳过。
+- **红线**：优先级层只做「通道选择」，***不改任何计算口径/信号公式***。
+
 - 东方财富（`push2.eastmoney.com`）需 HTTP 代理（推荐 Clash Verge 混合端口 `7897`）。非东方财富接口（新浪/同花顺/申万/OKX/Binance/腾讯自选股）直连不受影响，可作兜底。
 - 腾讯源（gtimg 行情、新浪日 K、westock-data 资金流）走直连，始终可用。
 - akshare 列名易错：`macro_china_pmi`→`制造业-指数`；`macro_china_m2_yearly`→值`今值`/日期`日期`；`macro_china_ppi`→`当月同比增长`。

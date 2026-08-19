@@ -489,3 +489,222 @@ def _to_int(v):
         return int(v)
     except (ValueError, TypeError):
         return None
+
+
+@mcp.tool(
+    name="policy_hot_signals",
+    description=(
+        "市场舆情热度信号（热点数据采集轮子）：调用本地 Node 热点脚本抓取抖音/微博/百度/"
+        "B站/快手实时热搜，作为政策市场关注度的舆情佐证。可筛选含政策/产业关键词的热度条目，"
+        "与 policy_daily / policy_market_link 联动。返回 JSON。"
+    ),
+)
+def policy_hot_signals(
+        platform: str = Field("all", description="平台: all|douyin|weibo|baidu|bilibili|kuaishou"),
+        keyword: str = Field("", description="仅保留标题含该关键词的热度条目（如 '政策,规划,会议'），空=返回全部"),
+        top_n: int = Field(20, description="返回条数上限"),
+) -> str:
+    """返回 JSON：
+    - status: ok | error
+    - platform
+    - count
+    - items: [{rank, title, hot, url, platform}]
+    """
+    from ..data.sources.scrapers import run_hot
+
+    platform = _val(platform, "all")
+    keyword = _val(keyword)
+    try:
+        top_n = int(top_n)
+    except (ValueError, TypeError):
+        top_n = 20
+
+    raw = run_hot(platform)
+    if raw.get("status") != "ok":
+        return json.dumps(
+            {"status": "error", "message": raw.get("message", "未知错误"), "platform": platform, "items": []},
+            ensure_ascii=False,
+        )
+
+    items = raw.get("items") or raw.get("data") or []
+    # 归一化字段（不同平台脚本输出字段名不一）
+    norm = []
+    for it in items:
+        title = it.get("title") or it.get("word") or it.get("name") or ""
+        if not title:
+            continue
+        norm.append({
+            "rank": it.get("rank") or it.get("position") or 0,
+            "title": title,
+            "hot": it.get("hot") or it.get("heat") or it.get("count") or "",
+            "url": it.get("url") or it.get("link") or "",
+            "platform": it.get("platform") or platform,
+        })
+
+    # 关键词过滤（逗号分隔，任一命中即保留）
+    if keyword:
+        kws = [k.strip() for k in keyword.split(",") if k.strip()]
+        if kws:
+            norm = [n for n in norm if any(k in n["title"] for k in kws)]
+
+    norm = norm[:top_n]
+    return json.dumps(
+        {"status": "ok", "platform": platform, "count": len(norm), "items": norm},
+        ensure_ascii=False,
+    )
+
+
+@mcp.tool(
+    name="policy_topic_stocks",
+    description=(
+        "政策主题→个股映射（股票题材猎手轮子）：对政策关键词/板块做『主题→个股』解析。"
+        "优先命中本地固化映射（theme_enrich，经 web_search 实测验证），并提供实时检索补全说明，"
+        "供 agent 在得到主题后进一步做受益股验证。返回 JSON。"
+    ),
+)
+def policy_topic_stocks(
+        topic: str = Field("", description="政策主题/关键词，如 '十五五·商业航天'、'半导体'、'低空经济'"),
+        use_static: bool = Field(True, description="是否优先使用本地固化映射（theme_enrich）"),
+        enrich_hint: bool = Field(True, description="是否返回『建议实时检索验证』的提示（题材猎手二阶传导）"),
+) -> str:
+    """返回 JSON：
+    - topic
+    - matched_static: 命中的本地固化受益股 [{code, name, reason, intensity, next_day}]
+    - static_hit: bool
+    - search_suggestion: 建议实时检索的查询串（题材猎手方法：主题+政策+A股受益股）
+    - note: 方法论说明
+    """
+    from ..data.sources.scrapers.theme_enrich import enrich_theme_targets
+
+    topic = _val(topic)
+    try:
+        use_static = bool(use_static)
+        enrich_hint = bool(enrich_hint)
+    except (ValueError, TypeError):
+        use_static, enrich_hint = True, True
+
+    if not topic:
+        return json.dumps({"error": "topic 不能为空", "topic": ""}, ensure_ascii=False)
+
+    matched = enrich_theme_targets(topic) if use_static else []
+    static_hit = bool(matched)
+
+    # 去重（按 code）
+    seen = set()
+    matched_unique = []
+    for m in matched:
+        if m["code"] in seen:
+            continue
+        seen.add(m["code"])
+        matched_unique.append(m)
+
+    suggestion = f"{topic} 政策 A股 受益股 龙头 产业链"
+    result = {
+        "topic": topic,
+        "static_hit": static_hit,
+        "matched_static": matched_unique,
+        "search_suggestion": suggestion if enrich_hint else "",
+        "note": (
+            "本地映射经 2026-08-10 web_search 实测验证；新主题（如最新十五五细分方向）"
+            "建议用 search_suggestion 实时检索补全，避免静态库滞后。"
+        ),
+    }
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool(
+    name="policy_daily_brief",
+    description=(
+        "政策每日要闻摘要（新闻摘要轮子，政策语境化）：基于已入库政策按日期聚合，"
+        "输出当日/指定日期的政策要闻摘要（机构分布、情绪倾向、关键主题、吹风信号）。"
+        "供前端『每日要闻』面板或定时任务播报调用。返回 JSON。"
+    ),
+)
+def policy_daily_brief(
+        date: str = Field("", description="指定日期 YYYY-MM-DD；空=取最新入库日"),
+        days: int = Field(1, description="聚合最近 N 天政策（date 为空时生效）"),
+) -> str:
+    """返回 JSON：
+    - date / range
+    - total
+    - by_org: {机构: 条数}
+    - sentiment: {利好, 中性, 利空}
+    - top_topics: [{topic, count}]（基于 keywords 词频）
+    - blow_signals: 吹风源条目 [{org, title, url}]
+    - summary: 一句话摘要文本
+    """
+    from ..shared.policy_db import PolicyDB
+
+    date = _val(date)
+    try:
+        days = max(1, int(days))
+    except (ValueError, TypeError):
+        days = 1
+
+    db = PolicyDB()
+    docs = db.search(limit=300)  # 取近期批量，本地聚合
+    if not docs:
+        return json.dumps({"error": "库为空", "total": 0}, ensure_ascii=False)
+
+    # 选定日期窗口
+    if date:
+        target = date
+        window = [d for d in docs if (d.get("publish_date") or "").startswith(target)]
+    else:
+        # 最新入库日
+        dates = sorted({ (d.get("publish_date") or "")[:10] for d in docs if d.get("publish_date") }, reverse=True)
+        if not dates:
+            return json.dumps({"error": "无有效日期", "total": 0}, ensure_ascii=False)
+        target = dates[0]
+        # 取最新 days 天
+        recent_dates = dates[:days]
+        window = [d for d in docs if (d.get("publish_date") or "")[:10] in recent_dates]
+
+    if not window:
+        return json.dumps({"error": f"无 {target} 政策", "date": target, "total": 0}, ensure_ascii=False)
+
+    by_org: dict[str, int] = defaultdict(int)
+    sentiment = {"利好": 0, "中性": 0, "利空": 0}
+    topic_freq: dict[str, int] = defaultdict(int)
+    blow: list[dict] = []
+    BLOW_ORG = {"新华网", "券商中国"}
+
+    for d in window:
+        org = d.get("organization") or d.get("source") or "未知"
+        by_org[org] += 1
+        s = d.get("sentiment") or "中性"
+        if s in sentiment:
+            sentiment[s] += 1
+        else:
+            sentiment["中性"] += 1
+        for kw in (d.get("keywords") or "").split(","):
+            kw = kw.strip()
+            if kw:
+                topic_freq[kw] += 1
+        if org in BLOW_ORG:
+            blow.append({"org": org, "title": d.get("title") or "", "url": d.get("url") or ""})
+
+    top_topics = sorted(
+        ({"topic": t, "count": c} for t, c in topic_freq.items()),
+        key=lambda x: x["count"], reverse=True
+    )[:8]
+
+    total = len(window)
+    s_str = f"利好{sentiment['利好']}/中性{sentiment['中性']}/利空{sentiment['利空']}"
+    summary = (
+        f"{target} 共 {total} 条政策（{s_str}），"
+        f"主要来自 {max(by_org, key=by_org.get) if by_org else '—'}，"
+        f"焦点：{(top_topics[0]['topic'] if top_topics else '—')}"
+        + (f"，含 {len(blow)} 条吹风信号" if blow else "")
+    )
+
+    return json.dumps({
+        "date": target,
+        "range": f"近 {days} 天" if not date else date,
+        "total": total,
+        "by_org": dict(sorted(by_org.items(), key=lambda x: x[1], reverse=True)),
+        "sentiment": sentiment,
+        "top_topics": top_topics,
+        "blow_signals": blow[:10],
+        "summary": summary,
+    }, ensure_ascii=False)

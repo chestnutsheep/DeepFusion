@@ -12,39 +12,26 @@ from ..shared.indicators import add_technical_indicators
 
 
 def fetch_kline(symbol: str, period: str = "daily") -> pd.DataFrame | None:
-    """获取股票 K 线，优先腾讯源 → akshare 东方财富回退。"""
-    market = "sh" if symbol.startswith("6") else "sz"
-    try:
-        # 腾讯源（稳定）
-        df = ak_cache(ak.stock_zh_a_daily, symbol=f"{market}{symbol}", adjust="qfq", ttl=3600)
-        if df is not None and not df.empty:
-            df = df.rename(columns={
-                "date": "trade_date", "open": "open", "close": "close",
-                "high": "high", "low": "low", "volume": "volume",
-            })
-            df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.strftime("%Y%m%d")
-            df = df.sort_values("trade_date")
-            return df
-    except Exception:
-        pass
+    """获取股票 K 线，按项目权威数据源优先级降级取数：
+    通达信 > 腾讯 > 新浪 > 同花顺 > 东方财富。
 
-    # 回退：东方财富源（偶尔被反爬）
-    try:
-        df = ak_cache(
-            ak.stock_zh_a_hist, symbol=symbol, period=period,
-            start_date="19700101", end_date="22220101", ttl=3600,
-        )
-        if df is not None and not df.empty:
-            df = df.rename(columns={
-                "日期": "trade_date", "开盘": "open", "收盘": "close",
-                "最高": "high", "最低": "low", "成交量": "volume",
-            })
-            df = df.sort_values("trade_date")
-            return df
-    except Exception:
-        pass
+    统一经 ``data/sources/quote_priority`` 的 ``fetch_stock_daily_priority``
+    （首个可达且非空的源生效），不改动任何计算口径。返回 akshare 风格的
+    列（trade_date/open/close/high/low/volume），与下游 add_technical_indicators 一致。
+    """
+    from ..data.sources.quote_priority import fetch_stock_daily_priority
 
-    return None
+    rows, src = fetch_stock_daily_priority(symbol, days_back=800)
+    if not rows:
+        return None
+    df = pd.DataFrame(rows)
+    df = df.rename(columns={
+        "date": "trade_date", "open": "open", "close": "close",
+        "high": "high", "low": "low", "volume": "volume",
+    })
+    df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.strftime("%Y%m%d")
+    df = df.sort_values("trade_date")
+    return df
 
 
 @mcp.tool(

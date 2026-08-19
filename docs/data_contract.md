@@ -52,8 +52,12 @@ index_daily(code TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL,
 3. **口径统一**：前复权、交易日维度、代码 6 位、日期 `YYYY-MM-DD`，全局一致。
 4. **幂等写入**：收集器用 `INSERT OR REPLACE`，只追加比库内更新的行，不删历史。
 
-> 取数底层优先用 **Sina 直连端点**（`stock_zh_a_daily` / `stock_zh_index_daily`），
-> 与 Claw 现有数据源一致且**无需代理**；仅 `stock_info`（代码→名称）走东方财富，需代理。
+> **行情数据源权威优先级（2026-08-19 落地）：通达信 > 腾讯 > 新浪 > 同花顺 > 东方财富**。
+> 个股日 K 经 `deep_fusion/data/sources/quote_priority.py` 的 `fetch_stock_daily_priority`
+> 按优先级降级（首个可达且非空的源生效）；通达信（pytdx 原生 TCP 直连，已实测可用）最高优先级，
+> 腾讯/新浪直连无需代理，同花顺/东方财富需代理。内置 Sina 直连作双保险兜底。
+> 指数日 K 默认 Sina 直连（`stock_zh_index_daily`，无需代理）；基础信息（代码/名称）仅同花顺、东方财富提供，
+> `fetch_stock_info` 按「同花顺 → 东方财富」两级降级。优先级层只做通道选择，不改计算口径。
 
 ---
 

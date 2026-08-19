@@ -51,6 +51,9 @@ export default function PolicyDashboard() {
   // ── 动态数据源 ──
   const stats = useMCP('policy_stats');
   const timeline = useMCP('policy_timeline', { year: timelineYear });
+  // ── 现成轮子接入：每日要闻(新闻摘要) + 舆情热度(热点数据采集) ──
+  const dailyBrief = useMCP('policy_daily_brief', { days: 7 });
+  const hotSignals = useMCP('policy_hot_signals', { platform: 'douyin', keyword: '政策,规划,会议,发布,条例,发展', top_n: 8 });
 
   // ── 刷新（触发后端采集） ──
   const queryClient = useQueryClient();
@@ -321,6 +324,56 @@ export default function PolicyDashboard() {
       </>
       )}
 
+      {/* ── 现成轮子：每日要闻 + 舆情热度 ── */}
+      {activePolicySub === 'stats' && (
+      <div className="policy-extra-grid">
+        {/* 每日要闻（新闻摘要轮子，政策语境化） */}
+        <CardWrapper className="policy-brief" hoverable={false}>
+          <SectionHeader badge="DAILY" title="每日要闻" highlight="政策播报" desc={dailyBrief.data ? `近 7 天 · ${dailyBrief.data.total} 条` : '聚合入库政策'} />
+          {dailyBrief.isLoading && <div className="pe-loading">加载中…</div>}
+          {dailyBrief.data && (
+            <div className="pb-body">
+              <div className="pb-summary">{dailyBrief.data.summary}</div>
+              <div className="pb-topics">
+                {dailyBrief.data.top_topics.slice(0, 6).map((t) => (
+                  <span key={t.topic} className="pb-topic-pill">{t.topic}<i>{t.count}</i></span>
+                ))}
+              </div>
+              {dailyBrief.data.blow_signals.length > 0 && (
+                <div className="pb-blow">
+                  <span className="pb-blow-label">🌬 吹风信号</span>
+                  {dailyBrief.data.blow_signals.slice(0, 3).map((b, i) => (
+                    <a key={i} href={b.url} target="_blank" rel="noreferrer" className="pb-blow-item">{b.title}</a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardWrapper>
+
+        {/* 舆情热度（热点数据采集轮子：实时热搜） */}
+        <CardWrapper className="policy-hot" hoverable={false}>
+          <SectionHeader badge="HOT" title="舆情热度" highlight="实时热搜" desc="抖音热搜中含政策/产业关键词" />
+          {hotSignals.isLoading && <div className="pe-loading">加载中…</div>}
+          {hotSignals.data && hotSignals.data.status === 'ok' && (
+            <div className="ph-list">
+              {hotSignals.data.items.map((it, i) => (
+                <div key={i} className="ph-row">
+                  <span className="ph-rank">{i + 1}</span>
+                  <span className="ph-title">{it.title}</span>
+                  {it.hot ? <span className="ph-heat">{(Number(it.hot) / 10000).toFixed(0)}w</span> : null}
+                </div>
+              ))}
+              {hotSignals.data.items.length === 0 && <div className="pe-empty">当前无政策相关热搜</div>}
+            </div>
+          )}
+          {hotSignals.data && hotSignals.data.status !== 'ok' && (
+            <div className="pe-empty">热搜源暂不可用（{hotSignals.data.message || '接口变动'}）</div>
+          )}
+        </CardWrapper>
+      </div>
+      )}
+
       {/* ── 顶部卡片 ── */}
       {activePolicySub === 'stats' && (
       <div className="top-cards">
@@ -548,6 +601,19 @@ export default function PolicyDashboard() {
       </div>
       )}
 
+      {/* ── 信号源覆盖说明（吹风缺口补强）── */}
+      {activePolicySub === 'stats' && (
+      <div className="links-section">
+        <div className="links-header"><h2>📡 信号覆盖</h2></div>
+        <div className="coverage-note">
+          <span className="coverage-pill coverage-official">官方源</span>
+          <span>国务院 · 统计局 · 央行 · 财政部 · 发改委 · 外管局 · 证监会 · 央行 · 实时快讯</span>
+          <span className="coverage-pill coverage-blow">吹风源</span>
+          <span>新华网（规划/会议吹风）+ 券商中国（券商平台吹风）—— 覆盖「十五五文件 / 开会强调 xxxx 发展」类高价值信号</span>
+        </div>
+      </div>
+      )}
+
       {/* ── 采集管理 ── */}
       {activePolicySub === 'collect' && (
       <div className="links-section">
@@ -620,6 +686,9 @@ function sentimentTag(sent) {
 function PolicyListItem({ policy, onHover, onMove, onLeave, onClick }) {
   const seps = (policy.sector || []).filter(Boolean);
   const kws = (policy.keywords || []).filter(Boolean);
+  // 吹风类信号源（券商平台/官方吹风，覆盖十五五/会议强调缺口）
+  const BLOW_SOURCE = new Set(["新华网", "券商中国"]);
+  const isBlow = BLOW_SOURCE.has(policy.org);
   return (
     <div
       className="policy-list-item"
@@ -644,6 +713,7 @@ function PolicyListItem({ policy, onHover, onMove, onLeave, onClick }) {
         {seps.map((s) => <span key={s} className="policy-sector-chip">{s}</span>)}
         {kws.slice(0, 5).map((k) => <span key={k} className="policy-kw-chip">{k}</span>)}
         {kws.length > 0 && <span className="policy-link-hint">📈 含市场联动</span>}
+        {isBlow && <span className="policy-blow-hint">🌬 吹风/{policy.org}</span>}
         {policy.url && <span className="policy-link-hint">双击标题↗</span>}
       </div>
     </div>
