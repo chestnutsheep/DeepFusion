@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useMCP } from "../../hooks/useMCP.js";
 import CardWrapper from "../common/CardWrapper.jsx";
 import ErrorBoundary from "../common/ErrorBoundary.jsx";
@@ -638,11 +638,26 @@ export function QualityStockWidget() {
                 <span style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)" }}>{s.code}</span>
               </div>
               <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", marginTop: 4 }}>
-                现价 {s.price ?? "—"} · 质量评分 {s.quality ?? "—"}
+                现价 {s.price ?? "—"} · 质量评分 <b style={{ color: Number(s.quality) >= 65 ? "#5BAE7A" : "#C0584F" }}>{s.quality ?? "—"}</b>
               </div>
-              {s.reason && (
-                <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
-                  {s.reason}
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 9 }}>
+                {[
+                  ["技术", s.tech?.score], ["政策", s.policy?.score], ["舆情", s.sent?.score],
+                  ["风格", s.style?.score], ["质地", s.qual?.score],
+                ].map(([label, value]) => (
+                  <span key={label} style={{ fontSize: "var(--fs-2xs)", padding: "3px 6px", borderRadius: 5, color: value == null ? "var(--text-muted)" : Number(value) >= 60 ? "#5BAE7A" : "#C0584F", background: "rgba(255,255,255,0.045)", border: "1px solid var(--border-subtle)" }}>
+                    {label} {value == null ? "待补" : value}
+                  </span>
+                ))}
+              </div>
+              {s.selection?.reasons?.length > 0 && (
+                <div style={{ fontSize: "var(--fs-2xs)", color: "#C0584F", marginTop: 8, lineHeight: 1.5 }}>
+                  未通过硬门槛：{s.selection.reasons.join("、")}
+                </div>
+              )}
+              {s.logic && (
+                <div style={{ fontSize: "var(--fs-2xs)", color: "var(--text-muted)", marginTop: 7, lineHeight: 1.5 }}>
+                  {s.logic}
                 </div>
               )}
             </CardWrapper>

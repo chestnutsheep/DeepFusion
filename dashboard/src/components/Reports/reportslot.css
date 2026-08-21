@@ -58,21 +58,47 @@
   font-size: var(--fs-sm); color: var(--text-muted); padding: 12px 0;
 }
 .invest-theme-widget .theme-card {
-  background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle);
-  border-radius: 10px; padding: 12px 14px;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(255,255,255,0.018));
+  border: 1px solid rgba(201,168,97,0.18); border-radius: 14px; padding: 16px 17px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.invest-theme-widget .theme-card::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: linear-gradient(180deg, var(--accent-gold), rgba(201,168,97,0.05));
+}
+.invest-theme-widget .theme-card:hover {
+  transform: translateY(-2px); border-color: rgba(201,168,97,0.46);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.22);
 }
 .invest-theme-widget .theme-head {
-  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+  display: flex; align-items: flex-start; gap: 12px; justify-content: space-between;
+}
+.invest-theme-widget .theme-title-wrap { display: flex; flex-direction: column; gap: 3px; }
+.invest-theme-widget .theme-kicker {
+  color: var(--accent-gold); font-size: 9px; letter-spacing: .16em; opacity: .75;
 }
 .invest-theme-widget .theme-name {
-  font-size: var(--fs-md); font-weight: 700; color: var(--text-primary);
+  font-size: clamp(var(--fs-md), 2vw, var(--fs-lg)); font-weight: 750; color: var(--text-primary);
 }
-.invest-theme-widget .theme-sentiment {
-  font-size: var(--fs-xs); font-weight: 600;
+.invest-theme-widget .theme-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.invest-theme-widget .theme-sentiment, .invest-theme-widget .theme-intensity {
+  font-size: var(--fs-xs); font-weight: 650; white-space: nowrap;
 }
+.invest-theme-widget .theme-intensity i {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 8px currentColor; vertical-align: 1px;
+}
+.invest-theme-widget .theme-metrics {
+  display: flex; gap: 16px; flex-wrap: wrap; margin: 13px 0 10px; padding: 9px 11px;
+  background: rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.06); border-radius: 9px;
+  color: var(--text-muted); font-size: var(--fs-2xs);
+}
+.invest-theme-widget .theme-metrics b { color: var(--text-primary); font-size: var(--fs-sm); margin-right: 3px; }
 .invest-theme-widget .theme-summary {
-  font-size: var(--fs-sm); color: var(--text-secondary); margin-top: 6px;
-  line-height: 1.5;
+  font-size: var(--fs-sm); color: var(--text-secondary); margin-top: 8px;
+  line-height: 1.65; letter-spacing: .01em;
 }
 .invest-theme-widget .theme-sources {
   display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
@@ -83,8 +109,10 @@
 }
 .invest-theme-widget .theme-targets { margin-top: 10px; }
 .invest-theme-widget .targets-title {
-  font-size: var(--fs-xs); color: var(--text-muted); margin-bottom: 6px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: var(--fs-xs); color: var(--text-secondary); margin-bottom: 7px;
 }
+.invest-theme-widget .targets-title em { color: var(--text-muted); font-size: var(--fs-2xs); font-style: normal; font-weight: 400; }
 .invest-theme-widget .targets-table {
   width: 100%; border-collapse: collapse; font-size: var(--fs-xs);
 }

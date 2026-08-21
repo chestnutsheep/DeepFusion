@@ -23,6 +23,7 @@ export function computeMarketScene() {
 
 export const useAppStore = create((set) => ({
   activeTab: 'macro',
+  activeDailySub: 'overview',
   activeMacroSub: 'kitchin',
   activeMesoSub: 'signals',
   activeMicroSub: 'standby',
@@ -37,6 +38,7 @@ export const useAppStore = create((set) => ({
   boardAutoRefresh: false,    // 看板自动刷新(60s)
   dataScene: computeMarketScene(),  // 数据场景: live/closed/offday
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveDailySub: (sub) => set({ activeDailySub: sub }),
   setActiveMacroSub: (sub) => set({ activeMacroSub: sub }),
   setActiveMesoSub: (sub) => set({ activeMesoSub: sub }),
   setActiveMicroSub: (sub) => set({ activeMicroSub: sub }),

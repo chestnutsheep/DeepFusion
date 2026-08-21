@@ -3,7 +3,7 @@ import os
 import sys
 import threading
 import warnings
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 # 抑制 websockets 14+/uvicorn 0.46 的 legacy 弃用警告（不影响功能）
 # 注：实际生效点在 deep_fusion/logging_config.py（其 simplefilter("default") 会清空早期 filter）
@@ -50,6 +50,13 @@ _load_tools()
 
 configure_logging(os.getenv('DF_LOG_LEVEL', 'WARNING'))
 _LOGGER = get_logger(__name__)
+
+# 先建齐日报/连板/日历表，再启动后台线程，避免两个每日模块首轮因缺表失败。
+try:
+    from deep_fusion.reports.store import init_db as _init_reports_db
+    _init_reports_db()
+except Exception as e:
+    _LOGGER.warning("reports_db_init_failed", error=str(e))
 
 
 async def call_tool(request: Request) -> JSONResponse:
@@ -235,7 +242,7 @@ def _daily_data_collect_loop():
         now = datetime.now()
         next_run = now.replace(hour=16, minute=30, second=0, microsecond=0)
         if now >= next_run:
-            next_run += datetime.timedelta(days=1)
+            next_run += timedelta(days=1)
         wait_sec = max(60, (next_run - now).total_seconds())
         _LOGGER.info("daily_collect_next", next_run=str(next_run), wait_sec=wait_sec)
         time.sleep(wait_sec)
@@ -270,16 +277,26 @@ def _daily_report_loop():
         nxt = now.replace(hour=16, minute=0, second=0, microsecond=0)
         if now >= nxt:
             nxt += timedelta(days=1)
+        while nxt.weekday() >= 5:
+            nxt += timedelta(days=1)
         return nxt
+
+    # 文档约定为交易日 16:00 执行，启动时不能立即触发重型联网任务。
+    initial_next = _next_run_dt()
+    initial_wait = max(0, (initial_next - datetime.now()).total_seconds())
+    _LOGGER.info("daily_report_next", next_run=str(initial_next), wait_sec=initial_wait)
+    time.sleep(initial_wait)
 
     while True:
         today = date.today()
         weekday = today.weekday()  # 0=周一 ... 6=周日
 
-        # 周末非交易日：跳过往后睡，避免无谓联网（节假日接口返回空也不崩，此处仅省资源）
+        # 周末非交易日：睡到下一个工作日 16:00，避免每小时空转。
         if weekday >= 5:
-            _LOGGER.info("daily_report_skip_weekend", date=str(today))
-            time.sleep(3600)
+            next_run = _next_run_dt()
+            wait_sec = max(60, (next_run - datetime.now()).total_seconds())
+            _LOGGER.info("daily_report_skip_weekend", date=str(today), next_run=str(next_run))
+            time.sleep(wait_sec)
             continue
 
         _LOGGER.info("daily_report_start", date=str(today), weekday=weekday)

@@ -25,23 +25,43 @@ function parseJSON(str, fallback) {
 function ThemeCard({ theme }) {
   const t = theme || {};
   const targets = t.targets || [];
+  const sources = t.sources || [];
+  const sentiment = t.sentiment || "中性";
+  const intensity = t.intensity || "中";
+  const positiveTargets = targets.filter((x) => {
+    const pct = Number(x?.next_day?.pct ?? x?.pct);
+    return Number.isFinite(pct) && pct > 0;
+  }).length;
   return (
     <div className="theme-card">
       <div className="theme-head">
-        <span className="theme-name">{t.theme || "未命名主题"}</span>
-        <span className="theme-sentiment" style={{ color: SENTIMENT_COLOR[t.sentiment] || "#7a8aa0" }}>
-          {t.sentiment || "中性"}
-        </span>
+        <div className="theme-title-wrap">
+          <span className="theme-kicker">THEME SIGNAL</span>
+          <span className="theme-name">{t.theme || "未命名主题"}</span>
+        </div>
+        <div className="theme-badges">
+          <span className="theme-intensity" style={{ color: INTENSITY_COLOR[intensity] || "#7a8aa0" }}>
+            <i /> {intensity}强度
+          </span>
+          <span className="theme-sentiment" style={{ color: SENTIMENT_COLOR[sentiment] || "#7a8aa0" }}>
+            {sentiment}
+          </span>
+        </div>
+      </div>
+      <div className="theme-metrics">
+        <span><b>{targets.length}</b> 关联标的</span>
+        <span><b>{positiveTargets}</b> 次日正向</span>
+        <span><b>{sources.length}</b> 信息源</span>
       </div>
       {t.summary && <div className="theme-summary">{t.summary}</div>}
-      {t.sources && t.sources.length > 0 && (
+      {sources.length > 0 && (
         <div className="theme-sources">
-          {t.sources.map((s, i) => <span key={i} className="src-tag">{s}</span>)}
+          {sources.map((s, i) => <span key={i} className="src-tag">{s}</span>)}
         </div>
       )}
       {targets.length > 0 && (
         <div className="theme-targets">
-          <div className="targets-title">关联标的（次日回测）</div>
+          <div className="targets-title"><span>关联标的</span><em>按催化强度排序 · 含次日表现</em></div>
           <table className="targets-table">
             <thead>
               <tr><th>代码</th><th>名称</th><th>当日</th><th>强度</th><th>次日</th><th>说明</th></tr>
